@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity"
+    android:background="@color/white">
+
+    <ImageView
+        android:id="@+id/main_logo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:src="@drawable/socially_logo">
+
+    </ImageView>
+
+    <TextView
+        android:id="@+id/SMD"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:text="@string/SMD"
+        android:textSize="48dp"
+        android:textColor="@color/smd_theme"
+        android:fontFamily="@font/instagram_sans_bold"
+        android:layout_marginBottom="24dp">
+
+    </TextView>
+
+    <TextView
+        android:id="@+id/from"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/SMD"
+        android:layout_centerHorizontal="true"
+        android:text="@string/from"
+        android:textSize="18dp"
+        android:textColor="@color/gray"
+        android:fontFamily="@font/instagram_sans"
+        android:layout_marginBottom="8dp">
+
+    </TextView>
+
+</RelativeLayout>

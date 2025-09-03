@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/login_gradient">
+
+    <TextView
+        android:id="@+id/Socially"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Socially"
+        android:textSize="36dp"
+        android:textColor="@color/white"
+        android:fontFamily="@font/instagram_sans"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="15dp">
+
+    </TextView>
+
+    <ImageView
+        android:layout_width="50dp"
+        android:layout_height="75dp"
+        android:src="@drawable/left_arrow"
+        android:layout_toLeftOf="@+id/Socially"
+        android:layout_marginRight="30dp"
+        android:id="@+id/left_arrow">
+
+    </ImageView>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/Socially"
+        android:text="@string/login_message"
+        android:textColor="@color/white"
+        android:fontFamily="@font/instagram_sans"
+        android:layout_centerInParent="true"
+        android:textSize="20dp"
+        android:id="@+id/Sign_up_text">
+
+    </TextView>
+
+    <FrameLayout
+        android:layout_width="125dp"
+        android:layout_height="125dp"
+        android:layout_below="@+id/Sign_up_text"
+        android:layout_centerInParent="true"
+        android:layout_marginTop="3dp"
+        android:id="@+id/Profile_circle">
+
+        <ImageView
+            android:layout_width="150dp"
+            android:layout_height="150dp"
+            android:src="@drawable/circling"
+            android:layout_gravity="center">
+
+        </ImageView>
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/cam"
+            android:layout_gravity="center">
+
+        </ImageView>
+
+    </FrameLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Username"
+        android:textColor="@color/white"
+        android:fontFamily="@font/instagram_sans_bold"
+        android:layout_below="@+id/Profile_circle"
+        android:layout_marginLeft="20dp"
+        android:textSize="18dp"
+        android:id="@+id/Username"
+        >
+
+    </TextView>
+
+    <EditText
+        android:layout_width="350dp"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/Username"
+        android:hint="Rayaan Raza"
+        android:layout_marginLeft="18dp"
+        android:textColor="@color/white"
+        android:backgroundTint="@color/white"
+        android:textColorHint="@color/white"
+        android:fontFamily="@font/instagram_sans"
+        android:textSize="12dp"
+        android:id="@+id/Username_input"
+        android:layout_marginTop="3dp"
+        >
+
+    </EditText>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Your Name"
+        android:textColor="@color/white"
+        android:fontFamily="@font/instagram_sans_bold"
+        android:layout_below="@+id/Username_input"
+        android:layout_marginLeft="20dp"
+        android:textSize="18dp"
+        android:id="@+id/your_name"
+        android:layout_marginTop="5dp"
+        >
+
+    </TextView>
+
+    <EditText
+        android:layout_width="350dp"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/your_name"
+        android:hint="Rayaan Raza"
+        android:layout_marginLeft="18dp"
+        android:textColor="@color/white"
+        android:backgroundTint="@color/white"
+        android:textColorHint="@color/white"
+        android:fontFamily="@font/instagram_sans"
+        android:textSize="12dp"
+        android:id="@+id/your_name_input"
+        android:layout_marginTop="3dp"
+        >
+
+    </EditText>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Last Name"
+        android:textColor="@color/white"
+        android:fontFamily="@font/instagram_sans_bold"
+        android:layout_below="@+id/your_name_input"
+        android:layout_marginLeft="20dp"
+        android:textSize="18dp"
+        android:id="@+id/last_name"
+        android:layout_marginTop="5dp"
+        >
+
+    </TextView>
+
+    <EditText
+        android:layout_width="350dp"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/last_name"
+        android:hint="Rayaan Raza"
+        android:layout_marginLeft="18dp"
+        android:textColor="@color/white"
+        android:backgroundTint="@color/white"
+        android:textColorHint="@color/white"
+        android:fontFamily="@font/instagram_sans"
+        android:textSize="12dp"
+        android:id="@+id/last_name_input"
+        android:layout_marginTop="3dp"
+        >
+
+    </EditText>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Date of Birth"
+        android:textColor="@color/white"
+        android:fontFamily="@font/instagram_sans_bold"
+        android:layout_below="@id/last_name_input"
+        android:layout_marginLeft="20dp"
+        android:textSize="18dp"
+        android:id="@+id/date_of_birth"
+        android:layout_marginTop="5dp">
+
+    </TextView>
+
+    <EditText
+        android:layout_width="350dp"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/date_of_birth"
+        android:hint="DD-MM-YYYY"
+        android:layout_marginLeft="18dp"
+        android:textColor="@color/white"
+        android:backgroundTint="@color/white"
+        android:textColorHint="@color/white"
+        android:fontFamily="@font/instagram_sans"
+        android:textSize="12dp"
+        android:id="@+id/date_of_birth_input"
+        android:layout_marginTop="3dp">
+
+    </EditText>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="E-mail"
+        android:textColor="@color/white"
+        android:fontFamily="@font/instagram_sans_bold"
+        android:layout_below="@id/date_of_birth_input"
+        android:layout_marginLeft="20dp"
+        android:textSize="18dp"
+        android:id="@+id/email"
+        android:layout_marginTop="5dp">
+
+    </TextView>
+
+    <EditText
+        android:layout_width="350dp"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/email"
+        android:hint="Enter E-mail"
+        android:layout_marginLeft="18dp"
+        android:textColor="@color/white"
+        android:backgroundTint="@color/white"
+        android:textColorHint="@color/white"
+        android:fontFamily="@font/instagram_sans"
+        android:textSize="12dp"
+        android:id="@+id/email_input"
+        android:layout_marginTop="3dp"
+        android:inputType="textEmailAddress">
+
+    </EditText>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Password"
+        android:textColor="@color/white"
+        android:fontFamily="@font/instagram_sans_bold"
+        android:layout_below="@id/email_input"
+        android:layout_marginLeft="20dp"
+        android:textSize="18dp"
+        android:id="@+id/password"
+        android:layout_marginTop="5dp">
+
+    </TextView>
+
+    <EditText
+        android:layout_width="350dp"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/password"
+        android:hint="Enter Password"
+        android:layout_marginLeft="18dp"
+        android:textColor="@color/white"
+        android:backgroundTint="@color/white"
+        android:textColorHint="@color/white"
+        android:fontFamily="@font/instagram_sans"
+        android:textSize="12dp"
+        android:id="@+id/password_input"
+        android:layout_marginTop="3dp"
+        android:inputType="textPassword">
+
+    </EditText>
+
+
+<Button
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="Button"
+
+
+
+
+
+</RelativeLayout>
