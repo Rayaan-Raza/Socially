@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".login_sign"
+    android:background="@color/white">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:text="Socially"
+        android:fontFamily="@font/instagram_sans_bold"
+        android:textColor="@color/smd_theme"
+        android:textSize="48dp"
+        android:id="@+id/Socially"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="170dp">
+    </TextView>
+
+    <ImageView
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_gravity="center"
+        android:paddingTop="5dp"
+        android:src="@drawable/circling"
+        android:id="@+id/pfp"
+        android:layout_below="@id/Socially"
+        android:layout_centerInParent="true"
+        android:layout_marginTop="60dp">
+
+    </ImageView>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/username"
+        android:text="Username"
+        android:textColor="@color/black"
+        android:fontFamily="@font/instagram_sans_medium"
+        android:layout_below="@id/pfp"
+        android:layout_centerInParent="true"
+        android:textSize="18dp"
+        android:layout_marginTop="20dp">
+
+    </TextView>
+
+    <com.google.android.material.button.MaterialButton
+        android:layout_width="250dp"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/username"
+        android:backgroundTint="@color/smd_theme"
+        android:layout_centerInParent="true"
+        app:cornerRadius="6dp"
+        android:text="Log In"
+        android:textColor="@color/white"
+        android:layout_marginTop="12dp"
+        android:id="@+id/log_in"
+        android:gravity="center">
+
+    </com.google.android.material.button.MaterialButton>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/switch_acc"
+        android:text="Switch Accounts"
+        android:textColor="@color/smd_theme"
+        android:fontFamily="@font/instagram_sans_medium"
+        android:layout_below="@id/log_in"
+        android:layout_centerInParent="true"
+        android:textSize="16dp"
+        android:layout_marginTop="20dp">
+
+    </TextView>
+
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/Sign_up_text"
+        android:text="Don't have an account?"
+        android:textColor="@color/smd_theme"
+        android:fontFamily="@font/instagram_sans_light"
+        android:layout_alignParentBottom="true"
+       android:layout_marginLeft="110dp"
+        android:textSize="13dp"
+        android:layout_marginBottom="20dp">
+
+    </TextView>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/Sign_up"
+        android:text="Sign Up"
+        android:textColor="@color/smd_theme"
+        android:fontFamily="@font/instagram_sans_bold"
+        android:textSize="13dp"
+        android:layout_marginBottom="20dp"
+        android:layout_toRightOf="@id/Sign_up_text"
+        android:layout_alignParentBottom="true"
+        android:layout_marginLeft="2dp"
+        >
+
+    </TextView>
+
+
+
+
+
+</RelativeLayout>

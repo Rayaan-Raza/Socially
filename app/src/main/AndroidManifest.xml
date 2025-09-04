@@ -12,7 +12,27 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.I230535">
         <activity
+            android:name=".home_page"
+            android:exported="false" />
+        <activity
+            android:name=".switch_account"
+            android:exported="false" />
+        <activity
+            android:name=".signup_page"
+            android:exported="false" />
+        <activity
+            android:name=".login_sign"
+            android:exported="false" />
+        <activity
+            android:name=".login_page_2"
+            android:exported="false"
+            android:theme="@style/Theme.I230535" />
+        <activity
             android:name=".login_page"
+            android:exported="false"
+            android:theme="@style/Theme.I230535" />
+        <activity
+            android:name=".sign_up_page"
             android:exported="false" />
         <activity
             android:name=".MainActivity"

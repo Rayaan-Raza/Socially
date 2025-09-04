@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".switch_account"
+    android:background="@color/white">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:text="Socially"
+        android:fontFamily="@font/instagram_sans_bold"
+        android:textColor="@color/smd_theme"
+        android:textSize="48dp"
+        android:id="@+id/Socially"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="140dp">
+    </TextView>
+
+    <EditText
+        android:layout_width="350dp"
+        android:layout_height="wrap_content"
+        android:hint="Username"
+        android:background="@drawable/acc_bar"
+        android:textColorHint="@color/material_grey_600"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="250dp"
+        android:id="@id/username">
+
+    </EditText>
+
+    <EditText
+        android:layout_width="350dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:hint="Password"
+        android:inputType="textPassword"
+        android:background="@drawable/acc_bar"
+        android:textColorHint="@color/material_grey_600"
+        android:layout_below="@+id/username"
+        android:layout_centerInParent="true"
+        android:id="@+id/password">
+
+    </EditText>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/password"
+        android:layout_alignEnd="@+id/password"
+        android:layout_marginTop="20dp"
+        android:text="Forgot Password?"
+        android:fontFamily="@font/instagram_sans_medium"
+        android:textColor="@color/smd_theme"
+        android:id="@id/forgot_password">
+
+
+
+    </TextView>
+
+
+    <com.google.android.material.button.MaterialButton
+        android:layout_width="340dp"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/forgot_password"
+        android:backgroundTint="@color/smd_theme"
+        android:layout_centerInParent="true"
+        app:cornerRadius="6dp"
+        android:text="Log In"
+        android:textColor="@color/white"
+        android:layout_marginTop="12dp"
+        android:id="@+id/log_in"
+        android:gravity="center">
+
+    </com.google.android.material.button.MaterialButton>
+
+
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/OR"
+        android:text="OR"
+        android:textColor="@color/gray"
+        android:fontFamily="@font/instagram_sans_medium"
+        android:layout_below="@id/log_in"
+        android:layout_centerInParent="true"
+        android:textSize="16dp"
+        android:layout_marginTop="50dp"
+       >
+
+    </TextView>
+
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/Sign_up_text"
+        android:text="Don't have an account?"
+        android:textColor="@color/gray"
+        android:fontFamily="@font/instagram_sans_light"
+        android:layout_marginLeft="110dp"
+        android:textSize="16dp"
+        android:layout_below="@+id/OR"
+        android:layout_marginTop="30dp">
+
+    </TextView>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/Sign_up"
+        android:text="Sign Up"
+        android:textColor="@color/smd_theme"
+        android:fontFamily="@font/instagram_sans_bold"
+        android:textSize="16dp"
+        android:layout_toRightOf="@id/Sign_up_text"
+        android:layout_marginLeft="4dp"
+        android:layout_below="@+id/OR"
+        android:layout_marginTop="30dp"
+        >
+
+    </TextView>
+
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_alignParentBottom="true"
+        android:text="Socially"
+        android:fontFamily="@font/instagram_sans"
+        android:textColor="@color/smd_theme"
+        android:textSize="20dp"
+        android:id="@+id/bottom"
+        android:layout_marginBottom="20dp"
+        >
+    </TextView>
+
+
+
+
+
+
+
+
+</RelativeLayout>
