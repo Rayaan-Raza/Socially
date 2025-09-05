@@ -12,6 +12,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.I230535">
         <activity
+            android:name=".search_feed"
+            android:exported="false" />
+        <activity
             android:name=".home_page"
             android:exported="false" />
         <activity
