@@ -56,10 +56,6 @@
         android:scrollbars="none"
         android:paddingStart="12dp"
         android:paddingEnd="12dp">
-
-
-
-
     </HorizontalScrollView>
 
     <LinearLayout
@@ -307,7 +303,6 @@
 
         </LinearLayout>
     </ScrollView>
-
 
     <RelativeLayout
         android:id="@+id/bottomBar"

@@ -12,6 +12,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.I230535">
         <activity
+            android:name=".dms"
+            android:exported="false" />
+        <activity
+            android:name=".specific_search"
+            android:exported="false" />
+        <activity
             android:name=".search_feed"
             android:exported="false" />
         <activity
