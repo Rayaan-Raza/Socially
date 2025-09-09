@@ -253,9 +253,22 @@
         android:textSize="12dp"
         android:id="@+id/password_input"
         android:layout_marginTop="3dp"
-        android:inputType="textPassword">
+        android:inputType="textPassword"
+        >
 
     </EditText>
+
+    <ImageView
+        android:layout_width="wrap_content"
+        android:layout_height="30dp"
+        android:layout_alignParentEnd="true"
+        android:layout_toEndOf="@id/password_input"
+        android:src="@drawable/eye"
+        app:tint="@color/white"
+        android:id="@+id/eye"
+        android:layout_marginTop="620dp"
+        />
+
 
     <com.google.android.material.button.MaterialButton
         android:layout_width="wrap_content"
@@ -264,9 +277,12 @@
         android:backgroundTint="@color/white"
         android:layout_centerInParent="true"
         app:cornerRadius="6dp"
-        android:text="          Create an Account          "
+        android:text="Create an Account"
+        android:paddingLeft="50dp"
+        android:paddingRight="50dp"
         android:textColor="@color/smd_theme"
-        android:layout_marginTop="9dp">
+        android:layout_marginTop="9dp"
+        android:id="@+id/create_account">
 
     </com.google.android.material.button.MaterialButton>
 </RelativeLayout>

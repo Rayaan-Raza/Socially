@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/white">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:background="#F8F8F8">
+
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/back"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="12dp"
+        android:src="@drawable/left_chev"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        app:tint="@color/smd_theme" />
+
+    <TextView
+        android:id="@+id/avatar"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_toEndOf="@id/back"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="10dp"
+        android:gravity="center"
+        android:text="IS"
+        android:background="@drawable/circular_background"
+        android:backgroundTint="@color/smd_theme"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:textColor="@color/white"
+
+        />
+
+    <TextView
+        android:id="@+id/username"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_toEndOf="@id/avatar"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="14dp"
+        android:text="internshala"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textColor="@color/black"
+        android:fontFamily="@font/instagram_sans_headline"/>
+
+    <ImageView
+        android:id="@+id/video"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_alignParentEnd="true"
+        android:layout_marginEnd="12dp"
+        android:layout_marginTop="12dp"
+        android:src="@drawable/info"
+        app:tint="@color/smd_theme" />
+
+    <ImageView
+        android:id="@+id/info"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_toStartOf="@id/video"
+        android:layout_marginEnd="12dp"
+        android:layout_marginTop="12dp"
+        android:src="@drawable/call_real" />
+
+    <TextView
+        android:id="@+id/time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="4:49 PM"
+        android:textColor="#8A8A8A"
+        android:textSize="12sp"
+        android:layout_centerHorizontal="true"
+        android:layout_above="@id/helloPill"
+        android:layout_marginBottom="15dp"
+        android:fontFamily="@font/instagram_sans_bold"/>
+
+
+    <Button
+        android:id="@+id/helloPill"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Hello"
+        android:textAllCaps="false"
+        android:textColor="@color/white"
+        android:textSize="16dp"
+        android:gravity="center"
+        android:backgroundTint="@color/smd_theme"
+        android:layout_alignParentEnd="true"
+        android:layout_marginEnd="12dp"
+        android:layout_above="@+id/inputField"
+        android:layout_marginBottom="12dp"
+        android:clickable="true"
+        android:focusable="true"/>
+
+
+    <RelativeLayout
+        android:layout_width="350dp"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="20dp"
+        android:id="@+id/inputField">
+
+        <EditText
+            android:id="@+id/message_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/message_bar"
+            android:hint="Message..."
+            android:textColorHint="@color/gray"
+            android:paddingStart="50dp"
+            android:paddingEnd="120dp"
+            android:inputType="text"/>
+
+        <ImageView
+            android:id="@+id/cameraIcon"
+            android:layout_width="30dp"
+            android:layout_height="44dp"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:layout_marginLeft="5dp"
+            android:src="@drawable/camera_circle"/>
+
+        <ImageView
+            android:id="@+id/stickersIcon"
+            android:layout_width="24dp"
+            android:layout_height="44dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:layout_marginRight="10dp"
+            android:src="@drawable/stickers"/>
+
+        <ImageView
+            android:id="@+id/gallery"
+            android:layout_width="20dp"
+            android:layout_height="44dp"
+            android:layout_toStartOf="@id/stickersIcon"
+            android:layout_centerVertical="true"
+            android:src="@drawable/Picture"
+            android:layout_marginRight="10dp"/>
+
+        <ImageView
+            android:id="@+id/extraIcon"
+            android:layout_width="22dp"
+            android:layout_height="44dp"
+            android:layout_toStartOf="@id/gallery"
+            android:layout_centerVertical="true"
+            android:src="@drawable/mic"
+            android:layout_marginRight="10dp"/>
+
+    </RelativeLayout>
+
+
+
+</RelativeLayout>

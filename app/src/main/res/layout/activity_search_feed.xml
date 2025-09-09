@@ -77,21 +77,24 @@
             android:text="Shop"
             android:textSize="12dp"
             android:fontFamily="@font/instagram_sans_bold"
-            android:layout_weight="2"/>
+            android:layout_weight="2"
+            android:drawableStart="@drawable/shopping_bag"
+            android:drawableTint="@color/smd_theme"/>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="32dp"
             android:layout_marginStart="8dp"
-            android:paddingStart="14dp"
-            android:textColor="@color/smd_theme"
             android:layout_weight="2"
-
-            android:paddingEnd="14dp"
+            android:fontFamily="@font/instagram_sans_bold"
             android:gravity="center"
+
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
             android:text="Style"
+            android:textColor="@color/smd_theme"
             android:textSize="12dp"
-            android:fontFamily="@font/instagram_sans_bold"/>
+            tools:ignore="TextSizeCheck" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -138,10 +141,11 @@
         android:id="@+id/gridScroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_below="@id/chips"
         android:layout_above="@+id/bottomBar"
+        android:layout_below="@id/chips"
         android:fillViewport="true"
-        android:overScrollMode="never">
+        android:overScrollMode="never"
+        tools:ignore="SpeakableTextPresentCheck">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -158,26 +162,26 @@
                 <ImageView
                     android:layout_width="0dp"
                     android:layout_height="120dp"
-                    android:layout_weight="1"
                     android:layout_margin="1dp"
+                    android:layout_weight="1"
                     android:scaleType="centerCrop"
-                    android:src="@drawable/lake"/>
+                    android:src="@drawable/lake" />
 
                 <ImageView
                     android:layout_width="0dp"
                     android:layout_height="120dp"
-                    android:layout_weight="1"
                     android:layout_margin="1dp"
+                    android:layout_weight="1"
                     android:scaleType="centerCrop"
-                    android:src="@drawable/lake"/>
+                    android:src="@drawable/lake" />
 
                 <ImageView
                     android:layout_width="0dp"
                     android:layout_height="120dp"
-                    android:layout_weight="1"
                     android:layout_margin="1dp"
+                    android:layout_weight="1"
                     android:scaleType="centerCrop"
-                    android:src="@drawable/lake"/>
+                    android:src="@drawable/lake" />
             </LinearLayout>
 
             <LinearLayout
@@ -188,26 +192,26 @@
                 <ImageView
                     android:layout_width="0dp"
                     android:layout_height="120dp"
-                    android:layout_weight="1"
                     android:layout_margin="1dp"
+                    android:layout_weight="1"
                     android:scaleType="centerCrop"
-                    android:src="@drawable/lake"/>
+                    android:src="@drawable/lake" />
 
                 <ImageView
                     android:layout_width="0dp"
                     android:layout_height="120dp"
-                    android:layout_weight="1"
                     android:layout_margin="1dp"
+                    android:layout_weight="1"
                     android:scaleType="centerCrop"
-                    android:src="@drawable/lake"/>
+                    android:src="@drawable/lake" />
 
                 <ImageView
                     android:layout_width="0dp"
                     android:layout_height="120dp"
-                    android:layout_weight="1"
                     android:layout_margin="1dp"
+                    android:layout_weight="1"
                     android:scaleType="centerCrop"
-                    android:src="@drawable/lake"/>
+                    android:src="@drawable/lake" />
             </LinearLayout>
 
             <LinearLayout
@@ -218,26 +222,26 @@
                 <ImageView
                     android:layout_width="0dp"
                     android:layout_height="120dp"
-                    android:layout_weight="1"
                     android:layout_margin="1dp"
+                    android:layout_weight="1"
                     android:scaleType="centerCrop"
-                    android:src="@drawable/lake"/>
+                    android:src="@drawable/lake" />
 
                 <ImageView
                     android:layout_width="0dp"
                     android:layout_height="120dp"
-                    android:layout_weight="1"
                     android:layout_margin="1dp"
+                    android:layout_weight="1"
                     android:scaleType="centerCrop"
-                    android:src="@drawable/lake"/>
+                    android:src="@drawable/lake" />
 
                 <ImageView
                     android:layout_width="0dp"
                     android:layout_height="120dp"
-                    android:layout_weight="1"
                     android:layout_margin="1dp"
+                    android:layout_weight="1"
                     android:scaleType="centerCrop"
-                    android:src="@drawable/lake"/>
+                    android:src="@drawable/lake" />
             </LinearLayout>
 
             <LinearLayout

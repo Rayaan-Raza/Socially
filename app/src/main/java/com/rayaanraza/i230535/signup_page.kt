@@ -1,20 +1,29 @@
 package com.rayaanraza.i230535
 
+import android.annotation.SuppressLint
+import android.content.Intent
 import android.os.Bundle
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
+import com.google.android.material.button.MaterialButton
+import android.widget.ImageView
+import com.rayaanraza.i230535.R.id.create_account
 
 class signup_page : AppCompatActivity() {
+
+    @SuppressLint("MissingInflatedId")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContentView(R.layout.activity_signup_page)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
+
+        findViewById<ImageView>(R.id.left_arrow).setOnClickListener {
+            startActivity(Intent(this, login_sign::class.java))
+            finish()
+        }
+
+
+        findViewById<MaterialButton>(R.id.create_account).setOnClickListener {
+            startActivity(Intent(this, switch_account::class.java))
+            finish()
         }
     }
 }

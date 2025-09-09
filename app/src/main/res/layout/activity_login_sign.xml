@@ -27,19 +27,22 @@
         android:layout_height="100dp"
         android:layout_gravity="center"
         android:paddingTop="5dp"
-        android:src="@drawable/circling"
+        android:src="@drawable/person1"
+        android:background="@drawable/circular_background"
         android:id="@+id/pfp"
         android:layout_below="@id/Socially"
         android:layout_centerInParent="true"
-        android:layout_marginTop="60dp">
+        android:layout_marginTop="60dp"
+        android:scaleType="centerCrop"
+        android:clipToOutline="true" />
 
-    </ImageView>
+
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:id="@+id/username"
-        android:text="Username"
+        android:text="@string/jacob_w"
         android:textColor="@color/black"
         android:fontFamily="@font/instagram_sans_medium"
         android:layout_below="@id/pfp"
@@ -80,32 +83,33 @@
 
 
     <TextView
+        android:id="@+id/Sign_up_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:id="@+id/Sign_up_text"
+        android:layout_alignParentBottom="true"
+        android:layout_marginLeft="110dp"
+        android:layout_marginBottom="20dp"
+        android:fontFamily="@font/instagram_sans_light"
         android:text="Don't have an account?"
         android:textColor="@color/smd_theme"
-        android:fontFamily="@font/instagram_sans_light"
-        android:layout_alignParentBottom="true"
-       android:layout_marginLeft="110dp"
         android:textSize="13dp"
-        android:layout_marginBottom="20dp">
+        tools:ignore="SpUsage,TextSizeCheck">
 
     </TextView>
 
     <TextView
+        android:id="@+id/Sign_up"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:id="@+id/Sign_up"
-        android:text="Sign Up"
-        android:textColor="@color/smd_theme"
-        android:fontFamily="@font/instagram_sans_bold"
-        android:textSize="13dp"
-        android:layout_marginBottom="20dp"
-        android:layout_toRightOf="@id/Sign_up_text"
         android:layout_alignParentBottom="true"
         android:layout_marginLeft="2dp"
-        >
+        android:layout_marginBottom="20dp"
+        android:layout_toRightOf="@id/Sign_up_text"
+        android:fontFamily="@font/instagram_sans_bold"
+        android:text="Sign Up"
+        android:textColor="@color/smd_theme"
+        android:textSize="13dp"
+        tools:ignore="TextSizeCheck">
 
     </TextView>
 

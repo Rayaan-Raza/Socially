@@ -18,15 +18,7 @@
             android:src="@drawable/story_circle"
             android:contentDescription="Ring" />
 
-        <!-- AVATAR (circular via CardView) -->
-        <androidx.cardview.widget.CardView
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:layout_gravity="center"
-            app:cardCornerRadius="32dp"
-            app:cardUseCompatPadding="false"
-            app:cardPreventCornerOverlap="true"
-            app:cardBackgroundColor="@android:color/transparent">
+
 
             <ImageView
                 android:id="@+id/imgAvatar"
@@ -34,10 +26,8 @@
                 android:layout_height="match_parent"
                 android:scaleType="centerCrop"
                 android:src="@drawable/person1" />
-        </androidx.cardview.widget.CardView>
     </FrameLayout>
 
-    <!-- Username -->
     <TextView
         android:id="@+id/tvUsername"
         android:layout_width="72dp"

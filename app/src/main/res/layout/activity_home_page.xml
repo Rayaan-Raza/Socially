@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -20,7 +21,8 @@
             android:layout_height="24dp"
             android:layout_centerVertical="true"
             android:src="@drawable/cam"
-            app:tint="@color/smd_theme">
+            app:tint="@color/smd_theme"
+            tools:ignore="ContentDescription">
 
         </ImageView>
 
@@ -33,7 +35,8 @@
             android:textStyle="bold"
             android:layout_centerInParent="true"
             android:fontFamily="@font/instagram_sans_bold"
-            android:textColor="@color/smd_theme">
+            android:textColor="@color/smd_theme"
+            tools:ignore="HardcodedText,SpUsage">
 
         </TextView>
 
@@ -44,7 +47,8 @@
             android:layout_alignParentEnd="true"
             android:layout_centerVertical="true"
             android:src="@drawable/share"
-            app:tint="@color/smd_theme">
+            app:tint="@color/smd_theme"
+            tools:ignore="ContentDescription">
 
         </ImageView>
 
@@ -88,13 +92,13 @@
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
-
             <LinearLayout
+                android:id="@+id/story1"
                 android:layout_width="72dp"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:gravity="center_horizontal"
-                android:paddingEnd="0dp">
+                >
 
                 <FrameLayout
                     android:layout_width="74dp"
@@ -105,12 +109,7 @@
                         android:layout_height="match_parent"
                         android:src="@drawable/story_circle"
                         app:tint="@color/smd_theme"
-                        android:id="@+id/ring"
-                        >
-
-                    </ImageView>
-
-
+                        android:id="@+id/ring1"/>
 
                     <androidx.cardview.widget.CardView
                         android:layout_width="64dp"
@@ -125,11 +124,8 @@
                             android:layout_height="match_parent"
                             android:scaleType="centerCrop"
                             android:src="@drawable/person1"
-                            android:id="@+id/pfp">
-
-                        </ImageView>
+                            android:id="@+id/pfp1"/>
                     </androidx.cardview.widget.CardView>
-
 
                 </FrameLayout>
 
@@ -140,18 +136,251 @@
                     android:gravity="center"
                     android:text="Your Story"
                     android:textSize="12dp"
-                    android:id="@+id/my_username"/>
-
-
+                    android:id="@+id/my_username1"/>
             </LinearLayout>
 
+            <LinearLayout
+                android:id="@+id/story2"
+                android:layout_width="72dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:layout_marginStart="10dp"
+                android:layout_marginEnd="10dp">
 
+                <FrameLayout
+                    android:layout_width="74dp"
+                    android:layout_height="72dp"
+                    >
 
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/story_circle"
+                        app:tint="@color/smd_theme"
+                        android:id="@+id/ring2"/>
 
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:layout_gravity="center"
+                        app:cardCornerRadius="32dp"
+                        app:cardUseCompatPadding="false"
+                        app:cardPreventCornerOverlap="true"
+                        >
 
+                        <ImageView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/person1"
+                            android:id="@+id/pfp2"/>
+                    </androidx.cardview.widget.CardView>
+
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="72dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center"
+                    android:text="Story 2"
+                    android:textSize="12dp"
+                    android:id="@+id/my_username2"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/story3"
+                android:layout_width="72dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:layout_marginEnd="10dp">
+
+                <FrameLayout
+                    android:layout_width="74dp"
+                    android:layout_height="72dp">
+
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/story_circle"
+                        app:tint="@color/smd_theme"
+                        android:id="@+id/ring3"/>
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:layout_gravity="center"
+                        app:cardCornerRadius="32dp"
+                        app:cardUseCompatPadding="false"
+                        app:cardPreventCornerOverlap="true">
+
+                        <ImageView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/person1"
+                            android:id="@+id/pfp3"/>
+                    </androidx.cardview.widget.CardView>
+
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="72dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center"
+                    android:text="Story 3"
+                    android:textSize="12dp"
+                    android:id="@+id/my_username3"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/story4"
+                android:layout_width="72dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:layout_marginEnd="10dp">
+
+                <FrameLayout
+                    android:layout_width="74dp"
+                    android:layout_height="72dp">
+
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/story_circle"
+                        app:tint="@color/smd_theme"
+                        android:id="@+id/ring4"/>
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:layout_gravity="center"
+                        app:cardCornerRadius="32dp"
+                        app:cardUseCompatPadding="false"
+                        app:cardPreventCornerOverlap="true">
+
+                        <ImageView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/person1"
+                            android:id="@+id/pfp4"/>
+                    </androidx.cardview.widget.CardView>
+
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="72dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center"
+                    android:text="Story 4"
+                    android:textSize="12dp"
+                    android:id="@+id/my_username4"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/story5"
+                android:layout_width="72dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:layout_marginEnd="10dp">
+
+                <FrameLayout
+                    android:layout_width="74dp"
+                    android:layout_height="72dp">
+
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/story_circle"
+                        app:tint="@color/smd_theme"
+                        android:id="@+id/ring5"/>
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:layout_gravity="center"
+                        app:cardCornerRadius="32dp"
+                        app:cardUseCompatPadding="false"
+                        app:cardPreventCornerOverlap="true">
+
+                        <ImageView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/person1"
+                            android:id="@+id/pfp5"/>
+                    </androidx.cardview.widget.CardView>
+
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="72dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center"
+                    android:text="Story 5"
+                    android:textSize="12dp"
+                    android:id="@+id/my_username5"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/story6"
+                android:layout_width="72dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:layout_marginEnd="10dp">
+
+                <FrameLayout
+                    android:layout_width="74dp"
+                    android:layout_height="72dp">
+
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/story_circle"
+                        app:tint="@color/smd_theme"
+                        android:id="@+id/ring6"/>
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:layout_gravity="center"
+                        app:cardCornerRadius="32dp"
+                        app:cardUseCompatPadding="false"
+                        app:cardPreventCornerOverlap="true">
+
+                        <ImageView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/person1"
+                            android:id="@+id/pfp6"/>
+                    </androidx.cardview.widget.CardView>
+
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="72dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center"
+                    android:text="Story 6"
+                    android:textSize="12dp"
+                    android:id="@+id/my_username6"/>
+            </LinearLayout>
 
         </LinearLayout>
     </HorizontalScrollView>
+
+
 
     <TextView
         android:id="@+id/stories_bar"
@@ -259,7 +488,8 @@
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="24dp"
-                        android:src="@drawable/like" />
+                        android:src="@drawable/like"
+                        android:id="@+id/like"/>
 
                     <ImageView
                         android:layout_width="24dp"
@@ -434,27 +664,32 @@
                 android:layout_height="24dp"
                 android:layout_weight="1"
                 android:src="@drawable/search"
-                 app:tint="@color/smd_theme" />
+                 app:tint="@color/smd_theme"
+                android:id="@+id/search"/>
 
             <ImageView
                 android:layout_width="0dp"
                 android:layout_height="24dp"
                 android:layout_weight="1"
                 android:src="@drawable/create"
-                app:tint="@color/smd_theme" />
+                app:tint="@color/smd_theme"
+                android:id="@+id/post"/>
 
             <ImageView
                 android:layout_width="0dp"
                 android:layout_height="24dp"
                 android:layout_weight="1"
                 android:src="@drawable/like"
-                app:tint="@color/smd_theme" />
+                app:tint="@color/smd_theme"
+                android:id="@+id/heart"
+                tools:ignore="ContentDescription" />
 
             <ImageView
                 android:layout_width="0dp"
                 android:layout_height="28dp"
                 android:layout_weight="1"
                 android:src="@drawable/oval"
+                android:id="@+id/profile"
                 />
         </LinearLayout>
     </RelativeLayout>

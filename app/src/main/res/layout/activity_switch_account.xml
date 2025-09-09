@@ -79,7 +79,29 @@
     </com.google.android.material.button.MaterialButton>
 
 
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/gray"
+        android:layout_alignEnd="@+id/OR"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="215dp"
+        android:layout_marginRight="25dp"
 
+        >
+    </View>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/gray"
+        android:layout_alignStart="@+id/OR"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="215dp"
+        android:layout_marginLeft="25dp"
+
+        >
+    </View>
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -101,7 +123,7 @@
         android:layout_height="wrap_content"
         android:id="@+id/Sign_up_text"
         android:text="Don't have an account?"
-        android:textColor="@color/gray"
+        android:textColor="#121111"
         android:fontFamily="@font/instagram_sans_light"
         android:layout_marginLeft="110dp"
         android:textSize="16dp"

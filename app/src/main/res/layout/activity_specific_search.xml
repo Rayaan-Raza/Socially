@@ -13,6 +13,8 @@
         android:layout_alignParentTop="true"
         android:layout_marginTop="20dp">
 
+
+
         <EditText
             android:id="@+id/search"
             android:layout_width="350dp"
@@ -63,7 +65,10 @@
             android:gravity="center"
             android:text="Top"
             android:textStyle="bold"
-            android:textSize="14sp"/>
+            android:textSize="14sp"
+            android:id="@+id/top"/>
+
+
 
         <TextView
             android:layout_width="0dp"
@@ -90,12 +95,26 @@
             android:textSize="14sp"/>
     </LinearLayout>
 
+
+
     <View
         android:id="@+id/dividerTabs"
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:layout_below="@id/tabs"
         android:background="#1A000000"/>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_below="@+id/topBar"
+        android:layout_marginRight="300dp"
+        android:layout_marginTop="45dp"
+        android:backgroundTint="@color/black"
+        android:background="@color/black"
+
+
+        />
 
     <ScrollView
         android:id="@+id/resultsScroll"

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#8E5E5E">
+
+    <ImageView
+        android:id="@+id/avatar"
+        android:layout_width="140dp"
+        android:layout_height="140dp"
+        android:background="@drawable/profile_rectangle"
+        android:layout_centerHorizontal="true"
+        android:layout_centerInParent="true"
+        android:clipToOutline="true"
+        android:scaleType="centerCrop"
+        android:src="@drawable/person1" />
+
+
+    <TextView
+        android:id="@+id/name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/avatar"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="16dp"
+        android:text="Mother ❤️"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/timer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/name"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="6dp"
+        android:text="03:12"
+        android:textColor="#EFEFEF"
+        android:textSize="12sp" />
+
+    <ImageView
+        android:id="@+id/menu"
+        android:layout_width="64dp"
+        android:layout_height="32dp"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="35dp"
+        android:layout_alignParentStart="true"
+        android:layout_marginLeft="78dp"
+        android:src="@drawable/list"
+        app:tint="#FFFFFF" />
+
+    <ImageButton
+        android:id="@+id/endCall"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="20dp"
+        android:background="@drawable/message_bar"
+        android:backgroundTint="#FF2D2D"
+        android:src="@drawable/close_phone"
+        android:scaleType="centerCrop"
+        app:tint="@color/white" />
+
+    <ImageView
+        android:id="@+id/speaker"
+        android:layout_width="64dp"
+        android:layout_height="32dp"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentBottom="true"
+        android:layout_marginEnd="78dp"
+        android:layout_marginBottom="35dp"
+        android:src="@drawable/speaker_bg"
+        android:tint="#FFFFFF"/>
+
+</RelativeLayout>

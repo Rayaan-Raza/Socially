@@ -12,6 +12,21 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.I230535">
         <activity
+            android:name=".edit_profile"
+            android:exported="false" />
+        <activity
+            android:name=".story"
+            android:exported="false" />
+        <activity
+            android:name=".call_page"
+            android:exported="false" />
+        <activity
+            android:name=".notification_following"
+            android:exported="false" />
+        <activity
+            android:name=".chat"
+            android:exported="false" />
+        <activity
             android:name=".dms"
             android:exported="false" />
         <activity
