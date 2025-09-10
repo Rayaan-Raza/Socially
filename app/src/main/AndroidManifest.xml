@@ -12,6 +12,15 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.I230535">
         <activity
+            android:name=".my_story_view"
+            android:exported="false" />
+        <activity
+            android:name=".story_post"
+            android:exported="false" />
+        <activity
+            android:name=".story_view"
+            android:exported="false" />
+        <activity
             android:name=".edit_profile"
             android:exported="false" />
         <activity

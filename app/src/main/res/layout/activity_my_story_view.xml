@@ -39,7 +39,7 @@
                 android:orientation="horizontal">
 
                 <View
-                    android:layout_width="0dp"
+                    android:layout_width="300dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:background="@android:color/white"/>
@@ -48,29 +48,13 @@
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
-                    android:layout_marginStart="6dp"
                     android:background="@android:color/darker_gray"/>
 
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:layout_marginStart="6dp"
-                    android:background="@android:color/darker_gray"/>
 
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:layout_marginStart="6dp"
-                    android:background="@android:color/darker_gray"/>
 
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:layout_marginStart="6dp"
-                    android:background="@android:color/darker_gray"/>
+
+
+
             </LinearLayout>
 
             <ImageView
@@ -79,36 +63,26 @@
                 android:layout_height="32dp"
                 android:layout_below="@id/progress_bar"
                 android:layout_marginTop="10dp"
-                android:src="@drawable/person1"
+                android:src="@drawable/my_story"
                 android:background="@drawable/circular_background"
                 android:scaleType="centerCrop"
                 android:clipToOutline="true"
                 />
 
-            <!-- Title + date -->
             <TextView
                 android:id="@+id/highlight_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_toEndOf="@id/highlight_icon"
                 android:layout_alignTop="@id/highlight_icon"
+                android:layout_marginTop="5dp"
                 android:layout_marginStart="8dp"
-                android:text="Highlight"
+                android:text="gruski.studio"
                 android:textColor="@android:color/white"
                 android:textStyle="bold"
-                android:textSize="14sp"/>
+                android:textSize="14dp"/>
 
-            <ImageView
-                android:layout_width="10dp"
-                android:layout_height="wrap_content"
-                android:src="@drawable/music"
-                android:layout_below="@id/highlight_title"
-                app:tint="@color/white"
-                android:layout_marginLeft="35dp"
-                android:layout_marginTop="2sp"
-                >
 
-            </ImageView>
 
             <TextView
                 android:id="@+id/highlight_date"
@@ -116,24 +90,15 @@
                 android:layout_height="wrap_content"
                 android:layout_alignRight="@id/highlight_title"
                 android:layout_alignStart="@id/highlight_title"
-                android:text="December 3, 2023"
+                android:text="11h"
                 android:textColor="@android:color/white"
                 android:alpha="0.8"
                 android:textSize="12dp"
-                android:layout_marginTop="12dp"
-                android:layout_marginLeft="70dp"/>
 
-            <TextView
-                android:id="@+id/song_info"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_below="@id/highlight_title"
-                android:text="Artist · Song Title"
-                android:textColor="@android:color/white"
-                android:alpha="0.9"
-                android:textSize="12dp"
-                android:layout_marginLeft="50dp"
-                android:layout_marginTop="2dp"/>
+                android:layout_marginTop="20dp"
+                android:layout_marginLeft="90dp"/>
+
+
 
             <ImageView
                 android:id="@+id/close_btn"
@@ -146,6 +111,8 @@
         </RelativeLayout>
 
     </FrameLayout>
+
+
     <RelativeLayout
         android:id="@+id/icon_bar"
         android:layout_width="match_parent"
@@ -158,31 +125,61 @@
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:layout_alignParentStart="true"
-            android:layout_centerVertical="true"
-            >
+            android:layout_centerVertical="true">
 
-           <ImageView
-                android:id="@+id/icon1"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/activity"
-                android:scaleType="centerCrop"
-                android:padding="15dp"/>
+            <LinearLayout
+                android:id="@+id/user_group"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="5dp"
+                android:layout_marginLeft="3dp">
 
+                <ImageView
+                    android:id="@+id/usrimg1"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:src="@drawable/usrimg1"
+                    android:scaleType="centerCrop"
+                    android:clipToOutline="true"
+                    android:background="@drawable/circular_background"
+                    android:layout_marginEnd="-12dp"/>
+
+                <ImageView
+                    android:id="@+id/usrimg2"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:src="@drawable/usrimg2"
+                    android:scaleType="centerCrop"
+                    android:clipToOutline="true"
+                    android:background="@drawable/circular_background"
+                    android:layout_marginEnd="-12dp"/>
+
+                <ImageView
+                    android:id="@+id/usrimg3"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:src="@drawable/usrimg3"
+                    android:scaleType="centerCrop"
+                    android:clipToOutline="true"
+                    android:background="@drawable/circular_background"/>
+            </LinearLayout>
+
+            <!-- Activity text -->
             <TextView
                 android:id="@+id/text1"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Activity"
                 android:textColor="@android:color/white"
-                android:textSize="10dp"
-                android:layout_below="@id/icon1"
+                android:textSize="10sp"
+                android:layout_below="@id/user_group"
                 android:layout_centerHorizontal="true"
-                android:layout_marginBottom="-8dp"
-               />
+                android:layout_marginTop="6dp"/>
         </RelativeLayout>
 
-        <!-- Second icon -->
+
         <RelativeLayout
             android:id="@+id/item2"
             android:layout_width="wrap_content"
@@ -197,7 +194,8 @@
                 android:layout_height="48dp"
                 android:src="@drawable/cam"
                 android:scaleType="centerCrop"
-                android:padding="4dp"/>
+                android:padding="4dp"
+                app:tint="@color/black" />
 
             <TextView
                 android:id="@+id/text2"
@@ -254,16 +252,16 @@
                 android:id="@+id/icon4"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:src="@drawable/boxes"
+                android:src="@drawable/facebook"
                 android:scaleType="centerCrop"
-                android:padding="8dp"
+                android:padding="12dp"
                 app:tint="@color/white" />
 
             <TextView
                 android:id="@+id/text4"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Create Post"
+                android:text="Facebook"
                 android:textColor="@android:color/white"
                 android:textSize="10dp"
                 android:layout_below="@id/icon4"
@@ -283,16 +281,16 @@
                 android:id="@+id/icon6"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:src="@drawable/share"
+                android:src="@drawable/options"
                 android:scaleType="centerCrop"
-                android:padding="15dp"
+                android:padding="21dp"
                 app:tint="@color/white" />
 
             <TextView
                 android:id="@+id/text6"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Share"
+                android:text="More"
                 android:textColor="@android:color/white"
                 android:textSize="10dp"
                 android:layout_below="@id/icon6"
@@ -313,7 +311,7 @@
                 android:id="@+id/icon5"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:src="@drawable/browse"
+                android:src="@drawable/highlightadd"
                 android:scaleType="centerCrop"
                 android:padding="15dp"/>
 
@@ -321,7 +319,7 @@
                 android:id="@+id/text5"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Browse"
+                android:text="Highlight"
                 android:textColor="@android:color/white"
                 android:textSize="10dp"
                 android:layout_below="@id/icon5"
