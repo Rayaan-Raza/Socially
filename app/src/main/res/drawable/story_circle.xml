@@ -2,7 +2,6 @@
     android:width="72dp" android:height="72dp"
     android:viewportWidth="72" android:viewportHeight="72">
 
-    <!-- hollow ring -->
     <path
         android:pathData="M36,36 m-34,0 a34,34 0 1,0 68,0 a34,34 0 1,0 -68,0"
         android:fillColor="#00000000"

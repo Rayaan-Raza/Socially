@@ -12,6 +12,27 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.I230535">
         <activity
+            android:name=".view_profile_2"
+            android:exported="false" />
+        <activity
+            android:name=".view_profile"
+            android:exported="false" />
+        <activity
+            android:name=".camera"
+            android:exported="false" />
+        <activity
+            android:name=".posting"
+            android:exported="false" />
+        <activity
+            android:name=".my_profile"
+            android:exported="false" />
+        <activity
+            android:name=".you_page"
+            android:exported="false" />
+        <activity
+            android:name=".following_page"
+            android:exported="false" />
+        <activity
             android:name=".my_story_view"
             android:exported="false" />
         <activity

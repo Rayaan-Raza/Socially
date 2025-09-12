@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+
+
+    <FrameLayout
+        android:id="@+id/bird_frame"
+        android:layout_width="match_parent"
+        android:layout_height="670dp"
+        android:clipToOutline="true"
+        android:background="@drawable/story_bg">
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@drawable/bird" />
+
+
+    </FrameLayout>
+
+
+
+    <ImageView
+        android:id="@+id/close_btn"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="30dp"
+        android:src="@drawable/settings"
+        android:scaleType="centerCrop"
+        app:tint="#ffffff"/>
+
+    <ImageView
+        android:id="@+id/flash_btn"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginEnd="20dp"
+        android:layout_marginTop="40dp"
+        android:src="@drawable/chev_right"
+        app:tint="#ffffff"/>
+
+    <RelativeLayout
+        android:id="@+id/camera_controls"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="80dp">
+
+        <ImageView
+            android:id="@+id/gallery_thumb"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:layout_marginStart="30dp"
+            android:src="@drawable/person1"
+            android:background="@drawable/rounded_corner"
+            android:scaleType="centerInside"
+            android:padding="2dp"
+            android:clipToOutline="true"/>
+        <ImageView
+            android:id="@+id/flash"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:layout_toEndOf="@id/gallery_thumb"
+            android:layout_centerVertical="true"
+            android:layout_marginStart="30dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/flash"
+          />
+
+
+        <RelativeLayout
+            android:id="@+id/capture_button_container"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_centerInParent="true">
+
+            <View
+                android:id="@+id/outer_circle"
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:layout_centerInParent="true"
+                android:background="@drawable/outer_circle"
+                android:alpha=".8"/>
+
+            <View
+                android:id="@+id/inner_circle"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_centerInParent="true"
+                android:background="@drawable/inner_circle"/>
+
+        </RelativeLayout>
+
+        <ImageView
+            android:id="@+id/flip_camera_btn"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:layout_marginEnd="100dp"
+            android:src="@drawable/flip"
+            app:tint="#ffffff"/>
+
+        <ImageView
+            android:id="@+id/filters"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:layout_marginEnd="40dp"
+            android:src="@drawable/filtrr"
+           />
+
+    </RelativeLayout>
+
+    <HorizontalScrollView
+        android:id="@+id/camera_modes_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="20dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TYPE"
+                android:textColor="#888888"
+                android:textSize="12sp"
+                android:layout_marginEnd="30dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="LIVE"
+                android:textColor="#888888"
+                android:textSize="12sp"
+                android:layout_marginEnd="30dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="30dp"
+                android:text="NORMAL"
+                android:textColor="#ffffff"
+                android:textSize="12sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="BOOMERANG"
+                android:textColor="#888888"
+                android:textSize="12sp"
+                android:layout_marginEnd="30dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SUPER"
+                android:textColor="#888888"
+                android:textSize="12sp"
+                android:layout_marginEnd="30dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="FOCUS"
+                android:textColor="#888888"
+                android:textSize="12sp"
+                android:layout_marginEnd="30dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="HANDS-FREE"
+                android:textColor="#888888"
+                android:textSize="12sp"
+                android:layout_marginEnd="30dp"/>
+
+        </LinearLayout>
+
+    </HorizontalScrollView>
+
+</RelativeLayout>

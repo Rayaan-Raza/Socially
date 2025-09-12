@@ -141,7 +141,7 @@
                 android:layout_height="20dp"
                 android:layout_alignTop="@id/highlight_icon"
                 android:layout_alignParentEnd="true"
-                android:src="@drawable/Close"
+                android:src="@drawable/close"
                 app:tint="@color/white" />
         </RelativeLayout>
 
@@ -224,7 +224,7 @@
                 android:id="@+id/icon3"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:src="@drawable/Reels"
+                android:src="@drawable/reels"
                 android:scaleType="centerCrop"
                 android:padding="13dp"
                 app:tint="@color/white" />

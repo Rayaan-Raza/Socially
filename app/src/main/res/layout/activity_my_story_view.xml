@@ -73,30 +73,31 @@
                 android:id="@+id/highlight_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_toEndOf="@id/highlight_icon"
                 android:layout_alignTop="@id/highlight_icon"
-                android:layout_marginTop="5dp"
                 android:layout_marginStart="8dp"
+                android:layout_marginTop="5dp"
+                android:layout_toEndOf="@id/highlight_icon"
                 android:text="gruski.studio"
                 android:textColor="@android:color/white"
+                android:textSize="14dp"
                 android:textStyle="bold"
-                android:textSize="14dp"/>
-
+                tools:ignore="TextSizeCheck" />
 
 
             <TextView
                 android:id="@+id/highlight_date"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_alignRight="@id/highlight_title"
                 android:layout_alignStart="@id/highlight_title"
-                android:text="11h"
-                android:textColor="@android:color/white"
-                android:alpha="0.8"
-                android:textSize="12dp"
-
+                android:layout_alignRight="@id/highlight_title"
+                android:layout_marginLeft="90dp"
                 android:layout_marginTop="20dp"
-                android:layout_marginLeft="90dp"/>
+                android:alpha="0.8"
+                android:text="11h"
+
+                android:textColor="@android:color/white"
+                android:textSize="12dp"
+                tools:ignore="TextSizeCheck" />
 
 
 
@@ -166,7 +167,6 @@
                     android:background="@drawable/circular_background"/>
             </LinearLayout>
 
-            <!-- Activity text -->
             <TextView
                 android:id="@+id/text1"
                 android:layout_width="wrap_content"
@@ -231,13 +231,13 @@
                 android:id="@+id/text3"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Create"
-                android:textColor="@android:color/white"
-                android:textSize="10dp"
                 android:layout_below="@id/icon3"
                 android:layout_centerHorizontal="true"
                 android:layout_marginBottom="-8dp"
-                />
+                android:text="Create"
+                android:textColor="@android:color/white"
+                android:textSize="10dp"
+                tools:ignore="TextSizeCheck" />
         </RelativeLayout>
 
         <RelativeLayout
@@ -261,12 +261,12 @@
                 android:id="@+id/text4"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_below="@id/icon4"
+                android:layout_centerHorizontal="true"
                 android:text="Facebook"
                 android:textColor="@android:color/white"
                 android:textSize="10dp"
-                android:layout_below="@id/icon4"
-                android:layout_centerHorizontal="true"
-                />
+                tools:ignore="TextSizeCheck" />
         </RelativeLayout>
 
         <RelativeLayout
@@ -290,12 +290,13 @@
                 android:id="@+id/text6"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_below="@id/icon6"
+                android:layout_centerHorizontal="true"
+                android:layout_marginBottom="-9dp"
                 android:text="More"
                 android:textColor="@android:color/white"
                 android:textSize="10dp"
-                android:layout_below="@id/icon6"
-                android:layout_centerHorizontal="true"
-                android:layout_marginBottom="-9dp"/>
+                tools:ignore="TextSizeCheck" />
         </RelativeLayout>
 
 
@@ -319,12 +320,13 @@
                 android:id="@+id/text5"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_below="@id/icon5"
+                android:layout_centerHorizontal="true"
+                android:layout_marginBottom="-9dp"
                 android:text="Highlight"
                 android:textColor="@android:color/white"
                 android:textSize="10dp"
-                android:layout_below="@id/icon5"
-                android:layout_centerHorizontal="true"
-                android:layout_marginBottom="-9dp"/>
+                tools:ignore="TextSizeCheck" />
         </RelativeLayout>
 
 
