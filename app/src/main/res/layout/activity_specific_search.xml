@@ -2,7 +2,10 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFFFFF">
+    xmlns:tools="http://schemas.android.com/tools"
+    android:background="#FFFFFF"
+    tools:context=".specific_search"
+    android:id="@+id/main">
 
     <RelativeLayout
         android:id="@+id/topBar"
@@ -29,7 +32,7 @@
             android:paddingStart="12dp"
             android:paddingEnd="12dp"
             android:drawableStart="@drawable/search"
-            android:drawableEnd="@drawable/Close"
+            android:drawableEnd="@drawable/close"
             android:drawableTint="#494545"
             android:drawablePadding="8dp"
             android:inputType="text"/>
@@ -133,7 +136,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="64dp"
                 android:paddingStart="12dp"
-                android:paddingEnd="12dp">
+                android:paddingEnd="12dp"
+                android:id="@+id/clickable">
 
                 <TextView
                     android:id="@+id/icon1"
@@ -162,7 +166,8 @@
                         android:layout_height="wrap_content"
                         android:text="internshala"
                         android:textStyle="bold"
-                        android:textSize="14sp"/>
+                        android:textSize="14sp"
+                        android:id="@+id/usr_name"/>
 
                     <TextView
                         android:layout_width="wrap_content"

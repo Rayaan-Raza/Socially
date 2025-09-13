@@ -3,7 +3,10 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:orientation="vertical"
+    tools:context=".signup_page"
+
     android:background="@drawable/login_gradient">
     <TextView
         android:id="@+id/Socially"
@@ -250,6 +253,7 @@
         android:backgroundTint="@color/white"
         android:textColorHint="@color/white"
         android:fontFamily="@font/instagram_sans"
+
         android:textSize="12dp"
         android:id="@+id/password_input"
         android:layout_marginTop="3dp"

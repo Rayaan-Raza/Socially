@@ -5,17 +5,14 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".story"
+    tools:context=".my_story_view"
     android:background="@color/black">
-
-
-
-
 
     <FrameLayout
         android:id="@+id/bird_frame"
         android:layout_width="match_parent"
-        android:layout_height="670dp"
+        android:layout_height="match_parent"
+        android:layout_above="@+id/icon_bar"
         android:clipToOutline="true"
         android:background="@drawable/story_bg">
 
@@ -29,8 +26,7 @@
             android:id="@+id/story_header"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="12dp"
-            >
+            android:padding="12dp">
 
             <LinearLayout
                 android:id="@+id/progress_bar"
@@ -39,7 +35,7 @@
                 android:orientation="horizontal">
 
                 <View
-                    android:layout_width="300dp"
+                    android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:background="@android:color/white"/>
@@ -49,12 +45,6 @@
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:background="@android:color/darker_gray"/>
-
-
-
-
-
-
             </LinearLayout>
 
             <ImageView
@@ -66,40 +56,30 @@
                 android:src="@drawable/my_story"
                 android:background="@drawable/circular_background"
                 android:scaleType="centerCrop"
-                android:clipToOutline="true"
-                />
+                android:clipToOutline="true"/>
 
             <TextView
                 android:id="@+id/highlight_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_alignTop="@id/highlight_icon"
-                android:layout_marginStart="8dp"
-                android:layout_marginTop="5dp"
                 android:layout_toEndOf="@id/highlight_icon"
+                android:layout_marginStart="8dp"
                 android:text="gruski.studio"
                 android:textColor="@android:color/white"
-                android:textSize="14dp"
-                android:textStyle="bold"
-                tools:ignore="TextSizeCheck" />
-
+                android:textSize="14sp"
+                android:textStyle="bold"/>
 
             <TextView
                 android:id="@+id/highlight_date"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_alignStart="@id/highlight_title"
-                android:layout_alignRight="@id/highlight_title"
-                android:layout_marginLeft="90dp"
-                android:layout_marginTop="20dp"
+                android:layout_below="@id/highlight_title"
+                android:layout_marginStart="90dp"
                 android:alpha="0.8"
                 android:text="11h"
-
                 android:textColor="@android:color/white"
-                android:textSize="12dp"
-                tools:ignore="TextSizeCheck" />
-
-
+                android:textSize="12sp"/>
 
             <ImageView
                 android:id="@+id/close_btn"
@@ -107,19 +87,65 @@
                 android:layout_height="20dp"
                 android:layout_alignTop="@id/highlight_icon"
                 android:layout_alignParentEnd="true"
-                android:src="@drawable/Close"
-                app:tint="@color/white" />
+                android:src="@drawable/close"
+                app:tint="@color/white"/>
         </RelativeLayout>
 
-    </FrameLayout>
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/liked"
+            app:tint="#F44336"
+            android:layout_gravity="bottom|start"
+            android:layout_marginBottom="30dp"
+            android:layout_marginStart="30dp"/>
 
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/liked"
+            app:tint="#F44336"
+            android:alpha=".7"
+            android:layout_gravity="bottom|start"
+            android:layout_marginBottom="50dp"
+            android:layout_marginStart="15dp"/>
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/liked"
+            app:tint="#F44336"
+            android:alpha=".5"
+            android:layout_gravity="bottom|start"
+            android:layout_marginBottom="70dp"
+            android:layout_marginStart="20dp"/>
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/liked"
+            app:tint="#F44336"
+            android:alpha=".5"
+            android:layout_gravity="bottom|start"
+            android:layout_marginBottom="100dp"
+            android:layout_marginStart="40dp"/>
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/liked"
+            app:tint="#F44336"
+            android:alpha=".8"
+            android:layout_gravity="bottom|start"
+            android:layout_marginBottom="130dp"
+            android:layout_marginStart="15dp"/>
+    </FrameLayout>
 
     <RelativeLayout
         android:id="@+id/icon_bar"
         android:layout_width="match_parent"
-        android:layout_height="100dp"
-        android:layout_below="@id/bird_frame"
-        >
+        android:layout_height="80dp"
+        android:layout_alignParentBottom="true">
 
         <RelativeLayout
             android:id="@+id/item1"
@@ -134,8 +160,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:layout_centerHorizontal="true"
-                android:layout_marginTop="5dp"
-                android:layout_marginLeft="3dp">
+                android:layout_marginTop="5dp">
 
                 <ImageView
                     android:id="@+id/usrimg1"
@@ -179,7 +204,6 @@
                 android:layout_marginTop="6dp"/>
         </RelativeLayout>
 
-
         <RelativeLayout
             android:id="@+id/item2"
             android:layout_width="wrap_content"
@@ -195,20 +219,18 @@
                 android:src="@drawable/cam"
                 android:scaleType="centerCrop"
                 android:padding="4dp"
-                app:tint="@color/black" />
+                app:tint="@color/black"/>
 
             <TextView
                 android:id="@+id/text2"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Icon 2"
                 android:textColor="@android:color/white"
                 android:textSize="12sp"
                 android:layout_below="@id/icon2"
                 android:layout_centerHorizontal="true"
                 android:layout_marginTop="10dp"/>
         </RelativeLayout>
-
 
         <RelativeLayout
             android:id="@+id/item3"
@@ -222,22 +244,21 @@
                 android:id="@+id/icon3"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:src="@drawable/Reels"
+                android:src="@drawable/reels"
                 android:scaleType="centerCrop"
                 android:padding="13dp"
-                app:tint="@color/white" />
+                app:tint="@color/white"/>
 
             <TextView
                 android:id="@+id/text3"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_below="@id/icon3"
-                android:layout_centerHorizontal="true"
-                android:layout_marginBottom="-8dp"
                 android:text="Create"
                 android:textColor="@android:color/white"
-                android:textSize="10dp"
-                tools:ignore="TextSizeCheck" />
+                android:textSize="10sp"
+                android:layout_below="@id/icon3"
+                android:layout_centerHorizontal="true"
+                android:layout_marginBottom="-8dp"/>
         </RelativeLayout>
 
         <RelativeLayout
@@ -255,50 +276,18 @@
                 android:src="@drawable/facebook"
                 android:scaleType="centerCrop"
                 android:padding="12dp"
-                app:tint="@color/white" />
+                app:tint="@color/white"/>
 
             <TextView
                 android:id="@+id/text4"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_below="@id/icon4"
-                android:layout_centerHorizontal="true"
                 android:text="Facebook"
                 android:textColor="@android:color/white"
-                android:textSize="10dp"
-                tools:ignore="TextSizeCheck" />
+                android:textSize="10sp"
+                android:layout_below="@id/icon4"
+                android:layout_centerHorizontal="true"/>
         </RelativeLayout>
-
-        <RelativeLayout
-            android:id="@+id/item6"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_toEndOf="@id/item5"
-            android:layout_centerVertical="true"
-            android:layout_marginStart="16dp">
-
-            <ImageView
-                android:id="@+id/icon6"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/options"
-                android:scaleType="centerCrop"
-                android:padding="21dp"
-                app:tint="@color/white" />
-
-            <TextView
-                android:id="@+id/text6"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_below="@id/icon6"
-                android:layout_centerHorizontal="true"
-                android:layout_marginBottom="-9dp"
-                android:text="More"
-                android:textColor="@android:color/white"
-                android:textSize="10dp"
-                tools:ignore="TextSizeCheck" />
-        </RelativeLayout>
-
 
         <RelativeLayout
             android:id="@+id/item5"
@@ -320,15 +309,42 @@
                 android:id="@+id/text5"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_below="@id/icon5"
-                android:layout_centerHorizontal="true"
-                android:layout_marginBottom="-9dp"
                 android:text="Highlight"
                 android:textColor="@android:color/white"
-                android:textSize="10dp"
-                tools:ignore="TextSizeCheck" />
+                android:textSize="10sp"
+                android:layout_below="@id/icon5"
+                android:layout_centerHorizontal="true"
+                android:layout_marginBottom="-9dp"/>
         </RelativeLayout>
 
+        <RelativeLayout
+            android:id="@+id/item6"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_toEndOf="@id/item5"
+            android:layout_centerVertical="true"
+            android:layout_marginStart="16dp">
+
+            <ImageView
+                android:id="@+id/icon6"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/options"
+                android:scaleType="centerCrop"
+                android:padding="21dp"
+                app:tint="@color/white"/>
+
+            <TextView
+                android:id="@+id/text6"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="More"
+                android:textColor="@android:color/white"
+                android:textSize="10sp"
+                android:layout_below="@id/icon6"
+                android:layout_centerHorizontal="true"
+                android:layout_marginBottom="-9dp"/>
+        </RelativeLayout>
 
         <RelativeLayout
             android:id="@+id/item7"
@@ -345,7 +361,7 @@
                 android:src="@drawable/options"
                 android:scaleType="fitCenter"
                 android:padding="5dp"
-                app:tint="@color/white" />
+                app:tint="@color/white"/>
 
             <TextView
                 android:id="@+id/text7"
@@ -353,15 +369,10 @@
                 android:layout_height="wrap_content"
                 android:text="More"
                 android:textColor="@android:color/white"
-                android:textSize="10dp"
+                android:textSize="10sp"
                 android:layout_below="@id/icon7"
                 android:layout_centerHorizontal="true"
                 android:layout_marginBottom="-9dp"/>
         </RelativeLayout>
-
     </RelativeLayout>
-
-
-
-
 </RelativeLayout>

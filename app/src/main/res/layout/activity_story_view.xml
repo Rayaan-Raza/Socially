@@ -5,17 +5,16 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".story"
+    tools:context=".story_view"
     android:background="@color/black">
 
-
-
-
-
+    <!-- Top area now fills everything above the bottom bar -->
     <FrameLayout
         android:id="@+id/bird_frame"
         android:layout_width="match_parent"
-        android:layout_height="670dp"
+        android:layout_height="match_parent"
+        android:layout_alignParentTop="true"
+        android:layout_above="@+id/icon_bar"
         android:clipToOutline="true"
         android:background="@drawable/story_bg">
 
@@ -29,8 +28,7 @@
             android:id="@+id/story_header"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="12dp"
-            >
+            android:padding="12dp">
 
             <LinearLayout
                 android:id="@+id/progress_bar"
@@ -56,16 +54,13 @@
                     android:layout_height="match_parent"
                     android:layout_weight=".5"
                     android:layout_marginStart="6dp"
-                    android:background="@android:color/white"
-                    />
+                    android:background="@android:color/white"/>
 
                 <View
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight=".5"
-                    android:background="@android:color/darker_gray"
-                    />
-
+                    android:background="@android:color/darker_gray"/>
 
                 <View
                     android:layout_width="0dp"
@@ -91,8 +86,7 @@
                 android:src="@drawable/person1"
                 android:background="@drawable/circular_background"
                 android:scaleType="centerCrop"
-                android:clipToOutline="true"
-                />
+                android:clipToOutline="true"/>
 
             <TextView
                 android:id="@+id/highlight_title"
@@ -106,19 +100,17 @@
                 android:textStyle="bold"
                 android:textSize="14sp"/>
 
-
             <TextView
                 android:id="@+id/highlight_date"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_alignRight="@id/highlight_title"
                 android:layout_alignStart="@id/highlight_title"
+                android:layout_below="@id/highlight_title"
                 android:text="4h"
                 android:textColor="@android:color/white"
                 android:alpha="0.8"
-                android:textSize="12dp"
-                android:layout_marginTop="15dp"
-                android:layout_marginLeft="75dp"/>
+                android:textSize="12sp"
+                android:layout_marginTop="2dp"/>
 
             <ImageView
                 android:id="@+id/close_btn"
@@ -126,113 +118,79 @@
                 android:layout_height="20dp"
                 android:layout_alignTop="@id/highlight_icon"
                 android:layout_alignParentEnd="true"
-                android:src="@drawable/Close"
-                app:tint="@color/white" />
-
-
-
+                android:src="@drawable/close"
+                app:tint="@color/white"/>
         </RelativeLayout>
-
     </FrameLayout>
 
-
+    <!-- Bottom bar is now anchored to bottom -->
     <RelativeLayout
         android:id="@+id/icon_bar"
         android:layout_width="match_parent"
         android:layout_height="100dp"
-        android:layout_below="@id/bird_frame"
-        >
+        android:layout_alignParentBottom="true"
+        android:paddingHorizontal="12dp">
 
         <EditText
             android:id="@+id/item1"
-            android:layout_width="280dp"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_toStartOf="@id/item7"
+            android:layout_toEndOf="@id/cameraIcon"
+            android:layout_marginEnd="12dp"
             android:background="@drawable/message_bar"
             android:backgroundTint="#262626"
             android:hint="Message..."
             android:textColorHint="@color/smd_theme"
-            android:layout_marginTop="10dp"
-
-            android:paddingStart="50dp"
-            android:paddingEnd="120dp"
-            android:inputType="text"/>
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:inputType="text" />
 
         <ImageView
             android:id="@+id/cameraIcon"
-            android:layout_width="30dp"
-            android:layout_height="50dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:layout_alignParentStart="true"
             android:layout_centerVertical="true"
-            android:layout_marginLeft="5dp"
-            android:src="@drawable/camera_circle"
-            />
-
-        <RelativeLayout
-            android:id="@+id/item2"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_toEndOf="@id/item1"
-            android:layout_centerVertical="true"
-            android:layout_marginStart="16dp">
-
-
-
-
-        </RelativeLayout>
-
-
-
-
+            android:src="@drawable/camera_circle" />
 
         <RelativeLayout
             android:id="@+id/item6"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_toEndOf="@id/item1"
+            android:layout_toStartOf="@id/item7"
             android:layout_centerVertical="true"
-            android:layout_marginStart="16dp">
+            android:paddingEnd="8dp">
 
             <ImageView
                 android:id="@+id/icon6"
                 android:layout_width="50dp"
                 android:layout_height="50dp"
+                android:layout_centerVertical="true"
                 android:src="@drawable/share"
-                android:scaleType="centerCrop"
-                android:padding="15dp"
-                app:tint="@color/white"
-                android:layout_marginTop="10dp"/>
-
-
+                android:scaleType="centerInside"
+                android:padding="10dp"
+                app:tint="@color/white" />
         </RelativeLayout>
-
-
-
-
 
         <RelativeLayout
             android:id="@+id/item7"
-            android:layout_width="wrap_content"
+            android:layout_width="56dp"
             android:layout_height="match_parent"
-            android:layout_toEndOf="@id/item6"
-            android:layout_centerVertical="true"
-            android:layout_marginStart="16dp">
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true">
 
             <ImageView
                 android:id="@+id/icon7"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
+                android:layout_centerVertical="true"
                 android:src="@drawable/options"
                 android:scaleType="fitCenter"
                 android:padding="5dp"
-                app:tint="@color/white"
-                android:layout_marginTop="10"/>
-
-
+                app:tint="@color/white" />
         </RelativeLayout>
-
     </RelativeLayout>
-
-
-
 
 </RelativeLayout>

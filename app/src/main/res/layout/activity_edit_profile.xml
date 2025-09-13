@@ -1,67 +1,68 @@
 <?xml version="1.0" encoding="utf-8"?>
-    <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-        android:id="@+id/layout_root"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:padding="16dp"
-        android:background="@android:color/white">
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    android:background="@android:color/white"
+    tools:context=".edit_profile">
 
-        <TextView
-            android:id="@+id/btn_cancel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Cancel"
-            android:textSize="14sp"
-            android:textColor="#666"
-            android:layout_alignParentStart="true"
-            android:layout_alignParentTop="true"
-            android:fontFamily="@font/instagram_sans"/>
+    <TextView
+        android:id="@+id/btn_cancel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Cancel"
+        android:textSize="14sp"
+        android:textColor="#666"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:fontFamily="@font/instagram_sans" />
 
-        <TextView
-            android:id="@+id/title_edit_profile"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Edit Profile"
-            android:textStyle="bold"
-            android:textSize="16sp"
-            android:layout_centerHorizontal="true"
-            android:layout_alignTop="@id/btn_cancel"
-            android:fontFamily="@font/instagram_sans_bold"/>
+    <TextView
+        android:id="@+id/title_edit_profile"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Edit Profile"
+        android:textStyle="bold"
+        android:textSize="16sp"
+        android:layout_centerHorizontal="true"
+        android:layout_alignTop="@id/btn_cancel"
+        android:fontFamily="@font/instagram_sans_bold" />
 
-        <TextView
-            android:id="@+id/btn_done"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Done"
-            android:textSize="14sp"
-            android:textColor="@color/smd_theme"
-            android:layout_alignParentEnd="true"
-            android:layout_alignTop="@id/btn_cancel"
-            android:fontFamily="@font/instagram_sans"/>
-            />
+    <TextView
+        android:id="@+id/btn_done"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Done"
+        android:textSize="14sp"
+        android:textColor="@color/smd_theme"
+        android:layout_alignParentEnd="true"
+        android:layout_alignTop="@id/btn_cancel"
+        android:fontFamily="@font/instagram_sans" />
 
-        <ImageView
-            android:id="@+id/img_profile"
-            android:layout_width="72dp"
-            android:layout_height="72dp"
-            android:layout_below="@id/title_edit_profile"
-            android:layout_centerHorizontal="true"
-            android:layout_marginTop="16dp"
-            android:src="@drawable/person1"
-            android:background="@drawable/circular_background"
-            android:clipToOutline="true"
-            android:scaleType="centerCrop"/>
+    <ImageView
+        android:id="@+id/img_profile"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:layout_below="@id/title_edit_profile"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="16dp"
+        android:src="@drawable/person1"
+        android:background="@drawable/circular_background"
+        android:clipToOutline="true"
+        android:scaleType="centerCrop" />
 
-        <TextView
-            android:id="@+id/txt_change_photo"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Change Profile Photo"
-            android:textSize="13sp"
-            android:textColor="#C96B6B"
-            android:layout_below="@id/img_profile"
-            android:layout_centerHorizontal="true"
-            android:layout_marginTop="10dp"/>
+    <TextView
+        android:id="@+id/txt_change_photo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Change Profile Photo"
+        android:textSize="13sp"
+        android:textColor="#C96B6B"
+        android:layout_below="@id/img_profile"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="10dp" />
 
     <View
         android:id="@+id/first_divider"
@@ -69,8 +70,7 @@
         android:layout_height="2dp"
         android:background="#1F000000"
         android:layout_below="@id/txt_change_photo"
-        android:layout_marginTop="5dp"
-        />
+        android:layout_marginTop="5dp" />
 
     <TextView
         android:id="@+id/name"
@@ -79,7 +79,7 @@
         android:text="Name"
         android:layout_below="@id/txt_change_photo"
         android:layout_marginTop="20dp"
-        android:layout_alignParentStart="true"/>
+        android:layout_alignParentStart="true" />
 
     <EditText
         android:id="@+id/et_name"
@@ -90,114 +90,111 @@
         android:layout_marginStart="32dp"
         android:layout_marginTop="6dp"
         android:text="Jacob West"
-        android:inputType="textPersonName"/>
-
+        android:inputType="textPersonName" />
 
     <TextView
-            android:id="@+id/lbl_username"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Username"
-            android:layout_below="@id/et_name"
-            android:layout_marginTop="20dp"/>
+        android:id="@+id/lbl_username"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Username"
+        android:layout_below="@id/et_name"
+        android:layout_marginTop="20dp" />
 
-        <EditText
-            android:id="@+id/et_username"
-            android:layout_width="match_parent"
-            android:layout_height="40dp"
-            android:layout_below="@id/lbl_username"
-            android:layout_alignBaseline="@+id/lbl_username"
-            android:layout_marginStart="70dp"
-            android:layout_marginTop="4dp"
-            android:text="jacob_w"
-            android:inputType="textPersonName"/>
+    <EditText
+        android:id="@+id/et_username"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_below="@id/lbl_username"
+        android:layout_alignBaseline="@+id/lbl_username"
+        android:layout_marginStart="70dp"
+        android:layout_marginTop="4dp"
+        android:text="jacob_w"
+        android:inputType="textPersonName" />
 
-        <TextView
-            android:id="@+id/lbl_website"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Website"
-            android:layout_below="@id/et_username"
-            android:layout_marginTop="20dp"/>
+    <TextView
+        android:id="@+id/lbl_website"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Website"
+        android:layout_below="@id/et_username"
+        android:layout_marginTop="20dp" />
 
-        <EditText
-            android:id="@+id/et_website"
-            android:layout_width="match_parent"
-            android:layout_alignBaseline="@+id/lbl_website"
-            android:layout_marginStart="70dp"
+    <EditText
+        android:id="@+id/et_website"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_below="@id/lbl_website"
+        android:layout_alignBaseline="@+id/lbl_website"
+        android:layout_marginStart="70dp"
+        android:layout_marginTop="4dp"
+        android:hint="Website"
+        android:inputType="textUri" />
 
-            android:layout_height="40dp"
-            android:layout_below="@id/lbl_website"
-            android:layout_marginTop="4dp"
-            android:hint="Website"
-            android:inputType="textUri"/>
+    <TextView
+        android:id="@+id/lbl_bio"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Bio"
+        android:layout_below="@id/et_website"
+        android:layout_marginTop="20dp" />
 
-        <TextView
-            android:id="@+id/lbl_bio"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Bio"
-            android:layout_below="@id/et_website"
-            android:layout_marginTop="20dp"/>
+    <EditText
+        android:id="@+id/et_bio"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:layout_below="@id/lbl_bio"
+        android:layout_marginStart="70dp"
+        android:layout_alignBaseline="@+id/lbl_bio"
+        android:layout_marginTop="4dp"
+        android:gravity="top|start"
+        android:text="@string/bio_text"
+        android:inputType="textMultiLine" />
 
-        <EditText
-            android:id="@+id/et_bio"
-            android:layout_width="match_parent"
-            android:layout_height="72dp"
-            android:layout_below="@id/lbl_bio"
-            android:layout_marginStart="70dp"
-            android:layout_alignBaseline="@+id/lbl_bio"
-            android:layout_marginTop="4dp"
-            android:gravity="top|start"
-            android:text="@string/bio_text"
-            android:inputType="textMultiLine"/>
+    <TextView
+        android:id="@+id/btn_switch_pro"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Switch to Professional Account"
+        android:textColor="#C96B6B"
+        android:textSize="13sp"
+        android:layout_below="@id/et_bio"
+        android:layout_marginTop="20dp" />
 
-        <TextView
-            android:id="@+id/btn_switch_pro"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Switch to Professional Account"
-            android:textColor="#C96B6B"
-            android:textSize="13sp"
-            android:layout_below="@id/et_bio"
-            android:layout_marginTop="20dp"/>
+    <View
+        android:id="@+id/divider_private"
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:background="#1F000000"
+        android:layout_below="@id/lbl_bio"
+        android:layout_marginTop="50dp" />
 
-        <View
-            android:id="@+id/divider_private"
-            android:layout_width="match_parent"
-            android:layout_height="2dp"
-            android:background="#1F000000"
-            android:layout_below="@id/lbl_bio"
-            android:layout_marginTop="50dp"
-            />
+    <TextView
+        android:id="@+id/header_private"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Private Information"
+        android:textStyle="bold"
+        android:layout_below="@id/btn_switch_pro"
+        android:layout_marginTop="20dp" />
 
-        <TextView
-            android:id="@+id/header_private"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Private Information"
-            android:textStyle="bold"
-            android:layout_below="@id/btn_switch_pro"
-            android:layout_marginTop="20dp"/>
+    <TextView
+        android:id="@+id/lbl_email"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Email"
+        android:layout_below="@id/header_private"
+        android:layout_marginTop="20dp" />
 
-        <TextView
-            android:id="@+id/lbl_email"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Email"
-            android:layout_below="@id/header_private"
-            android:layout_marginTop="20dp"/>
-
-        <EditText
-            android:id="@+id/et_email"
-            android:layout_width="match_parent"
-            android:layout_marginStart="70dp"
-            android:layout_alignBaseline="@+id/lbl_email"
-            android:layout_height="40dp"
-            android:layout_below="@id/lbl_email"
-            android:layout_marginTop="4dp"
-            android:text="jacob.west@gmail.com"
-            android:inputType="textEmailAddress"/>
+    <EditText
+        android:id="@+id/et_email"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_below="@id/lbl_email"
+        android:layout_alignBaseline="@+id/lbl_email"
+        android:layout_marginStart="70dp"
+        android:layout_marginTop="4dp"
+        android:text="jacob.west@gmail.com"
+        android:inputType="textEmailAddress" />
 
     <TextView
         android:id="@+id/lbl_phone"
@@ -207,37 +204,34 @@
         android:layout_marginTop="20dp"
         android:text="Phone" />
 
-        <EditText
-            android:id="@+id/et_phone"
-            android:layout_width="match_parent"
-            android:layout_height="40dp"
-            android:layout_below="@id/lbl_phone"
-            android:layout_marginStart="70dp"
-            android:layout_alignBaseline="@+id/lbl_phone"
-            android:layout_marginTop="4dp"
-            android:text="+1 202 555 0147"
-            android:inputType="phone"/>
+    <EditText
+        android:id="@+id/et_phone"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_below="@id/lbl_phone"
+        android:layout_alignBaseline="@+id/lbl_phone"
+        android:layout_marginStart="70dp"
+        android:layout_marginTop="4dp"
+        android:text="+1 202 555 0147"
+        android:inputType="phone" />
 
-        <TextView
-            android:id="@+id/lbl_gender"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Gender"
-            android:layout_below="@id/et_phone"
-            android:layout_marginTop="20dp"/>
+    <TextView
+        android:id="@+id/lbl_gender"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Gender"
+        android:layout_below="@id/et_phone"
+        android:layout_marginTop="20dp" />
 
-        <EditText
-            android:id="@+id/et_gender"
-            android:layout_width="match_parent"
-            android:layout_height="40dp"
-            android:layout_below="@id/lbl_gender"
-            android:layout_marginStart="70dp"
-            android:layout_alignBaseline="@+id/lbl_gender"
-            android:layout_marginTop="4dp"
-            android:text="Male"
-            android:inputType="textPersonName"/>
+    <EditText
+        android:id="@+id/et_gender"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_below="@id/lbl_gender"
+        android:layout_alignBaseline="@+id/lbl_gender"
+        android:layout_marginStart="70dp"
+        android:layout_marginTop="4dp"
+        android:text="Male"
+        android:inputType="textPersonName" />
 
-    </RelativeLayout>
-
-
-
+</RelativeLayout>

@@ -96,12 +96,14 @@
                 android:id="@+id/item_karenme_1">
 
                 <ImageView
+                    android:id="@+id/avatar_karenme_1"
                     android:layout_width="40dp"
                     android:layout_height="40dp"
-                    android:src="@drawable/person1"
+                    android:src="@drawable/karenne"
                     android:background="@drawable/circular_background"
-                    android:clipToOutline="true"
-                    android:id="@+id/avatar_karenme_1"/>
+                    android:scaleType="centerCrop"
+                    android:clipToOutline="true"/>
+
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -126,7 +128,7 @@
                     <ImageView
                         android:layout_width="60dp"
                         android:layout_height="60dp"
-                        android:src="@drawable/lake"
+                        android:src="@drawable/people"
                         android:id="@+id/img_1_karenme_1"/>
 
                     <ImageView
@@ -139,7 +141,7 @@
                     <ImageView
                         android:layout_width="60dp"
                         android:layout_height="60dp"
-                        android:src="@drawable/lake"
+                        android:src="@drawable/city"
                         android:layout_marginLeft="5dp"
                         android:id="@+id/img_3_karenme_1"/>
 
@@ -153,13 +155,39 @@
                 android:padding="16dp"
                 android:id="@+id/item_kiero_1">
 
-                <ImageView
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:src="@drawable/person1"
-                    android:background="@drawable/circular_background"
-                    android:clipToOutline="true"
-                    android:id="@+id/avatar_kiero_1"/>
+                <RelativeLayout
+                    android:id="@+id/avatar_kiero_1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="5dp"
+                    >
+
+                    <ImageView
+                        android:id="@+id/usrimg1"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:src="@drawable/white_woman"
+                        android:scaleType="centerCrop"
+                        android:clipToOutline="true"
+                        android:background="@drawable/circular_background"
+                        android:layout_marginEnd="-12dp"
+                       />
+
+                    <ImageView
+                        android:id="@+id/usrimg2"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:src="@drawable/white_man"
+                        android:scaleType="centerCrop"
+                        android:clipToOutline="true"
+                        android:layout_marginLeft="20dp"
+                        android:layout_marginTop="20dp"
+                        android:background="@drawable/circular_background"
+                    />
+
+
+                </RelativeLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -190,12 +218,14 @@
                 android:id="@+id/item_kiero_2">
 
                 <ImageView
+                    android:id="@+id/avatar_kiero_2"
                     android:layout_width="40dp"
                     android:layout_height="40dp"
-                    android:src="@drawable/person1"
+                    android:src="@drawable/italian_man"
                     android:background="@drawable/circular_background"
-                    android:clipToOutline="true"
-                    android:id="@+id/avatar_kiero_2"/>
+                    android:scaleType="centerCrop"
+                    android:clipToOutline="true" />
+
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -222,7 +252,8 @@
                     android:src="@drawable/person1"
                     android:background="@drawable/circular_background"
                     android:clipToOutline="true"
-                    android:id="@+id/avatar_craig"/>
+                    android:id="@+id/avatar_craig"
+                    android:scaleType="centerCrop"/>
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -246,21 +277,21 @@
                     <ImageView
                         android:layout_width="60dp"
                         android:layout_height="60dp"
-                        android:src="@drawable/lake"
+                        android:src="@drawable/landscape"
                         android:layout_margin="2dp"
                         android:id="@+id/img_1_craig"/>
 
                     <ImageView
                         android:layout_width="60dp"
                         android:layout_height="60dp"
-                        android:src="@drawable/lake"
+                        android:src="@drawable/street"
                         android:layout_margin="2dp"
                         android:id="@+id/img_2_craig"/>
 
                     <ImageView
                         android:layout_width="60dp"
                         android:layout_height="60dp"
-                        android:src="@drawable/lake"
+                        android:src="@drawable/man_coffee"
                         android:layout_margin="2dp"
                         android:id="@+id/img_3_craig"/>
 
@@ -274,30 +305,20 @@
                     <ImageView
                         android:layout_width="60dp"
                         android:layout_height="60dp"
-                        android:src="@drawable/lake"
+                        android:src="@drawable/people"
                         android:layout_margin="2dp"
                         android:id="@+id/img_5_craig"/>
 
                     <ImageView
                         android:layout_width="60dp"
                         android:layout_height="60dp"
-                        android:src="@drawable/lake"
+                        android:src="@drawable/city"
                         android:layout_margin="2dp"
                         android:id="@+id/img_6_craig"/>
 
-                    <ImageView
-                        android:layout_width="60dp"
-                        android:layout_height="60dp"
-                        android:src="@drawable/lake"
-                        android:layout_margin="2dp"
-                        android:id="@+id/img_7_craig"/>
 
-                    <ImageView
-                        android:layout_width="60dp"
-                        android:layout_height="60dp"
-                        android:src="@drawable/lake"
-                        android:layout_margin="2dp"
-                        android:id="@+id/img_8_craig"/>
+
+
 
                 </GridLayout>
 
@@ -309,13 +330,37 @@
                 android:padding="16dp"
                 android:id="@+id/item_max_1">
 
-                <ImageView
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:src="@drawable/person1"
-                    android:background="@drawable/circular_background"
-                    android:clipToOutline="true"
-                    android:id="@+id/avatar_max_1"/>
+                <RelativeLayout
+                    android:id="@+id/avatar_max_1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="5dp"
+                    >
+
+                    <ImageView
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:src="@drawable/white_woman"
+                        android:scaleType="centerCrop"
+                        android:clipToOutline="true"
+                        android:background="@drawable/circular_background"
+                        android:layout_marginEnd="-12dp"
+                        />
+
+                    <ImageView
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:src="@drawable/white_man"
+                        android:scaleType="centerCrop"
+                        android:clipToOutline="true"
+                        android:layout_marginLeft="20dp"
+                        android:layout_marginTop="20dp"
+                        android:background="@drawable/circular_background"
+                        />
+
+
+                </RelativeLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -324,13 +369,14 @@
                     android:textSize="14sp"
                     android:textColor="#333333"
                     android:layout_toEndOf="@id/avatar_max_1"
+                    android:layout_marginTop="10dp"
                     android:layout_marginLeft="12dp"
                     android:id="@+id/text_max_1"/>
 
                 <ImageView
                     android:layout_width="60dp"
                     android:layout_height="60dp"
-                    android:src="@drawable/lake"
+                    android:src="@drawable/city"
                     android:layout_alignParentRight="true"
                     android:layout_centerVertical="true"
                     android:id="@+id/image_max_1"/>
@@ -343,11 +389,38 @@
                 android:padding="16dp"
                 android:id="@+id/item_max_2">
 
-                <ImageView
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:src="@drawable/person1"
-                    android:id="@+id/avatar_max_2"/>
+                <RelativeLayout
+                    android:id="@+id/avatar_max_2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="5dp"
+                    >
+
+                    <ImageView
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:src="@drawable/white_woman"
+                        android:scaleType="centerCrop"
+                        android:clipToOutline="true"
+                        android:background="@drawable/circular_background"
+                        android:layout_marginEnd="-12dp"
+                        />
+
+                    <ImageView
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:src="@drawable/italian_man"
+                        android:scaleType="centerCrop"
+                        android:clipToOutline="true"
+                        android:layout_marginLeft="20dp"
+                        android:layout_marginTop="20dp"
+                        android:background="@drawable/circular_background"
+                        />
+
+
+                </RelativeLayout>
+
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -363,7 +436,7 @@
                 <ImageView
                     android:layout_width="60dp"
                     android:layout_height="60dp"
-                    android:src="@drawable/lake"
+                    android:src="@drawable/man_coffee"
                     android:layout_alignParentRight="true"
                     android:layout_centerVertical="true"
                     android:id="@+id/image_max_2"/>
@@ -376,13 +449,32 @@
                 android:padding="16dp"
                 android:id="@+id/item_karenme_2">
 
-                <ImageView
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:src="@drawable/person1"
-                    android:background="@drawable/circular_background"
-                    android:clipToOutline="true"
-                    android:id="@+id/avatar_karenme_2"/>
+                <FrameLayout
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                   android:id="@+id/avatar_karenme_2">
+
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/story_circle"
+                         />
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_gravity="center"
+                        app:cardCornerRadius="18dp"
+                        app:cardUseCompatPadding="false"
+                        app:cardPreventCornerOverlap="true">
+
+                        <ImageView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/person1"/>
+                    </androidx.cardview.widget.CardView>
+                </FrameLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -398,7 +490,7 @@
                 <ImageView
                     android:layout_width="60dp"
                     android:layout_height="60dp"
-                    android:src="@drawable/lake"
+                    android:src="@drawable/landscape"
                     android:layout_alignParentRight="true"
                     android:layout_centerVertical="true"
                     android:id="@+id/image_karenme_2"/>
@@ -411,13 +503,32 @@
                 android:padding="16dp"
                 android:id="@+id/item_max_3">
 
-                <ImageView
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:src="@drawable/person1"
-                    android:background="@drawable/circular_background"
-                    android:clipToOutline="true"
-                    android:id="@+id/avatar_max_3"/>
+                <FrameLayout
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:id="@+id/avatar_max_3">
+
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/story_circle"
+                        />
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_gravity="center"
+                        app:cardCornerRadius="18dp"
+                        app:cardUseCompatPadding="false"
+                        app:cardPreventCornerOverlap="true">
+
+                        <ImageView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/white_man"/>
+                    </androidx.cardview.widget.CardView>
+                </FrameLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -441,7 +552,7 @@
                     <ImageView
                         android:layout_width="60dp"
                         android:layout_height="60dp"
-                        android:src="@drawable/lake"
+                        android:src="@drawable/landscape"
                         android:layout_marginRight="4dp"
                         android:id="@+id/img_1_max_3"/>
 
@@ -455,7 +566,7 @@
                     <ImageView
                         android:layout_width="60dp"
                         android:layout_height="60dp"
-                        android:src="@drawable/lake"
+                        android:src="@drawable/people"
                         android:id="@+id/img_3_max_3"/>
 
                 </LinearLayout>

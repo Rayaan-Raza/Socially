@@ -8,14 +8,12 @@
     tools:context=".story"
     android:background="@color/black">
 
-
-
-
-
     <FrameLayout
         android:id="@+id/bird_frame"
         android:layout_width="match_parent"
-        android:layout_height="670dp"
+        android:layout_height="match_parent"
+        android:layout_alignParentTop="true"
+        android:layout_above="@+id/icon_bar"
         android:clipToOutline="true"
         android:background="@drawable/story_bg">
 
@@ -29,8 +27,7 @@
             android:id="@+id/story_header"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="12dp"
-            >
+            android:padding="12dp">
 
             <LinearLayout
                 android:id="@+id/progress_bar"
@@ -82,10 +79,8 @@
                 android:src="@drawable/person1"
                 android:background="@drawable/circular_background"
                 android:scaleType="centerCrop"
-                android:clipToOutline="true"
-                />
+                android:clipToOutline="true"/>
 
-            <!-- Title + date -->
             <TextView
                 android:id="@+id/highlight_title"
                 android:layout_width="wrap_content"
@@ -99,40 +94,38 @@
                 android:textSize="14sp"/>
 
             <ImageView
+                android:id="@+id/music_icon"
                 android:layout_width="10dp"
-                android:layout_height="wrap_content"
+                android:layout_height="10dp"
                 android:src="@drawable/music"
                 android:layout_below="@id/highlight_title"
+                android:layout_alignStart="@id/highlight_title"
                 app:tint="@color/white"
-                android:layout_marginLeft="35dp"
-                android:layout_marginTop="2sp"
-                >
-
-            </ImageView>
+                android:layout_marginTop="2dp"/>
 
             <TextView
                 android:id="@+id/highlight_date"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_alignRight="@id/highlight_title"
                 android:layout_alignStart="@id/highlight_title"
                 android:text="December 3, 2023"
                 android:textColor="@android:color/white"
                 android:alpha="0.8"
-                android:textSize="12dp"
-                android:layout_marginTop="12dp"
-                android:layout_marginLeft="70dp"/>
+                android:textSize="12sp"
+                android:layout_below="@id/music_icon"
+                android:layout_marginTop="8dp"/>
 
             <TextView
                 android:id="@+id/song_info"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_below="@id/highlight_title"
+                android:layout_toEndOf="@id/music_icon"
+                android:layout_marginStart="8dp"
                 android:text="Artist · Song Title"
                 android:textColor="@android:color/white"
                 android:alpha="0.9"
-                android:textSize="12dp"
-                android:layout_marginLeft="50dp"
+                android:textSize="12sp"
                 android:layout_marginTop="2dp"/>
 
             <ImageView
@@ -143,25 +136,77 @@
                 android:layout_alignParentEnd="true"
                 android:src="@drawable/close"
                 app:tint="@color/white" />
-        </RelativeLayout>
 
+            <ImageView
+                android:id="@+id/heart1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/liked"
+                app:tint="#F44336"
+                android:layout_alignParentBottom="true"
+                android:layout_marginStart="0dp"
+                android:layout_marginBottom="0dp"/>
+
+            <ImageView
+                android:id="@+id/heart2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/liked"
+                app:tint="#F44336"
+                android:alpha=".7"
+                android:layout_alignParentBottom="true"
+                android:layout_marginStart="10dp"
+                android:layout_marginBottom="40dp"/>
+
+            <ImageView
+                android:id="@+id/heart3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/liked"
+                app:tint="#F44336"
+                android:alpha=".5"
+                android:layout_alignParentBottom="true"
+                android:layout_marginStart="0dp"
+                android:layout_marginBottom="80dp"/>
+
+            <ImageView
+                android:id="@+id/heart4"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/liked"
+                app:tint="#F44336"
+                android:alpha=".5"
+                android:layout_alignParentBottom="true"
+                android:layout_marginStart="0dp"
+                android:layout_marginBottom="110dp"/>
+
+            <ImageView
+                android:id="@+id/heart5"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/liked"
+                app:tint="#F44336"
+                android:alpha=".8"
+                android:layout_alignParentBottom="true"
+                android:layout_marginStart="15dp"
+                android:layout_marginBottom="140dp"/>
+        </RelativeLayout>
     </FrameLayout>
+
     <RelativeLayout
         android:id="@+id/icon_bar"
         android:layout_width="match_parent"
         android:layout_height="100dp"
-        android:layout_below="@id/bird_frame"
-        >
+        android:layout_alignParentBottom="true">
 
         <RelativeLayout
             android:id="@+id/item1"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:layout_alignParentStart="true"
-            android:layout_centerVertical="true"
-            >
+            android:layout_centerVertical="true">
 
-           <ImageView
+            <ImageView
                 android:id="@+id/icon1"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
@@ -175,14 +220,12 @@
                 android:layout_height="wrap_content"
                 android:text="Activity"
                 android:textColor="@android:color/white"
-                android:textSize="10dp"
+                android:textSize="10sp"
                 android:layout_below="@id/icon1"
                 android:layout_centerHorizontal="true"
-                android:layout_marginBottom="-8dp"
-               />
+                android:layout_marginBottom="-8dp"/>
         </RelativeLayout>
 
-        <!-- Second icon -->
         <RelativeLayout
             android:id="@+id/item2"
             android:layout_width="wrap_content"
@@ -197,20 +240,20 @@
                 android:layout_height="48dp"
                 android:src="@drawable/cam"
                 android:scaleType="centerCrop"
+                android:alpha=".1"
                 android:padding="4dp"/>
 
             <TextView
                 android:id="@+id/text2"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Icon 2"
+                android:text=""
                 android:textColor="@android:color/white"
                 android:textSize="12sp"
                 android:layout_below="@id/icon2"
                 android:layout_centerHorizontal="true"
                 android:layout_marginTop="10dp"/>
         </RelativeLayout>
-
 
         <RelativeLayout
             android:id="@+id/item3"
@@ -235,11 +278,10 @@
                 android:layout_height="wrap_content"
                 android:text="Create"
                 android:textColor="@android:color/white"
-                android:textSize="10dp"
+                android:textSize="10sp"
                 android:layout_below="@id/icon3"
                 android:layout_centerHorizontal="true"
-                android:layout_marginBottom="-8dp"
-                />
+                android:layout_marginBottom="-8dp"/>
         </RelativeLayout>
 
         <RelativeLayout
@@ -265,10 +307,37 @@
                 android:layout_height="wrap_content"
                 android:text="Create Post"
                 android:textColor="@android:color/white"
-                android:textSize="10dp"
+                android:textSize="10sp"
                 android:layout_below="@id/icon4"
+                android:layout_centerHorizontal="true"/>
+        </RelativeLayout>
+
+        <RelativeLayout
+            android:id="@+id/item5"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_toEndOf="@id/item4"
+            android:layout_centerVertical="true"
+            android:layout_marginStart="16dp">
+
+            <ImageView
+                android:id="@+id/icon5"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/browse"
+                android:scaleType="centerCrop"
+                android:padding="15dp"/>
+
+            <TextView
+                android:id="@+id/text5"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Browse"
+                android:textColor="@android:color/white"
+                android:textSize="10sp"
+                android:layout_below="@id/icon5"
                 android:layout_centerHorizontal="true"
-                />
+                android:layout_marginBottom="-9dp"/>
         </RelativeLayout>
 
         <RelativeLayout
@@ -294,41 +363,11 @@
                 android:layout_height="wrap_content"
                 android:text="Share"
                 android:textColor="@android:color/white"
-                android:textSize="10dp"
+                android:textSize="10sp"
                 android:layout_below="@id/icon6"
                 android:layout_centerHorizontal="true"
                 android:layout_marginBottom="-9dp"/>
         </RelativeLayout>
-
-
-        <RelativeLayout
-            android:id="@+id/item5"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_toEndOf="@id/item4"
-            android:layout_centerVertical="true"
-            android:layout_marginStart="16dp">
-
-            <ImageView
-                android:id="@+id/icon5"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/browse"
-                android:scaleType="centerCrop"
-                android:padding="15dp"/>
-
-            <TextView
-                android:id="@+id/text5"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Browse"
-                android:textColor="@android:color/white"
-                android:textSize="10dp"
-                android:layout_below="@id/icon5"
-                android:layout_centerHorizontal="true"
-                android:layout_marginBottom="-9dp"/>
-        </RelativeLayout>
-
 
         <RelativeLayout
             android:id="@+id/item7"
@@ -353,15 +392,10 @@
                 android:layout_height="wrap_content"
                 android:text="More"
                 android:textColor="@android:color/white"
-                android:textSize="10dp"
+                android:textSize="10sp"
                 android:layout_below="@id/icon7"
                 android:layout_centerHorizontal="true"
                 android:layout_marginBottom="-9dp"/>
         </RelativeLayout>
-
     </RelativeLayout>
-
-
-
-
 </RelativeLayout>

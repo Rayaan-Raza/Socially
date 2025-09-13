@@ -3,7 +3,6 @@
     <ImageView
         android:layout_width="44dp"
         android:layout_height="44dp"
-        android:background="@drawable/circle_white_border"
         android:src="@drawable/hashtag"
         android:scaleType="centerInside"
         android:padding="10dp"/>

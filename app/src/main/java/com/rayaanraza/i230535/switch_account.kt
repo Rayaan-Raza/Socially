@@ -18,8 +18,13 @@ class switch_account : AppCompatActivity() {
         }
 
         findViewById<MaterialButton>(R.id.log_in).setOnClickListener {
-            startActivity(Intent(this, home_page::class.java))
-            finish()
+            val intent = Intent(this, home_page::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
         }
+
+
+
     }
+
 }

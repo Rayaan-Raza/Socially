@@ -6,7 +6,6 @@ import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import android.widget.ImageView
-import com.rayaanraza.i230535.R.id.create_account
 
 class signup_page : AppCompatActivity() {
 
@@ -22,7 +21,9 @@ class signup_page : AppCompatActivity() {
 
 
         findViewById<MaterialButton>(R.id.create_account).setOnClickListener {
-            startActivity(Intent(this, switch_account::class.java))
+            val intent = Intent(this, home_page::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
             finish()
         }
     }

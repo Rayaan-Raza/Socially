@@ -5,14 +5,14 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".story"
+    tools:context=".story_post"
     android:background="@color/black">
 
 
     <FrameLayout
         android:id="@+id/bird_frame"
         android:layout_width="match_parent"
-        android:layout_height="670dp"
+        android:layout_height="match_parent"
         android:clipToOutline="true"
         android:background="@drawable/story_bg">
 
@@ -41,7 +41,7 @@
                     android:id="@+id/icon1"
                     android:layout_width="30dp"
                     android:layout_height="30dp"
-                    android:src="@drawable/Close"
+                    android:src="@drawable/close"
                     android:background="@drawable/circular_background"
                     android:scaleType="fitCenter"
                     android:layout_marginTop="15dp"
@@ -224,6 +224,7 @@
                 android:layout_weight="1"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
+                android:id="@+id/post_2"
                 android:paddingStart="12dp"
                 android:paddingEnd="12dp"
                 android:background="@drawable/pill_bg_dark">
@@ -280,6 +281,7 @@
                 android:background="@drawable/circular_background"
                 android:backgroundTint="@color/white"
                 android:padding="12dp"
+                android:id="@+id/post"
                 android:scaleType="centerInside"/>
         </LinearLayout>
 

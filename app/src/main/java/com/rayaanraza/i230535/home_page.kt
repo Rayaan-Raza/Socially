@@ -1,50 +1,52 @@
 package com.rayaanraza.i230535
 
+import android.content.Intent
 import android.os.Bundle
+import android.widget.FrameLayout
 import android.widget.ImageView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.navigation.NavController
-import androidx.navigation.fragment.NavHostFragment
 
 class home_page : AppCompatActivity() {
 
-    private lateinit var likeImageView: ImageView
-    private lateinit var searchImageView: ImageView
-    private lateinit var dmsImageView: ImageView
+    private var isPostLiked = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_home_page)
 
-        likeImageView = findViewById(R.id.heart)
-        searchImageView = findViewById(R.id.search)
-        dmsImageView = findViewById(R.id.dms)
-
-        likeImageView.setOnClickListener {
-            val isLiked = likeImageView.drawable.constantState == resources.getDrawable(R.drawable.like).constantState
-            if (isLiked) {
-                likeImageView.setImageResource(R.drawable.liked) // Change to liked image
-                Toast.makeText(this, "Liked!", Toast.LENGTH_SHORT).show()
-            } else {
-                likeImageView.setImageResource(R.drawable.like) // Change back to like image
-                Toast.makeText(this, "Unliked!", Toast.LENGTH_SHORT).show()
-            }
+        findViewById<ImageView>(R.id.like).setOnClickListener { postLikeImageView ->
+            isPostLiked = !isPostLiked
+            (postLikeImageView as ImageView).setImageResource(
+                if (isPostLiked) R.drawable.liked else R.drawable.like
+            )
         }
 
-        searchImageView.setOnClickListener {
-            val navController = findNavController(R.id.search)
-            navController.navigate(R.id.search)
+        findViewById<ImageView>(R.id.heart).setOnClickListener {
+            startActivity(Intent(this, following_page::class.java))
         }
 
-        dmsImageView.setOnClickListener {
-            val navController = findNavController(R.id.dms)
-            navController.navigate(R.id.dms)
+        findViewById<FrameLayout>(R.id.story_clickable).setOnClickListener {
+            startActivity(Intent(this, story_view::class.java))
         }
-    }
 
-    private fun findNavController(id: Int): NavController {
-        val navHostFragment = supportFragmentManager.findFragmentById(id) as NavHostFragment
-        return navHostFragment.navController
+        findViewById<ImageView>(R.id.search).setOnClickListener {
+            startActivity(Intent(this, search_feed::class.java))
+        }
+
+        findViewById<ImageView>(R.id.dms).setOnClickListener {
+            startActivity(Intent(this, dms::class.java))
+        }
+
+        findViewById<ImageView>(R.id.camera).setOnClickListener {
+            startActivity(Intent(this, camera::class.java))
+        }
+
+        findViewById<ImageView>(R.id.post).setOnClickListener {
+            startActivity(Intent(this, posting::class.java))
+        }
+
+        findViewById<ImageView>(R.id.profile).setOnClickListener {
+            startActivity(Intent(this, my_profile::class.java))
+        }
     }
 }

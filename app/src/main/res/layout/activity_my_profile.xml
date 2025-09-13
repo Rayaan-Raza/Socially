@@ -5,7 +5,8 @@
     android:layout_height="match_parent"
     xmlns:tools="http://schemas.android.com/tools"
     tools:context=".my_profile"
-    android:background="@color/white">
+    android:background="@color/white"
+    android:id="@+id/main">
 
     <RelativeLayout
         android:id="@+id/topBar"
@@ -52,7 +53,7 @@
             android:layout_height="16dp"
             android:layout_alignParentEnd="true"
             android:layout_centerVertical="true"
-            android:src="@drawable/Union"
+            android:src="@drawable/union"
             android:background="@drawable/menu_options"
             android:backgroundTint="@color/smd_theme"
             android:layout_marginRight="10dp"
@@ -82,16 +83,34 @@
                 android:paddingTop="16dp"
                 android:paddingBottom="16dp">
 
-                <ImageView
+                <FrameLayout
                     android:id="@+id/profileImage"
                     android:layout_width="80dp"
                     android:layout_height="80dp"
-                    android:layout_alignParentStart="true"
-                    android:layout_centerVertical="true"
-                    android:background="@drawable/circular_background"
-                    android:clipToOutline="true"
-                    android:src="@drawable/person1"
-                    android:scaleType="centerCrop" />
+                    >
+
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/highlight_circle" />
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="72dp"
+                        android:layout_height="72dp"
+                        android:layout_gravity="center"
+                        android:layout_margin="10dp"
+                        app:cardCornerRadius="36dp"
+                        app:cardUseCompatPadding="false"
+                        app:cardPreventCornerOverlap="true">
+
+                        <ImageView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/person1" />
+                    </androidx.cardview.widget.CardView>
+                </FrameLayout>
+
 
                 <LinearLayout
                     android:id="@+id/statsContainer"
@@ -290,17 +309,35 @@
                     android:gravity="center"
                     android:layout_marginEnd="16dp">
 
-                    <ImageView
-                        android:id="@+id/friendsHighlightIcon"
+                    <FrameLayout
+                        android:id="@+id/friendsHighlightContainer"
                         android:layout_width="60dp"
-                        android:layout_height="60dp"
-                        android:src="@drawable/lake"
-                        android:background="@drawable/highlight_circle"
-                        android:clipToOutline="true"
-                        android:scaleType="centerCrop"
-                        android:padding="3dp"
+                        android:layout_height="60dp">
 
-                         />
+                        <ImageView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:src="@drawable/highlight_circle"
+                            />
+
+                        <androidx.cardview.widget.CardView
+                            android:layout_width="52dp"
+                            android:layout_height="52dp"
+                            android:layout_gravity="center"
+                            android:layout_margin="10dp"
+                            app:cardCornerRadius="26dp"
+                            app:cardUseCompatPadding="false"
+                            app:cardPreventCornerOverlap="true">
+
+                            <ImageView
+                                android:id="@+id/friendsHighlightIcon"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:scaleType="centerCrop"
+                                android:src="@drawable/people" />
+                        </androidx.cardview.widget.CardView>
+                    </FrameLayout>
+
 
                     <TextView
                         android:id="@+id/friendsHighlightLabel"
@@ -322,14 +359,34 @@
                     android:gravity="center"
                     android:layout_marginEnd="16dp">
 
-                    <ImageView
-                        android:id="@+id/sportHighlightIcon"
+                    <FrameLayout
+                        android:id="@+id/sportHighlightContainer"
                         android:layout_width="60dp"
-                        android:layout_height="60dp"
-                        android:src="@drawable/lake"
-                        android:background="@drawable/highlight_circle"
-                        android:clipToOutline="true"
-                        android:scaleType="centerCrop" />
+                        android:layout_height="60dp">
+
+                        <ImageView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:src="@drawable/highlight_circle" />
+
+                        <androidx.cardview.widget.CardView
+                            android:layout_width="52dp"
+                            android:layout_height="52dp"
+                            android:layout_gravity="center"
+                            android:layout_margin="4dp"
+                            app:cardCornerRadius="26dp"
+                            app:cardUseCompatPadding="false"
+                            app:cardPreventCornerOverlap="true">
+
+                            <ImageView
+                                android:id="@+id/sportHighlightIcon"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:scaleType="centerCrop"
+                                android:src="@drawable/city" />
+                        </androidx.cardview.widget.CardView>
+                    </FrameLayout>
+
 
                     <TextView
                         android:id="@+id/sportHighlightLabel"
@@ -349,14 +406,34 @@
                     android:orientation="vertical"
                     android:gravity="center">
 
-                    <ImageView
-                        android:id="@+id/designHighlightIcon"
+                    <FrameLayout
+                        android:id="@+id/designHighlightContainer"
                         android:layout_width="60dp"
-                        android:layout_height="60dp"
-                        android:src="@drawable/person1"
-                        android:background="@drawable/highlight_circle"
-                        android:clipToOutline="true"
-                        android:scaleType="centerCrop" />
+                        android:layout_height="60dp">
+
+                        <ImageView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:src="@drawable/highlight_circle" />
+
+                        <androidx.cardview.widget.CardView
+                            android:layout_width="52dp"
+                            android:layout_height="52dp"
+                            android:layout_gravity="center"
+                            android:layout_margin="4dp"
+                            app:cardCornerRadius="26dp"
+                            app:cardUseCompatPadding="false"
+                            app:cardPreventCornerOverlap="true">
+
+                            <ImageView
+                                android:id="@+id/designHighlightIcon"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:scaleType="centerCrop"
+                                android:src="@drawable/person1" />
+                        </androidx.cardview.widget.CardView>
+                    </FrameLayout>
+
 
                     <TextView
                         android:id="@+id/designHighlightLabel"
@@ -434,7 +511,7 @@
                         android:layout_height="120dp"
                         android:layout_weight="1"
                         android:scaleType="centerCrop"
-                        android:src="@drawable/lake"
+                        android:src="@drawable/city"
                         android:layout_margin="2dp" />
 
                     <ImageView
@@ -451,7 +528,7 @@
                         android:layout_weight="1"
                         android:layout_margin="2dp"
                         android:scaleType="centerCrop"
-                        android:src="@drawable/lake"/>
+                        android:src="@drawable/people"/>
                 </LinearLayout>
 
                 <LinearLayout
@@ -464,7 +541,7 @@
                         android:layout_height="120dp"
                         android:layout_weight="1"
                         android:scaleType="centerCrop"
-                        android:src="@drawable/lake"
+                        android:src="@drawable/man_coffee"
                         android:layout_margin="2dp"/>
 
                     <ImageView
@@ -472,7 +549,7 @@
                         android:layout_height="120dp"
                         android:layout_weight="1"
                         android:scaleType="centerCrop"
-                        android:src="@drawable/lake"
+                        android:src="@drawable/landscape"
                         android:layout_margin="2dp"/>
 
                     <ImageView
@@ -480,7 +557,7 @@
                         android:layout_height="120dp"
                         android:layout_weight="1"
                         android:scaleType="centerCrop"
-                        android:src="@drawable/lake"
+                        android:src="@drawable/karenne"
                         android:layout_margin="2dp"
                         />
                 </LinearLayout>
@@ -494,7 +571,7 @@
                         android:layout_height="120dp"
                         android:layout_weight="1"
                         android:scaleType="centerCrop"
-                        android:src="@drawable/lake"
+                        android:src="@drawable/white_man"
                         android:layout_margin="2dp"/>
 
                     <ImageView
@@ -502,7 +579,7 @@
                         android:layout_height="120dp"
                         android:layout_weight="1"
                         android:scaleType="centerCrop"
-                        android:src="@drawable/lake"
+                        android:src="@drawable/white_woman"
                         android:layout_margin="2dp"/>
 
                     <ImageView
@@ -510,7 +587,7 @@
                         android:layout_height="120dp"
                         android:layout_weight="1"
                         android:scaleType="centerCrop"
-                        android:src="@drawable/lake"
+                        android:src="@drawable/italian_man"
                         android:layout_margin="2dp"
                         />
                 </LinearLayout>
