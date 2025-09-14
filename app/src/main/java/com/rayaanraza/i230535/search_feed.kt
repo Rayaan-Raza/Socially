@@ -43,6 +43,7 @@ class search_feed : AppCompatActivity() {
 
         findViewById<EditText>(R.id.search).setOnClickListener {
             startActivity(Intent(this, specific_search::class.java))
+            finish()
         }
     }
 }

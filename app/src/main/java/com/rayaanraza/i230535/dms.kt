@@ -2,6 +2,7 @@ package com.rayaanraza.i230535
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
@@ -25,6 +26,13 @@ class dms : AppCompatActivity() {
 
         findViewById<LinearLayout>(clickable).setOnClickListener {
             startActivity(Intent(this, chat::class.java))
+            finish()
+
+        }
+
+        findViewById<ImageView>(R.id.back).setOnClickListener {
+            startActivity(Intent(this, home_page::class.java))
+            finish()
 
         }
     }

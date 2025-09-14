@@ -27,6 +27,12 @@ class view_profile_2 : AppCompatActivity() {
 
         }
 
+        findViewById<TextView>(R.id.backButton).setOnClickListener {
+            startActivity(Intent(this, specific_search::class.java))
+            finish()
+
+        }
+
         findViewById<ImageView>(R.id.navHome).setOnClickListener {
             startActivity(Intent(this, home_page::class.java))
             finish()

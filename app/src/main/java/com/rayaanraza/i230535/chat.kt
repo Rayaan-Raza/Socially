@@ -28,6 +28,7 @@ class chat : AppCompatActivity() {
 
         findViewById<ImageView>(R.id.info).setOnClickListener {
             startActivity(Intent(this, call_page::class.java))
+            finish()
         }
 
 

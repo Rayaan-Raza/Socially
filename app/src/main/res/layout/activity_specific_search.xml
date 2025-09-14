@@ -27,13 +27,13 @@
             android:layout_toLeftOf="@id/scan"
             android:layout_marginEnd="12dp"
             android:background="@drawable/acc_bar"
-            android:hint="Search"
-            android:textColorHint="#7A7171"
+            android:hint="internshala"
+            android:textColorHint="@color/black"
             android:paddingStart="12dp"
             android:paddingEnd="12dp"
             android:drawableStart="@drawable/search"
             android:drawableEnd="@drawable/close"
-            android:drawableTint="#494545"
+            android:drawableTint="#766D6D"
             android:drawablePadding="8dp"
             android:inputType="text"/>
 

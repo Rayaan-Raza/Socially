@@ -22,28 +22,23 @@ class login_sign : AppCompatActivity() {
         }
 
         findViewById<TextView>(R.id.log_in).setOnClickListener {
-            try {
+
                 startActivity(Intent(this, home_page::class.java))
                 finish()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+
         }
 
         findViewById<TextView>(R.id.switch_acc).setOnClickListener {
-            try {
+
                 startActivity(Intent(this, switch_account::class.java))
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+
         }
 
         findViewById<TextView>(R.id.Sign_up).setOnClickListener {
-            try {
+
                 startActivity(Intent(this, signup_page::class.java))
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            finish()
+
         }
     }
 

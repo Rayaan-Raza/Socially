@@ -25,5 +25,10 @@ class specific_search : AppCompatActivity() {
         findViewById<RelativeLayout>(R.id.clickable).setOnClickListener {
             startActivity(Intent(this, view_profile::class.java))
         }
+
+        findViewById<TextView>(R.id.scan).setOnClickListener {
+            startActivity(Intent(this, search_feed::class.java))
+            finish()
+        }
     }
 }

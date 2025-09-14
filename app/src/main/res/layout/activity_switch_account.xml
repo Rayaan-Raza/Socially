@@ -27,6 +27,7 @@
         android:hint="Username"
         android:background="@drawable/acc_bar"
         android:textColorHint="@color/material_grey_600"
+        android:textColor="@color/black"
         android:layout_centerHorizontal="true"
         android:layout_marginTop="250dp"
         android:id="@id/username">

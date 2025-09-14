@@ -195,7 +195,6 @@
                 app:layout_columnWeight="1"
                 app:layout_gravity="fill"/>
 
-            <!-- Row 2 (three small tiles) -->
             <ImageView
                 android:layout_width="0dp"
                 android:layout_height="120dp"
@@ -205,6 +204,7 @@
                 app:layout_column="0"
                 app:layout_columnWeight="1"
                 app:layout_gravity="fill"/>
+
 
             <ImageView
                 android:layout_width="0dp"

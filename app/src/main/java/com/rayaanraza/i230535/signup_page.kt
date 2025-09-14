@@ -19,12 +19,10 @@ class signup_page : AppCompatActivity() {
             finish()
         }
 
-
         findViewById<MaterialButton>(R.id.create_account).setOnClickListener {
-            val intent = Intent(this, home_page::class.java)
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            startActivity(intent)
+            startActivity(Intent(this, home_page::class.java))
             finish()
         }
+
     }
 }

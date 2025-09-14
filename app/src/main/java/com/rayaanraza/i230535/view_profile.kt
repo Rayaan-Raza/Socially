@@ -26,6 +26,12 @@ class view_profile : AppCompatActivity() {
 
         }
 
+        findViewById<ImageView>(R.id.backButton).setOnClickListener {
+            startActivity(Intent(this, specific_search::class.java))
+            finish()
+
+        }
+
         findViewById<ImageView>(R.id.navSearch).setOnClickListener {
             startActivity(Intent(this, search_feed::class.java))
             finish()

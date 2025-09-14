@@ -30,6 +30,7 @@ class camera : AppCompatActivity() {
 
         findViewById<RelativeLayout>(R.id.capture_button_container).setOnClickListener {
             startActivity(Intent(this, story_post::class.java))
+            finish()
         }
     }
 }

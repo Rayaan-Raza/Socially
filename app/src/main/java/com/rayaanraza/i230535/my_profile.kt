@@ -23,6 +23,7 @@ class my_profile : AppCompatActivity() {
 
         findViewById<TextView>(R.id.editProfileBtn).setOnClickListener {
             startActivity(Intent(this, edit_profile::class.java))
+            finish()
 
         }
 
@@ -55,6 +56,7 @@ class my_profile : AppCompatActivity() {
 
         findViewById<FrameLayout>(R.id.profileImage).setOnClickListener {
             startActivity(Intent(this, my_story_view::class.java))
+            finish()
         }
 
 

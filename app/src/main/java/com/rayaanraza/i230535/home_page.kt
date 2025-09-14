@@ -27,10 +27,12 @@ class home_page : AppCompatActivity() {
 
         findViewById<FrameLayout>(R.id.story_clickable).setOnClickListener {
             startActivity(Intent(this, story_view::class.java))
+            finish()
         }
 
         findViewById<ImageView>(R.id.search).setOnClickListener {
             startActivity(Intent(this, search_feed::class.java))
+            finish()
         }
 
         findViewById<ImageView>(R.id.dms).setOnClickListener {
@@ -39,6 +41,7 @@ class home_page : AppCompatActivity() {
 
         findViewById<ImageView>(R.id.camera).setOnClickListener {
             startActivity(Intent(this, camera::class.java))
+            finish()
         }
 
         findViewById<ImageView>(R.id.post).setOnClickListener {
