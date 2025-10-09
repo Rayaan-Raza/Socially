@@ -48,7 +48,6 @@ class switch_account : AppCompatActivity() {
                         return@addOnSuccessListener
                     }
 
-                    // Read profileCompleted from Realtime DB
                     val userRef = FirebaseDatabase.getInstance().getReference("users").child(uid)
                     userRef.get()
                         .addOnSuccessListener { snap ->
