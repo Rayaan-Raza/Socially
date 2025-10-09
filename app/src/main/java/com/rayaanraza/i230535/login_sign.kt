@@ -23,7 +23,6 @@ class login_sign : AppCompatActivity() {
 
         auth = FirebaseAuth.getInstance()
 
-        // If already logged in, skip this screen
         if (auth.currentUser != null) {
             startActivity(Intent(this, home_page::class.java))
             finish()
