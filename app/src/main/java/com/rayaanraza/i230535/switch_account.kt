@@ -59,7 +59,6 @@ class switch_account : AppCompatActivity() {
                         }
                         .addOnFailureListener { e ->
                             Toast.makeText(this, "Could not read profile: ${e.message}", Toast.LENGTH_LONG).show()
-                            // Fallback to home if you prefer:
                             startActivity(Intent(this, home_page::class.java))
                             finish()
                         }
