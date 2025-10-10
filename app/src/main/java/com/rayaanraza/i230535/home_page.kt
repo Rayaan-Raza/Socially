@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
+import com.google.firebase.auth.FirebaseAuth
 
 class home_page : AppCompatActivity() {
 
@@ -40,13 +41,23 @@ class home_page : AppCompatActivity() {
         }
 
         findViewById<ImageView>(R.id.camera).setOnClickListener {
-            startActivity(Intent(this, camera::class.java))
-            finish()
+            startActivity(Intent(this, camera_activiy::class.java))
+
         }
 
         findViewById<ImageView>(R.id.post).setOnClickListener {
             startActivity(Intent(this, posting::class.java))
         }
+
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        findViewById<ImageView>(R.id.ring1).setOnClickListener {
+            startActivity(
+                Intent(this, camera_story::class.java)
+                    .putExtra("uid", uid)
+            )
+        }
+
+
 
         findViewById<ImageView>(R.id.profile).setOnClickListener {
             startActivity(Intent(this, my_profile::class.java))
