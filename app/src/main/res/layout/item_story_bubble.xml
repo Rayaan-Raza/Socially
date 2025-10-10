@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="72dp"
+    android:layout_height="wrap_content"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    >
+
+    <FrameLayout
+        android:layout_width="74dp"
+        android:layout_height="72dp">
+
+        <!-- ring (we’ll tint/alpha to show active/inactive) -->
+        <ImageView
+            android:id="@+id/imgRing"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/story_circle"/>
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_gravity="center"
+            app:cardCornerRadius="30dp"
+            app:cardUseCompatPadding="false"
+            app:cardPreventCornerOverlap="true">
+
+            <ImageView
+                android:id="@+id/pfp"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"/>
+        </androidx.cardview.widget.CardView>
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/username"
+        android:layout_width="72dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:ellipsize="end"/>
+</LinearLayout>

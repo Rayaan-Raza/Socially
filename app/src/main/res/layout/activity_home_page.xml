@@ -4,8 +4,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/root"
     android:layout_width="match_parent"
-    tools:context=".home_page"
     android:layout_height="match_parent"
+    tools:context=".home_page"
     android:background="#FFFFFF">
 
     <RelativeLayout
@@ -23,23 +23,19 @@
             android:layout_centerVertical="true"
             android:src="@drawable/cam"
             app:tint="@color/smd_theme"
-            tools:ignore="ContentDescription">
-
-        </ImageView>
+            tools:ignore="ContentDescription" />
 
         <TextView
             android:id="@+id/Socially"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Socially"
-            android:textSize="18dp"
+            android:textSize="18sp"
             android:textStyle="bold"
             android:layout_centerInParent="true"
             android:fontFamily="@font/instagram_sans_bold"
             android:textColor="@color/smd_theme"
-            tools:ignore="HardcodedText,SpUsage">
-
-        </TextView>
+            tools:ignore="HardcodedText,SpUsage" />
 
         <ImageView
             android:id="@+id/dms"
@@ -49,9 +45,7 @@
             android:layout_centerVertical="true"
             android:src="@drawable/share"
             app:tint="@color/smd_theme"
-            tools:ignore="ContentDescription">
-
-        </ImageView>
+            tools:ignore="ContentDescription" />
 
         <ImageView
             android:id="@+id/reels"
@@ -61,10 +55,7 @@
             android:layout_toLeftOf="@+id/dms"
             android:layout_marginEnd="16dp"
             android:src="@drawable/reels"
-            app:tint="@color/smd_theme">
-
-        </ImageView>
-
+            app:tint="@color/smd_theme" />
 
     </RelativeLayout>
 
@@ -73,323 +64,24 @@
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:layout_below="@id/topBar"
-        android:background="#1A000000"
-        android:text="">
+        android:background="#1A000000" />
 
-    </TextView>
-
-    <HorizontalScrollView
-        android:id="@+id/storiesScroll"
+    <!-- NEW: RecyclerView for stories -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvStories"
         android:layout_width="match_parent"
         android:layout_height="110dp"
         android:layout_below="@id/boundary_top"
         android:paddingStart="8dp"
-        android:paddingEnd="8dp">
-
-        <LinearLayout
-            android:id="@+id/storiesRow"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <LinearLayout
-                android:id="@+id/story1"
-                android:layout_width="72dp"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center_horizontal"
-                >
-
-                <FrameLayout
-                    android:layout_width="74dp"
-                    android:layout_height="72dp">
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:src="@drawable/story_circle"
-                        android:id="@+id/ring1"/>
-
-                    <androidx.cardview.widget.CardView
-                        android:layout_width="60dp"
-                        android:layout_height="60dp"
-                        android:layout_gravity="center"
-                        app:cardCornerRadius="32dp"
-                        app:cardUseCompatPadding="false"
-                        app:cardPreventCornerOverlap="true"
-                        >
-
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/person1"
-
-                            android:id="@+id/pfp1"/>
-                    </androidx.cardview.widget.CardView>
-
-                </FrameLayout>
-
-                <TextView
-                    android:layout_width="72dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:gravity="center"
-                    android:text="Your Story"
-                    android:textSize="12dp"
-                    android:id="@+id/my_username1"/>
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/story2"
-                android:layout_width="72dp"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center_horizontal"
-                android:layout_marginStart="10dp"
-                android:layout_marginEnd="10dp">
-
-                <FrameLayout
-                    android:layout_width="74dp"
-                    android:layout_height="72dp"
-                    android:id="@+id/story_clickable"
-                    >
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:src="@drawable/story_circle"
-                        android:id="@+id/ring2"/>
-
-                    <androidx.cardview.widget.CardView
-                        android:layout_width="60dp"
-                        android:layout_height="60dp"
-                        android:layout_gravity="center"
-                        app:cardCornerRadius="32dp"
-                        app:cardUseCompatPadding="false"
-                        app:cardPreventCornerOverlap="true"
-                        >
-
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/karenne"
-                            android:id="@+id/pfp2"/>
-                    </androidx.cardview.widget.CardView>
-
-                </FrameLayout>
-
-                <TextView
-                    android:layout_width="72dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:gravity="center"
-                    android:text="Karennne"
-                    android:textSize="12dp"
-                    android:id="@+id/my_username2"/>
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/story3"
-                android:layout_width="72dp"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center_horizontal"
-                android:layout_marginEnd="10dp">
-
-                <FrameLayout
-                    android:layout_width="74dp"
-                    android:layout_height="72dp">
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:src="@drawable/story_circle"
-                        android:id="@+id/ring3"/>
-
-                    <androidx.cardview.widget.CardView
-                        android:layout_width="60dp"
-                        android:layout_height="60dp"
-                        android:layout_gravity="center"
-                        app:cardCornerRadius="32dp"
-                        app:cardUseCompatPadding="false"
-                        app:cardPreventCornerOverlap="true">
-
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/black_man"
-                            android:id="@+id/pfp3"/>
-                    </androidx.cardview.widget.CardView>
-
-                </FrameLayout>
-
-                <TextView
-                    android:layout_width="72dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:gravity="center"
-                    android:text="zackjohn"
-                    android:textSize="12dp"
-                    android:id="@+id/my_username3"/>
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/story4"
-                android:layout_width="72dp"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center_horizontal"
-                android:layout_marginEnd="10dp">
-
-                <FrameLayout
-                    android:layout_width="74dp"
-                    android:layout_height="72dp">
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:src="@drawable/story_circle"
-                        android:id="@+id/ring4"/>
-
-                    <androidx.cardview.widget.CardView
-                        android:layout_width="60dp"
-                        android:layout_height="60dp"
-                        android:layout_gravity="center"
-                        app:cardCornerRadius="32dp"
-                        app:cardUseCompatPadding="false"
-                        app:cardPreventCornerOverlap="true">
-
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/italian_man"
-                            android:id="@+id/pfp4"/>
-                    </androidx.cardview.widget.CardView>
-
-                </FrameLayout>
-
-                <TextView
-                    android:layout_width="72dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:gravity="center"
-                    android:text="kieron_d"
-                    android:textSize="12dp"
-                    android:id="@+id/my_username4"/>
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/story5"
-                android:layout_width="72dp"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center_horizontal"
-                android:layout_marginEnd="10dp">
-
-                <FrameLayout
-                    android:layout_width="74dp"
-                    android:layout_height="72dp">
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:src="@drawable/story_circle"
-                        android:id="@+id/ring5"/>
-
-                    <androidx.cardview.widget.CardView
-                        android:layout_width="60dp"
-                        android:layout_height="60dp"
-                        android:layout_gravity="center"
-                        app:cardCornerRadius="32dp"
-                        app:cardUseCompatPadding="false"
-                        app:cardPreventCornerOverlap="true">
-
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/white_woman"
-                            android:id="@+id/pfp5"/>
-                    </androidx.cardview.widget.CardView>
-
-                </FrameLayout>
-
-                <TextView
-                    android:layout_width="72dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:gravity="center"
-                    android:text="anna_m"
-                    android:textSize="12dp"
-                    android:id="@+id/my_username5"/>
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/story6"
-                android:layout_width="72dp"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center_horizontal"
-                android:layout_marginEnd="10dp">
-
-                <FrameLayout
-                    android:layout_width="74dp"
-                    android:layout_height="72dp">
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:src="@drawable/story_circle"
-                        android:id="@+id/ring6"/>
-
-                    <androidx.cardview.widget.CardView
-                        android:layout_width="60dp"
-                        android:layout_height="60dp"
-                        android:layout_gravity="center"
-                        app:cardCornerRadius="32dp"
-                        app:cardUseCompatPadding="false"
-                        app:cardPreventCornerOverlap="true">
-
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/person1"
-                            android:id="@+id/pfp6"/>
-                    </androidx.cardview.widget.CardView>
-
-                </FrameLayout>
-
-                <TextView
-                    android:layout_width="72dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:gravity="center"
-                    android:text="harry_s"
-                    android:textSize="12dp"
-                    android:id="@+id/my_username6"/>
-            </LinearLayout>
-
-        </LinearLayout>
-    </HorizontalScrollView>
-
-
+        android:paddingEnd="8dp"
+        android:clipToPadding="false" />
 
     <TextView
         android:id="@+id/stories_bar"
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:layout_below="@id/storiesScroll"
-        android:background="#1A000000"
-        android:text="">
-
-    </TextView>
-
+        android:layout_below="@id/rvStories"
+        android:background="#1A000000" />
 
     <ScrollView
         android:id="@+id/feedScroll"
@@ -405,7 +97,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-
+            <!-- everything below here is unchanged from your feed -->
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
@@ -422,10 +114,7 @@
                     android:src="@drawable/black_man"
                     android:clipToOutline="true"
                     android:scaleType="centerCrop"
-
-                    android:layout_centerVertical="true">
-
-                </ImageView>
+                    android:layout_centerVertical="true" />
 
                 <LinearLayout
                     android:layout_width="wrap_content"
@@ -439,18 +128,14 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="joshua_l"
-                        android:textStyle="bold">
-
-                    </TextView>
+                        android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Tokyo, Japan"
-                        android:textSize="12dp"
-                        android:textColor="#7A7A7A">
-
-                    </TextView>
+                        android:textSize="12sp"
+                        android:textColor="#7A7A7A" />
                 </LinearLayout>
 
                 <ImageView
@@ -459,10 +144,7 @@
                     android:layout_height="20dp"
                     android:layout_alignParentEnd="true"
                     android:layout_centerVertical="true"
-                    android:src="@drawable/options"
-                    >
-
-                </ImageView>
+                    android:src="@drawable/options" />
 
                 <ImageView
                     android:id="@+id/verifiedBadge"
@@ -473,26 +155,19 @@
                     android:layout_marginRight="270dp"
                     android:tint="@color/smd_theme"
                     android:padding="3dp"
-
-                    tools:ignore="UseAppTint">
-
-                </ImageView>
+                    tools:ignore="UseAppTint" />
             </RelativeLayout>
 
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
 
-
-
                 <ImageView
                     android:id="@+id/p1Image"
                     android:layout_width="match_parent"
                     android:layout_height="240dp"
                     android:scaleType="centerCrop"
-                    android:src="@drawable/lake">
-
-                </ImageView>
+                    android:src="@drawable/lake" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -505,14 +180,8 @@
                     android:textColor="@color/white"
                     android:backgroundTint="@color/smd_theme"
                     android:layout_marginRight="20dp"
-                    android:layout_marginTop="8dp"
-                    >
-
-                </TextView>
+                    android:layout_marginTop="8dp" />
             </RelativeLayout>
-
-
-
 
             <RelativeLayout
                 android:layout_width="match_parent"
@@ -552,9 +221,7 @@
                     android:src="@drawable/options"
                     android:layout_centerHorizontal="true"
                     android:layout_centerInParent="true"
-                    app:tint="@color/smd_theme">
-
-                </ImageView>
+                    app:tint="@color/smd_theme" />
 
                 <ImageView
                     android:id="@+id/p1Save"
@@ -574,10 +241,7 @@
                     android:layout_height="wrap_content"
                     android:src="@drawable/oval"
                     android:id="@+id/liked_by"
-                    android:layout_marginLeft="10dp"
-                    >
-
-                </ImageView>
+                    android:layout_marginLeft="10dp" />
 
                 <TextView
                     android:layout_width="match_parent"
@@ -586,11 +250,8 @@
                     android:paddingEnd="12dp"
                     android:text="Liked by craig_love and 44,686 others"
                     android:textStyle="bold"
-                    android:layout_marginLeft="25dp"/>
-
+                    android:layout_marginLeft="25dp" />
             </RelativeLayout>
-
-
 
             <TextView
                 android:layout_width="match_parent"
@@ -598,7 +259,7 @@
                 android:paddingStart="12dp"
                 android:paddingEnd="12dp"
                 android:paddingBottom="16dp"
-                android:text="joshua_l  The game in Japan was amazing and I want to share some photos"/>
+                android:text="joshua_l  The game in Japan was amazing and I want to share some photos" />
 
             <RelativeLayout
                 android:layout_width="match_parent"
@@ -616,7 +277,7 @@
                     android:src="@drawable/italian_man"
                     android:clipToOutline="true"
                     android:scaleType="centerCrop"
-                    android:layout_centerVertical="true"/>
+                    android:layout_centerVertical="true" />
 
                 <LinearLayout
                     android:layout_width="wrap_content"
@@ -629,14 +290,14 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="alex_k"
-                        android:textStyle="bold"/>
+                        android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Berlin, Germany"
-                        android:textSize="12dp"
-                        android:textColor="#7A7A7A"/>
+                        android:textSize="12sp"
+                        android:textColor="#7A7A7A" />
                 </LinearLayout>
 
                 <ImageView
@@ -651,7 +312,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="240dp"
                 android:scaleType="centerCrop"
-                android:src="@drawable/people"   />
+                android:src="@drawable/people" />
 
             <RelativeLayout
                 android:layout_width="match_parent"
@@ -691,18 +352,15 @@
                     android:src="@drawable/save" />
             </RelativeLayout>
 
-
             <RelativeLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                >
+                android:layout_height="wrap_content">
+
                 <ImageView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:src="@drawable/oval"
-                    android:layout_marginLeft="10dp">
-
-                </ImageView>
+                    android:layout_marginLeft="10dp" />
 
                 <TextView
                     android:layout_width="match_parent"
@@ -711,9 +369,7 @@
                     android:paddingEnd="12dp"
                     android:text="Liked by jenny and 1,203 others"
                     android:textStyle="bold"
-                    android:layout_marginLeft="25dp"/>
-
-
+                    android:layout_marginLeft="25dp" />
             </RelativeLayout>
 
             <TextView
@@ -722,7 +378,7 @@
                 android:paddingStart="12dp"
                 android:paddingEnd="12dp"
                 android:paddingBottom="16dp"
-                android:text="alex_k  Sunday brunch vibes."/>
+                android:text="alex_k  Sunday brunch vibes." />
         </LinearLayout>
     </ScrollView>
 
@@ -751,37 +407,36 @@
                 app:tint="@color/smd_theme" />
 
             <ImageView
+                android:id="@+id/search"
                 android:layout_width="0dp"
                 android:layout_height="24dp"
                 android:layout_weight="1"
                 android:src="@drawable/search"
-                 app:tint="@color/smd_theme"
-                android:id="@+id/search"/>
+                app:tint="@color/smd_theme" />
 
             <ImageView
+                android:id="@+id/post"
                 android:layout_width="0dp"
                 android:layout_height="24dp"
                 android:layout_weight="1"
                 android:src="@drawable/create"
-                app:tint="@color/smd_theme"
-                android:id="@+id/post"/>
+                app:tint="@color/smd_theme" />
 
             <ImageView
+                android:id="@+id/heart"
                 android:layout_width="0dp"
                 android:layout_height="24dp"
                 android:layout_weight="1"
                 android:src="@drawable/like"
                 app:tint="@color/smd_theme"
-                android:id="@+id/heart"
                 tools:ignore="ContentDescription" />
 
             <ImageView
+                android:id="@+id/profile"
                 android:layout_width="0dp"
                 android:layout_height="28dp"
                 android:layout_weight="1"
-                android:src="@drawable/oval"
-                android:id="@+id/profile"
-                />
+                android:src="@drawable/oval" />
         </LinearLayout>
     </RelativeLayout>
 
