@@ -1,0 +1,26 @@
+<!-- res/layout/dialog_caption.xml -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <ImageView
+        android:id="@+id/caption_preview"
+        android:layout_width="match_parent"
+        android:layout_height="180dp"
+        android:scaleType="centerCrop" />
+
+    <EditText
+        android:id="@+id/caption_input"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Write a caption…"
+        android:textColor="#000000"
+        android:textColorHint="#88000000"
+        android:padding="12dp"
+        android:background="?attr/editTextBackground"
+        android:inputType="textCapSentences|textMultiLine"
+        android:minLines="2"
+        android:maxLines="5" />
+</LinearLayout>
