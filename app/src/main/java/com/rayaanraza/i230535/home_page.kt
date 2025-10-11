@@ -2,7 +2,10 @@ package com.rayaanraza.i230535
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.util.Base64
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -18,7 +21,7 @@ import com.rayaanraza.i230535.databinding.ItemStoryBubbleBinding
 
 class home_page : AppCompatActivity() {
 
-    // Cache usernames (uid -> username) to avoid repeated reads
+    // Cache usernames (uid -> username)
     private val usernameCache = mutableMapOf<String, String>()
 
     private lateinit var rvStories: RecyclerView
@@ -31,18 +34,21 @@ class home_page : AppCompatActivity() {
     private val db = FirebaseDatabase.getInstance().reference
     private val auth = FirebaseAuth.getInstance()
 
+    // current feed snapshot
+    private val currentPosts = mutableListOf<Post>()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_home_page)
 
-        // --- STORIES RecyclerView ---
+        // STORIES
         rvStories = findViewById(R.id.rvStories)
         rvStories.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         storyAdapter = StoryAdapter(storyList)
         rvStories.adapter = storyAdapter
         loadStories()
 
-        // --- FEED RecyclerView ---
+        // FEED
         rvFeed = findViewById(R.id.rvFeed)
         rvFeed.layoutManager = LinearLayoutManager(this)
         postAdapter = PostAdapter(
@@ -52,7 +58,7 @@ class home_page : AppCompatActivity() {
         rvFeed.adapter = postAdapter
         loadFeed()
 
-        // --- Nav Buttons ---
+        // Nav
         findViewById<ImageView>(R.id.heart).setOnClickListener {
             startActivity(Intent(this, following_page::class.java))
         }
@@ -74,12 +80,10 @@ class home_page : AppCompatActivity() {
     }
 
     // ---------------- STORIES ----------------
-
     private fun loadStories() {
         val uid = auth.currentUser?.uid ?: return
         storyList.clear()
 
-        // Your story first
         db.child("users").child(uid).get().addOnSuccessListener { snapshot ->
             val myName = snapshot.child("username").getValue(String::class.java) ?: "You"
             val myPic = snapshot.child("profilePic").getValue(String::class.java)
@@ -87,7 +91,6 @@ class home_page : AppCompatActivity() {
             storyAdapter.notifyDataSetChanged()
         }
 
-        // People you follow (users/{uid}/following)
         db.child("users").child(uid).child("following")
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
@@ -140,28 +143,32 @@ class home_page : AppCompatActivity() {
     }
 
     // ---------------- FEED (POSTS) ----------------
-
     private fun loadFeed() {
         val myUid = auth.currentUser?.uid ?: return
 
-        // uids = me + following
         db.child("users").child(myUid).child("following")
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     val uids = mutableListOf<String>()
                     uids.add(myUid)
                     for (c in snapshot.children) uids.add(c.key ?: continue)
+
+                    // Initial load (posts -> comments) then show
                     readPostsFor(uids)
+
+                    // Realtime: new/changed/removed posts
+                    attachRealtimeFeed(uids)
                 }
                 override fun onCancelled(error: DatabaseError) {}
             })
     }
 
     private fun readPostsFor(uids: List<String>) {
-        val all = mutableListOf<Post>()
+        val collected = mutableListOf<Post>()
         val remaining = uids.toMutableSet()
         if (uids.isEmpty()) {
-            postAdapter.submitList(emptyList())
+            currentPosts.clear()
+            postAdapter.submitList(currentPosts)
             return
         }
 
@@ -170,13 +177,12 @@ class home_page : AppCompatActivity() {
                 .addListenerForSingleValueEvent(object : ValueEventListener {
                     override fun onDataChange(s: DataSnapshot) {
                         for (p in s.children) {
-                            p.getValue(Post::class.java)?.let { all.add(it) }
+                            p.getValue(Post::class.java)?.let { collected.add(it) }
                         }
                         remaining.remove(u)
                         if (remaining.isEmpty()) {
-                            all.sortByDescending { it.createdAt }
-                            postAdapter.submitList(all)
-                            attachRealtime(all)
+                            // ✅ we have all posts; now fetch initial comments for each post
+                            fetchInitialCommentsAndShow(collected)
                         }
                     }
                     override fun onCancelled(error: DatabaseError) {}
@@ -184,45 +190,140 @@ class home_page : AppCompatActivity() {
         }
     }
 
-    private fun attachRealtime(posts: List<Post>) {
-        val myUid = auth.currentUser?.uid ?: return
-        for (p in posts) {
-            // Live like count + my like
-            db.child("postLikes").child(p.postId)
-                .addValueEventListener(object : ValueEventListener {
-                    override fun onDataChange(s: DataSnapshot) {
-                        val count = s.childrenCount.toInt()
-                        val iLike = s.child(myUid).getValue(Boolean::class.java) == true
-                        postAdapter.setLikeCount(p.postId, count)
-                        postAdapter.setLiked(p.postId, iLike)
-                    }
-                    override fun onCancelled(error: DatabaseError) {}
-                })
+    /** Fetch last 2 comments for every post, then submit the list once. */
+    private fun fetchInitialCommentsAndShow(posts: MutableList<Post>) {
+        if (posts.isEmpty()) {
+            currentPosts.clear()
+            postAdapter.submitList(emptyList())
+            return
+        }
 
-            // Latest 2 comments + total count to control "View all"
-            db.child("postComments").child(p.postId)
-                .addValueEventListener(object : ValueEventListener {
-                    override fun onDataChange(s: DataSnapshot) {
-                        val totalCount = s.childrenCount.toInt()
-                        val allComments = s.children.mapNotNull { it.getValue(Comment::class.java) }
+        val previewsByPost = mutableMapOf<String, List<Comment>>()
+        val totalsByPost = mutableMapOf<String, Int>()
+        var pending = posts.size
+
+        posts.forEach { post ->
+            db.child("postComments").child(post.postId)
+                .orderByChild("createdAt")
+                .limitToLast(2)
+                .addListenerForSingleValueEvent(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        val latestTwo = snapshot.children
+                            .mapNotNull { it.getValue(Comment::class.java) }
                             .sortedByDescending { it.createdAt }
-                        val latestTwo = allComments.take(2)
-                        postAdapter.setCommentPreview(p.postId, latestTwo)
-                        postAdapter.setCommentTotal(p.postId, totalCount)
+
+                        previewsByPost[post.postId] = latestTwo
+
+                        // If you maintain posts/.../commentCount use that, else snapshot size (of last 2)
+                        val totalFromPost = post.commentCount.toInt()
+                        totalsByPost[post.postId] = if (totalFromPost > 0) totalFromPost else latestTwo.size
+
+                        pending--
+                        if (pending == 0) {
+                            // ✅ everything ready — show
+                            posts.sortByDescending { it.createdAt }
+                            currentPosts.clear()
+                            currentPosts.addAll(posts)
+                            postAdapter.submitList(currentPosts.toList())
+
+                            // push the comment previews into the adapter (will notify item-changed)
+                            previewsByPost.forEach { (pid, list) -> postAdapter.setCommentPreview(pid, list) }
+                            totalsByPost.forEach { (pid, total) -> postAdapter.setCommentTotal(pid, total) }
+
+                            // attach realtime for ongoing updates
+                            currentPosts.forEach { attachRealtimeFor(it) }
+                        }
                     }
-                    override fun onCancelled(error: DatabaseError) {}
+                    override fun onCancelled(error: DatabaseError) {
+                        pending--
+                        if (pending == 0) {
+                            // still show posts if a comment fetch failed
+                            posts.sortByDescending { it.createdAt }
+                            currentPosts.clear()
+                            currentPosts.addAll(posts)
+                            postAdapter.submitList(currentPosts.toList())
+                            currentPosts.forEach { attachRealtimeFor(it) }
+                        }
+                    }
                 })
         }
     }
 
-    // NEW: optimistic like write + counter sync
+    // Realtime: listen for new/changed/removed posts for each uid
+    private fun attachRealtimeFeed(uids: List<String>) {
+        for (u in uids) {
+            db.child("posts").child(u).addChildEventListener(object : ChildEventListener {
+                override fun onChildAdded(s: DataSnapshot, previousChildName: String?) {
+                    val p = s.getValue(Post::class.java) ?: return
+                    upsertPost(p)
+                    attachRealtimeFor(p) // likes + comment previews
+                }
+                override fun onChildChanged(s: DataSnapshot, previousChildName: String?) {
+                    val p = s.getValue(Post::class.java) ?: return
+                    upsertPost(p)
+                }
+                override fun onChildRemoved(s: DataSnapshot) {
+                    val p = s.getValue(Post::class.java) ?: return
+                    val idx = currentPosts.indexOfFirst { it.postId == p.postId }
+                    if (idx >= 0) {
+                        currentPosts.removeAt(idx)
+                        postAdapter.submitList(currentPosts.toList())
+                    }
+                }
+                override fun onChildMoved(s: DataSnapshot, previousChildName: String?) {}
+                override fun onCancelled(error: DatabaseError) {}
+            })
+        }
+    }
+
+    private fun upsertPost(p: Post) {
+        val idx = currentPosts.indexOfFirst { it.postId == p.postId }
+        if (idx >= 0) currentPosts[idx] = p else currentPosts.add(p)
+        currentPosts.sortByDescending { it.createdAt }
+        postAdapter.submitList(currentPosts.toList())
+    }
+
+    // Realtime per-post listeners for likes + last 2 comments
+    private fun attachRealtimeFor(p: Post) {
+        val myUid = auth.currentUser?.uid ?: return
+
+        // Likes
+        db.child("postLikes").child(p.postId)
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(s: DataSnapshot) {
+                    val count = s.childrenCount.toInt()
+                    val iLike = s.child(myUid).getValue(Boolean::class.java) == true
+                    postAdapter.setLikeCount(p.postId, count)
+                    postAdapter.setLiked(p.postId, iLike)
+                }
+                override fun onCancelled(error: DatabaseError) {}
+            })
+
+        // Latest 2 comments (preview) + total (prefer posts/.../commentCount if kept fresh)
+        db.child("postComments").child(p.postId)
+            .orderByChild("createdAt")
+            .limitToLast(2)
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val latestTwo = snapshot.children
+                        .mapNotNull { it.getValue(Comment::class.java) }
+                        .sortedByDescending { it.createdAt }
+
+                    val totalFromPost = currentPosts.find { it.postId == p.postId }?.commentCount?.toInt() ?: latestTwo.size
+                    postAdapter.setCommentPreview(p.postId, latestTwo)
+                    postAdapter.setCommentTotal(p.postId, totalFromPost)
+                }
+                override fun onCancelled(error: DatabaseError) {}
+            })
+    }
+
+    // Optimistic like write + counter sync
     private fun toggleLike(post: Post, wantLike: Boolean) {
         val myUid = auth.currentUser?.uid ?: return
         val likeRef = db.child("postLikes").child(post.postId).child(myUid)
 
         if (wantLike) likeRef.setValue(true) else likeRef.removeValue()
 
-        // Keep counters in sync in /posts
         val likeCountRef = db.child("posts").child(post.uid).child(post.postId).child("likeCount")
         likeCountRef.runTransaction(object : Transaction.Handler {
             override fun doTransaction(cur: MutableData): Transaction.Result {
@@ -233,7 +334,6 @@ class home_page : AppCompatActivity() {
             override fun onComplete(e: DatabaseError?, committed: Boolean, snap: DataSnapshot?) {}
         })
 
-        // Optional: mirror in index if you read from there elsewhere
         db.child("postIndex").child(post.postId).child("likeCount")
             .runTransaction(object : Transaction.Handler {
                 override fun doTransaction(cur: MutableData): Transaction.Result {
@@ -316,7 +416,6 @@ class home_page : AppCompatActivity() {
             h.tvCaption.text = "$shownName  ${item.caption}"
 
             if (item.username.isBlank()) {
-                // Fetch once, update UI, and heal the DB post so next loads are fast
                 db.child("users").child(item.uid).child("username")
                     .addListenerForSingleValueEvent(object : ValueEventListener {
                         override fun onDataChange(s: DataSnapshot) {
@@ -331,10 +430,10 @@ class home_page : AppCompatActivity() {
                     })
             }
 
-            // Avatar (placeholder for now)
+            // Avatar
             h.avatar.setImageResource(R.drawable.oval)
 
-            // Image: prefer URL (future-proof), else Base64 (RTDB-only)
+            // Image: prefer URL, else Base64 (strip "data:*;base64,")
             if (item.imageUrl.isNotEmpty()) {
                 Glide.with(h.postImage.context)
                     .load(item.imageUrl)
@@ -342,50 +441,41 @@ class home_page : AppCompatActivity() {
                     .error(R.drawable.person1)
                     .into(h.postImage)
             } else if (item.imageBase64.isNotEmpty()) {
-                val bytes = try {
-                    android.util.Base64.decode(item.imageBase64, android.util.Base64.DEFAULT)
-                } catch (_: Exception) { null }
-
-                val bmp = bytes?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }
-                if (bmp != null) {
-                    h.postImage.setImageBitmap(bmp)
-                } else {
-                    h.postImage.setImageResource(R.drawable.person1)
-                }
+                val bmp = decodeBase64ToBitmap(item.imageBase64)
+                if (bmp != null) h.postImage.setImageBitmap(bmp) else h.postImage.setImageResource(R.drawable.person1)
             } else {
                 h.postImage.setImageResource(R.drawable.person1)
             }
 
-            // Initial counts from the post object (fast first paint)
+            // Likes (realtime may overwrite)
             val initialLikes = item.likeCount.toInt()
-            h.tvLikes.text = if (initialLikes == 1) "1 like" else "$initialLikes likes"
-
-            val initialComments = item.commentCount.toInt()
-            h.tvViewAll.visibility = if (initialComments > 2) View.VISIBLE else View.GONE
-
-            // Likes UI (will be overwritten by realtime listeners)
             val liked = likeState[item.postId] == true
             h.likeBtn.setImageResource(if (liked) R.drawable.liked else R.drawable.like)
             val liveCount = likeCounts[item.postId] ?: initialLikes
             h.tvLikes.text = if (liveCount == 1) "1 like" else "$liveCount likes"
 
-            // Comment previews
+            // Comment previews (up to 2)
             val previews = commentPreviews[item.postId] ?: emptyList()
             if (previews.isNotEmpty()) {
                 h.tvC1.visibility = View.VISIBLE
-                h.tvC1.text = "${previews[0].username}  ${previews[0].text}"
-            } else h.tvC1.visibility = View.GONE
-
+                h.tvC1.text = "${previews[0].username}: ${previews[0].text}"
+            } else {
+                h.tvC1.visibility = View.GONE
+                h.tvC1.text = ""
+            }
             if (previews.size >= 2) {
                 h.tvC2.visibility = View.VISIBLE
-                h.tvC2.text = "${previews[1].username}  ${previews[1].text}"
-            } else h.tvC2.visibility = View.GONE
+                h.tvC2.text = "${previews[1].username}: ${previews[1].text}"
+            } else {
+                h.tvC2.visibility = View.GONE
+                h.tvC2.text = ""
+            }
 
-            // Show "View all" only if total comments > 2
-            val total = commentTotals[item.postId] ?: previews.size
+            // "View all"
+            val total = commentTotals[item.postId] ?: item.commentCount.toInt()
             h.tvViewAll.visibility = if (total > 2) View.VISIBLE else View.GONE
 
-            // Actions (optimistic like + open comment dialog)
+            // Actions
             h.likeBtn.setOnClickListener {
                 val currentlyLiked = likeState[item.postId] == true
                 val wantLike = !currentlyLiked
@@ -395,11 +485,9 @@ class home_page : AppCompatActivity() {
                 val base = likeCounts[item.postId] ?: item.likeCount.toInt()
                 val newCount = (base + if (wantLike) 1 else -1).coerceAtLeast(0)
                 likeCounts[item.postId] = newCount
-
                 h.likeBtn.setImageResource(if (wantLike) R.drawable.liked else R.drawable.like)
                 h.tvLikes.text = if (newCount == 1) "1 like" else "$newCount likes"
 
-                // Server write
                 onLikeToggle(item, wantLike)
             }
             h.commentBtn.setOnClickListener { onCommentClick(item) }
@@ -410,7 +498,6 @@ class home_page : AppCompatActivity() {
     }
 
     // ---------- Comments ----------
-
     private fun showAddCommentDialog(post: Post) {
         val input = android.widget.EditText(this).apply {
             hint = "Write a comment…"
@@ -430,7 +517,6 @@ class home_page : AppCompatActivity() {
 
     private fun addComment(post: Post, text: String) {
         val myUid = auth.currentUser?.uid ?: return
-        // fetch my username
         db.child("users").child(myUid).child("username")
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(s: DataSnapshot) {
@@ -456,9 +542,7 @@ class home_page : AppCompatActivity() {
                                     cur.value = ((cur.getValue(Long::class.java) ?: 0L) + 1L)
                                     return Transaction.success(cur)
                                 }
-                                override fun onComplete(
-                                    e: DatabaseError?, committed: Boolean, s2: DataSnapshot?
-                                ) {}
+                                override fun onComplete(e: DatabaseError?, committed: Boolean, s2: DataSnapshot?) {}
                             })
                         db.child("postIndex").child(post.postId).child("commentCount")
                             .runTransaction(object : Transaction.Handler {
@@ -466,13 +550,23 @@ class home_page : AppCompatActivity() {
                                     cur.value = ((cur.getValue(Long::class.java) ?: 0L) + 1L)
                                     return Transaction.success(cur)
                                 }
-                                override fun onComplete(
-                                    e: DatabaseError?, committed: Boolean, s2: DataSnapshot?
-                                ) {}
+                                override fun onComplete(e: DatabaseError?, committed: Boolean, s2: DataSnapshot?) {}
                             })
                     }
                 }
                 override fun onCancelled(error: DatabaseError) {}
             })
+    }
+
+    // --- Utils ---
+    private fun decodeBase64ToBitmap(raw: String?): Bitmap? {
+        if (raw.isNullOrBlank()) return null
+        val clean = raw.substringAfter("base64,", raw)
+        return try {
+            val bytes = Base64.decode(clean, Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        } catch (_: Exception) {
+            null
+        }
     }
 }
