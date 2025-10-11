@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 
 class PostAdapter(
     private val onLikeToggle: (postId: String, liked: Boolean) -> Unit,
@@ -69,8 +70,14 @@ class PostAdapter(
         h.avatar.setImageResource(R.drawable.oval)
 
         // Post image from Base64
-        val bmp = decodeBase64(item.imageBase64)
-        if (bmp != null) h.postImage.setImageBitmap(bmp) else h.postImage.setImageResource(R.drawable.person1)
+        // Post image from Firebase URL
+        if (!item.imageUrl.isNullOrEmpty()) {
+            Glide.with(h.postImage.context)
+                .load(item.imageUrl)
+                .into(h.postImage)
+        } else {
+            h.postImage.setImageResource(R.drawable.person1)
+        }
 
         // Likes UI
         val liked = likeState[item.postId] == true

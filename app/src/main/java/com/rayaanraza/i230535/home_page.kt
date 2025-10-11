@@ -1,13 +1,11 @@
 package com.rayaanraza.i230535
 
+import android.annotation.SuppressLint
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -15,14 +13,14 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.*
 import com.rayaanraza.i230535.databinding.ItemStoryBubbleBinding
 
-
 class home_page : AppCompatActivity() {
+
+    // Cache usernames (uid -> username) to avoid repeated reads
+    private val usernameCache = mutableMapOf<String, String>()
+
     private lateinit var rvStories: RecyclerView
     private lateinit var storyAdapter: StoryAdapter
     private val storyList = mutableListOf<StoryBubble>()
@@ -48,15 +46,13 @@ class home_page : AppCompatActivity() {
         rvFeed = findViewById(R.id.rvFeed)
         rvFeed.layoutManager = LinearLayoutManager(this)
         postAdapter = PostAdapter(
-            onLikeToggle = { postId, wantLike -> toggleLike(postId, wantLike) },
-            onCommentClick = { postId ->
-                // TODO: open comments
-            }
+            onLikeToggle = { post, wantLike -> toggleLike(post, wantLike) },
+            onCommentClick = { post -> showAddCommentDialog(post) }
         )
         rvFeed.adapter = postAdapter
         loadFeed()
 
-        // --- Existing Nav Buttons ---
+        // --- Nav Buttons ---
         findViewById<ImageView>(R.id.heart).setOnClickListener {
             startActivity(Intent(this, following_page::class.java))
         }
@@ -91,7 +87,7 @@ class home_page : AppCompatActivity() {
             storyAdapter.notifyDataSetChanged()
         }
 
-        // People you follow (NOTE: reading from users/{uid}/following to match your current code)
+        // People you follow (users/{uid}/following)
         db.child("users").child(uid).child("following")
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
@@ -148,7 +144,7 @@ class home_page : AppCompatActivity() {
     private fun loadFeed() {
         val myUid = auth.currentUser?.uid ?: return
 
-        // 1) collect uids = me + following (using users/{uid}/following to match your code)
+        // uids = me + following
         db.child("users").child(myUid).child("following")
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
@@ -203,36 +199,63 @@ class home_page : AppCompatActivity() {
                     override fun onCancelled(error: DatabaseError) {}
                 })
 
-            // Latest 2 comments
+            // Latest 2 comments + total count to control "View all"
             db.child("postComments").child(p.postId)
-                .orderByChild("createdAt").limitToLast(2)
                 .addValueEventListener(object : ValueEventListener {
                     override fun onDataChange(s: DataSnapshot) {
-                        val list = s.children.mapNotNull { it.getValue(Comment::class.java) }
+                        val totalCount = s.childrenCount.toInt()
+                        val allComments = s.children.mapNotNull { it.getValue(Comment::class.java) }
                             .sortedByDescending { it.createdAt }
-                        postAdapter.setCommentPreview(p.postId, list)
+                        val latestTwo = allComments.take(2)
+                        postAdapter.setCommentPreview(p.postId, latestTwo)
+                        postAdapter.setCommentTotal(p.postId, totalCount)
                     }
                     override fun onCancelled(error: DatabaseError) {}
                 })
         }
     }
 
-    private fun toggleLike(postId: String, wantLike: Boolean) {
+    // NEW: optimistic like write + counter sync
+    private fun toggleLike(post: Post, wantLike: Boolean) {
         val myUid = auth.currentUser?.uid ?: return
-        val likeRef = db.child("postLikes").child(postId).child(myUid)
+        val likeRef = db.child("postLikes").child(post.postId).child(myUid)
+
         if (wantLike) likeRef.setValue(true) else likeRef.removeValue()
+
+        // Keep counters in sync in /posts
+        val likeCountRef = db.child("posts").child(post.uid).child(post.postId).child("likeCount")
+        likeCountRef.runTransaction(object : Transaction.Handler {
+            override fun doTransaction(cur: MutableData): Transaction.Result {
+                val c = (cur.getValue(Long::class.java) ?: 0L)
+                cur.value = (c + if (wantLike) 1L else -1L).coerceAtLeast(0L)
+                return Transaction.success(cur)
+            }
+            override fun onComplete(e: DatabaseError?, committed: Boolean, snap: DataSnapshot?) {}
+        })
+
+        // Optional: mirror in index if you read from there elsewhere
+        db.child("postIndex").child(post.postId).child("likeCount")
+            .runTransaction(object : Transaction.Handler {
+                override fun doTransaction(cur: MutableData): Transaction.Result {
+                    val c = (cur.getValue(Long::class.java) ?: 0L)
+                    cur.value = (c + if (wantLike) 1L else -1L).coerceAtLeast(0L)
+                    return Transaction.success(cur)
+                }
+                override fun onComplete(e: DatabaseError?, committed: Boolean, snap: DataSnapshot?) {}
+            })
     }
 
     // ----- FEED ADAPTER -----
     inner class PostAdapter(
-        private val onLikeToggle: (postId: String, liked: Boolean) -> Unit,
-        private val onCommentClick: (postId: String) -> Unit
+        private val onLikeToggle: (post: Post, liked: Boolean) -> Unit,
+        private val onCommentClick: (post: Post) -> Unit
     ) : RecyclerView.Adapter<PostAdapter.PostVH>() {
 
         private val items = mutableListOf<Post>()
-        private val likeState = mutableMapOf<String, Boolean>()         // postId -> I liked
-        private val likeCounts = mutableMapOf<String, Int>()             // postId -> likes
-        private val commentPreviews = mutableMapOf<String, List<Comment>>() // postId -> 2 latest
+        private val likeState = mutableMapOf<String, Boolean>()            // postId -> I liked
+        private val likeCounts = mutableMapOf<String, Int>()               // postId -> likes
+        private val commentPreviews = mutableMapOf<String, List<Comment>>()// postId -> 2 latest
+        private val commentTotals = mutableMapOf<String, Int>()            // postId -> total comments
 
         fun submitList(list: List<Post>) {
             items.clear()
@@ -258,6 +281,12 @@ class home_page : AppCompatActivity() {
             if (idx >= 0) notifyItemChanged(idx)
         }
 
+        fun setCommentTotal(postId: String, total: Int) {
+            commentTotals[postId] = total
+            val idx = items.indexOfFirst { it.postId == postId }
+            if (idx >= 0) notifyItemChanged(idx)
+        }
+
         inner class PostVH(v: View) : RecyclerView.ViewHolder(v) {
             val avatar: ImageView = v.findViewById(R.id.imgAvatar)
             val username: TextView = v.findViewById(R.id.tvUsername)
@@ -276,25 +305,69 @@ class home_page : AppCompatActivity() {
             return PostVH(v)
         }
 
+        @SuppressLint("RecyclerView")
         override fun onBindViewHolder(h: PostVH, position: Int) {
             val item = items[position]
 
-            // Username / caption
-            h.username.text = item.username.ifEmpty { "user" }
-            h.tvCaption.text = "${item.username}  ${item.caption}"
+            // Username / caption with fallback + cache
+            val shownName = if (item.username.isNotBlank()) item.username
+            else usernameCache[item.uid] ?: "user"
+            h.username.text = shownName
+            h.tvCaption.text = "$shownName  ${item.caption}"
 
-            // Avatar (if you later store avatar, load it here. Use default now)
+            if (item.username.isBlank()) {
+                // Fetch once, update UI, and heal the DB post so next loads are fast
+                db.child("users").child(item.uid).child("username")
+                    .addListenerForSingleValueEvent(object : ValueEventListener {
+                        override fun onDataChange(s: DataSnapshot) {
+                            val name = (s.getValue(String::class.java) ?: "user").ifBlank { "user" }
+                            usernameCache[item.uid] = name
+                            val idx = items.indexOfFirst { it.postId == item.postId }
+                            if (idx >= 0) notifyItemChanged(idx)
+                            db.child("posts").child(item.uid).child(item.postId)
+                                .child("username").setValue(name)
+                        }
+                        override fun onCancelled(error: DatabaseError) {}
+                    })
+            }
+
+            // Avatar (placeholder for now)
             h.avatar.setImageResource(R.drawable.oval)
 
-            // Post image from Base64
-            val bmp = decodeBase64(item.imageBase64)
-            if (bmp != null) h.postImage.setImageBitmap(bmp) else h.postImage.setImageResource(R.drawable.person1)
+            // Image: prefer URL (future-proof), else Base64 (RTDB-only)
+            if (item.imageUrl.isNotEmpty()) {
+                Glide.with(h.postImage.context)
+                    .load(item.imageUrl)
+                    .placeholder(R.drawable.person1)
+                    .error(R.drawable.person1)
+                    .into(h.postImage)
+            } else if (item.imageBase64.isNotEmpty()) {
+                val bytes = try {
+                    android.util.Base64.decode(item.imageBase64, android.util.Base64.DEFAULT)
+                } catch (_: Exception) { null }
 
-            // Likes UI
+                val bmp = bytes?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }
+                if (bmp != null) {
+                    h.postImage.setImageBitmap(bmp)
+                } else {
+                    h.postImage.setImageResource(R.drawable.person1)
+                }
+            } else {
+                h.postImage.setImageResource(R.drawable.person1)
+            }
+
+            // Initial counts from the post object (fast first paint)
+            val initialLikes = item.likeCount.toInt()
+            h.tvLikes.text = if (initialLikes == 1) "1 like" else "$initialLikes likes"
+
+            val initialComments = item.commentCount.toInt()
+            h.tvViewAll.visibility = if (initialComments > 2) View.VISIBLE else View.GONE
+
+            // Likes UI (will be overwritten by realtime listeners)
             val liked = likeState[item.postId] == true
             h.likeBtn.setImageResource(if (liked) R.drawable.liked else R.drawable.like)
-            val count = likeCounts[item.postId] ?: 0
-            h.tvLikes.text = if (count == 1) "1 like" else "$count likes"
+            val liveCount = likeCounts[item.postId] ?: initialLikes
+            h.tvLikes.text = if (liveCount == 1) "1 like" else "$liveCount likes"
 
             // Comment previews
             val previews = commentPreviews[item.postId] ?: emptyList()
@@ -308,27 +381,98 @@ class home_page : AppCompatActivity() {
                 h.tvC2.text = "${previews[1].username}  ${previews[1].text}"
             } else h.tvC2.visibility = View.GONE
 
-            h.tvViewAll.visibility = if (previews.size > 2) View.VISIBLE else View.GONE
+            // Show "View all" only if total comments > 2
+            val total = commentTotals[item.postId] ?: previews.size
+            h.tvViewAll.visibility = if (total > 2) View.VISIBLE else View.GONE
 
-            // Actions
+            // Actions (optimistic like + open comment dialog)
             h.likeBtn.setOnClickListener {
                 val currentlyLiked = likeState[item.postId] == true
-                onLikeToggle(item.postId, !currentlyLiked)
+                val wantLike = !currentlyLiked
+
+                // Optimistic UI
+                likeState[item.postId] = wantLike
+                val base = likeCounts[item.postId] ?: item.likeCount.toInt()
+                val newCount = (base + if (wantLike) 1 else -1).coerceAtLeast(0)
+                likeCounts[item.postId] = newCount
+
+                h.likeBtn.setImageResource(if (wantLike) R.drawable.liked else R.drawable.like)
+                h.tvLikes.text = if (newCount == 1) "1 like" else "$newCount likes"
+
+                // Server write
+                onLikeToggle(item, wantLike)
             }
-            h.commentBtn.setOnClickListener { onCommentClick(item.postId) }
-            h.tvViewAll.setOnClickListener { onCommentClick(item.postId) }
+            h.commentBtn.setOnClickListener { onCommentClick(item) }
+            h.tvViewAll.setOnClickListener { onCommentClick(item) }
         }
 
         override fun getItemCount() = items.size
+    }
 
-        private fun decodeBase64(b64: String?): Bitmap? {
-            return try {
-                if (b64.isNullOrEmpty()) null
-                else {
-                    val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                }
-            } catch (_: Exception) { null }
+    // ---------- Comments ----------
+
+    private fun showAddCommentDialog(post: Post) {
+        val input = android.widget.EditText(this).apply {
+            hint = "Write a comment…"
+            setPadding(24, 24, 24, 24)
         }
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Add comment")
+            .setView(input)
+            .setPositiveButton("Post") { d, _ ->
+                val text = input.text?.toString()?.trim().orEmpty()
+                if (text.isNotEmpty()) addComment(post, text)
+                d.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun addComment(post: Post, text: String) {
+        val myUid = auth.currentUser?.uid ?: return
+        // fetch my username
+        db.child("users").child(myUid).child("username")
+            .addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(s: DataSnapshot) {
+                    val uname = (s.getValue(String::class.java) ?: "user").ifBlank { "user" }
+                    val commentId = java.util.UUID.randomUUID().toString()
+                    val comment = mapOf(
+                        "commentId" to commentId,
+                        "postId" to post.postId,
+                        "uid" to myUid,
+                        "username" to uname,
+                        "text" to text,
+                        "createdAt" to System.currentTimeMillis()
+                    )
+
+                    val updates = hashMapOf<String, Any>(
+                        "/postComments/${post.postId}/$commentId" to comment
+                    )
+                    db.updateChildren(updates).addOnSuccessListener {
+                        // bump counters
+                        db.child("posts").child(post.uid).child(post.postId).child("commentCount")
+                            .runTransaction(object : Transaction.Handler {
+                                override fun doTransaction(cur: MutableData): Transaction.Result {
+                                    cur.value = ((cur.getValue(Long::class.java) ?: 0L) + 1L)
+                                    return Transaction.success(cur)
+                                }
+                                override fun onComplete(
+                                    e: DatabaseError?, committed: Boolean, s2: DataSnapshot?
+                                ) {}
+                            })
+                        db.child("postIndex").child(post.postId).child("commentCount")
+                            .runTransaction(object : Transaction.Handler {
+                                override fun doTransaction(cur: MutableData): Transaction.Result {
+                                    cur.value = ((cur.getValue(Long::class.java) ?: 0L) + 1L)
+                                    return Transaction.success(cur)
+                                }
+                                override fun onComplete(
+                                    e: DatabaseError?, committed: Boolean, s2: DataSnapshot?
+                                ) {}
+                            })
+                    }
+                }
+                override fun onCancelled(error: DatabaseError) {}
+            })
     }
 }
