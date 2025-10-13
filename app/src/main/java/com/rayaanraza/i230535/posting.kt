@@ -4,8 +4,9 @@ import android.Manifest
 import android.content.ContentUris
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.view.LayoutInflater
@@ -23,9 +24,19 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.storage.FirebaseStorage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.tasks.await
+import java.io.ByteArrayOutputStream
 import java.util.UUID
 import kotlin.concurrent.thread
+import android.graphics.ImageDecoder
+import android.os.Build
+import android.util.Base64
+import com.bumptech.glide.Glide
+
 
 class posting : AppCompatActivity() {
 
@@ -61,8 +72,9 @@ class posting : AppCompatActivity() {
 
         // 3-column gallery grid
         adapter = GalleryAdapter(mutableListOf()) { uri ->
-            mainImage.setImageURI(uri)
             lastPickedUri = uri
+            // Use Glide for async preview (no UI jank)
+            Glide.with(this).load(uri).into(mainImage)
             showCaptionDialog(uri)
         }
         galleryGrid.layoutManager = GridLayoutManager(this, 3)
@@ -137,7 +149,7 @@ class posting : AppCompatActivity() {
                     adapter.submit(uris.take(200))
                     if (uris.isNotEmpty()) {
                         lastPickedUri = uris.first()
-                        mainImage.setImageURI(lastPickedUri)
+                        Glide.with(this).load(lastPickedUri).into(mainImage)
                     }
                 }
             }.onFailure {
@@ -161,7 +173,8 @@ class posting : AppCompatActivity() {
         input.isFocusableInTouchMode = true
         input.requestFocus()
 
-        preview.setImageURI(uri)
+        // async preview with Glide (prevents UI jank)
+        Glide.with(this).load(uri).into(preview)
 
         val dialog = AlertDialog.Builder(this)
             .setTitle("Add a caption")
@@ -181,15 +194,22 @@ class posting : AppCompatActivity() {
                     Toast.makeText(this, "No image selected", Toast.LENGTH_SHORT).show()
                     return@setOnClickListener
                 }
+
                 // Disable while uploading
                 isUploading = true
                 postBtn.isEnabled = false
                 cancelBtn.isEnabled = false
-                uploadPost(lastPickedUri!!, caption,
+
+                // Launch the upload off the UI thread
+                uploadPost(
+                    uri = lastPickedUri!!,
+                    caption = caption,
                     onDone = {
                         isUploading = false
                         postBtn.isEnabled = true
                         cancelBtn.isEnabled = true
+                        // return success so home_page can refresh
+                        setResult(RESULT_OK)
                         dialog.dismiss()
                         finish()
                     },
@@ -207,10 +227,9 @@ class posting : AppCompatActivity() {
     }
 
     /**
-     * Uploads image to Firebase Storage and writes metadata to Realtime Database.
-     * Mirrors your story approach.
+     * Uploads image to RTDB (Base64) and writes metadata.
+     * Heavy work (decode/compress) is off the UI thread.
      */
-// 1) Replace your existing uploadPost(...) with this RTDB-only version
     private fun uploadPost(
         uri: Uri,
         caption: String,
@@ -219,26 +238,36 @@ class posting : AppCompatActivity() {
     ) {
         val auth = FirebaseAuth.getInstance()
         val uid = auth.currentUser?.uid ?: return onError("Not authenticated")
-
-        // Convert the picked image -> Base64 (reuse your existing helper)
-        val base64 = encodeUriToBase64(uri, maxWidth = 1080, jpegQuality = 80)
-        if (base64.isEmpty()) return onError("Could not read image")
-
-        val postId = java.util.UUID.randomUUID().toString()
-        val now = System.currentTimeMillis()
         val db = FirebaseDatabase.getInstance().reference
+        val postId = UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
 
-        // ✅ Get username from /users/{uid}/username instead of displayName
-        db.child("users").child(uid).child("username").get()
-            .addOnSuccessListener { snap ->
-                val username = (snap.getValue(String::class.java) ?: "").ifBlank { "user" }
+        lifecycleScope.launch {
+            try {
+                // 1) Heavy work off main thread: decode+downsample+JPEG+Base64
+                val base64 = withContext(Dispatchers.IO) {
+                    encodeUriToBase64Safe(uri, maxWidth = 1080, jpegQuality = 80)
+                }
+                if (base64.isEmpty()) {
+                    onError("Could not read/encode image")
+                    return@launch
+                }
 
+                // 2) Read username (await, non-blocking)
+                val username = try {
+                    val snap = db.child("users").child(uid).child("username").get().await()
+                    (snap.getValue(String::class.java) ?: "").ifBlank { "user" }
+                } catch (e: Exception) {
+                    "user"
+                }
+
+                // 3) Compose post & write to RTDB
                 val post = mapOf(
                     "postId" to postId,
                     "uid" to uid,
-                    "username" to username,      // ✅ now filled
+                    "username" to username,
                     "imageUrl" to "",
-                    "imageBase64" to base64,     // RTDB-only flow
+                    "imageBase64" to base64,
                     "caption" to caption,
                     "createdAt" to now,
                     "likeCount" to 0,
@@ -254,48 +283,138 @@ class posting : AppCompatActivity() {
                     )
                 )
 
-                db.updateChildren(updates)
-                    .addOnSuccessListener {
-                        Toast.makeText(this, "Posted!", Toast.LENGTH_SHORT).show()
-                        onDone()
-                    }
-                    .addOnFailureListener { e -> onError("DB_UPDATE failed: ${e.message}") }
+                db.updateChildren(updates).await()
+
+                Toast.makeText(this@posting, "Posted!", Toast.LENGTH_SHORT).show()
+                onDone()
+
+            } catch (oom: OutOfMemoryError) {
+                onError("Image too large (OOM). Try a smaller one.")
+            } catch (e: Exception) {
+                onError("Post failed: ${e.message}")
             }
-            .addOnFailureListener { e -> onError("USERNAME_READ failed: ${e.message}") }
+        }
     }
 
-    // 2) Add this helper below uploadPost(...)
-    private fun encodeUriToBase64(
+    private fun encodeUriToBase64Safe(
         uri: Uri,
         maxWidth: Int,
         jpegQuality: Int
     ): String {
-        // Decode original
-        val original = contentResolver.openInputStream(uri)?.use { input ->
-            android.graphics.BitmapFactory.decodeStream(input)
-        } ?: return ""
+        try {
+            // --- Path A: Modern, reliable decoder (API 28+) ---
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val src = ImageDecoder.createSource(contentResolver, uri)
+                val bmp = ImageDecoder.decodeBitmap(src) { decoder, info, _ ->
+                    val w = info.size.width.coerceAtLeast(1)
+                    val h = info.size.height.coerceAtLeast(1)
+                    val scale = if (w > maxWidth) maxWidth.toFloat() / w else 1f
+                    val tw = (w * scale).toInt().coerceAtLeast(1)
+                    val th = (h * scale).toInt().coerceAtLeast(1)
+                    decoder.setTargetSize(tw, th)
+                    // Let ImageDecoder handle orientation/EXIF
+                }
+                val baos = ByteArrayOutputStream()
+                bmp.compress(Bitmap.CompressFormat.JPEG, jpegQuality, baos)
+                val bytes = baos.toByteArray()
+                baos.close()
+                bmp.recycle()
+                return Base64.encodeToString(bytes, Base64.NO_WRAP)
+            }
 
-        // Scale down if needed
-        val w = original.width
-        val h = original.height
-        val scale = if (w > maxWidth) maxWidth.toFloat() / w.toFloat() else 1f
-        val scaled = if (scale < 1f) {
-            android.graphics.Bitmap.createScaledBitmap(
-                original, (w * scale).toInt(), (h * scale).toInt(), true
-            )
-        } else original
+            // --- Path B: Legacy devices (BitmapFactory with inSampleSize) ---
+            // 1) Read bounds
+            val optsBounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            contentResolver.openInputStream(uri)?.use { input ->
+                BitmapFactory.decodeStream(input, null, optsBounds)
+            }
 
-        // Compress to JPEG
-        val baos = java.io.ByteArrayOutputStream()
-        scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, jpegQuality, baos)
-        if (scaled !== original) original.recycle()
+            var srcW = optsBounds.outWidth
+            var srcH = optsBounds.outHeight
 
-        val bytes = baos.toByteArray()
-        baos.close()
+            // Some formats/URIs don’t populate bounds — fallback decode once
+            if (srcW <= 0 || srcH <= 0) {
+                contentResolver.openInputStream(uri)?.use { input ->
+                    val tmp = BitmapFactory.decodeStream(input)
+                    if (tmp != null) {
+                        srcW = tmp.width
+                        srcH = tmp.height
+                        tmp.recycle()
+                    }
+                }
+            }
+            if (srcW <= 0 || srcH <= 0) {
+                // Final fallback handled below (Glide)
+                throw IllegalStateException("Bounds not readable")
+            }
 
-        // Base64 (no line breaks)
-        return android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+            var inSampleSize = 1
+            if (srcW > maxWidth) {
+                val ratio = Math.ceil(srcW.toDouble() / maxWidth.toDouble()).toInt().coerceAtLeast(1)
+                inSampleSize = Integer.highestOneBit(ratio).coerceAtLeast(1)
+            }
+
+            val optsDecode = BitmapFactory.Options().apply {
+                this.inSampleSize = inSampleSize
+                inPreferredConfig = Bitmap.Config.RGB_565
+            }
+
+            val sampled = contentResolver.openInputStream(uri)?.use { input ->
+                BitmapFactory.decodeStream(input, null, optsDecode)
+            }
+
+            if (sampled != null) {
+                val finalBmp = if (sampled.width > maxWidth) {
+                    val ratio = sampled.height.toFloat() / sampled.width.toFloat()
+                    val h = (maxWidth * ratio).toInt().coerceAtLeast(1)
+                    Bitmap.createScaledBitmap(sampled, maxWidth, h, true)
+                } else sampled
+
+                val baos = ByteArrayOutputStream()
+                finalBmp.compress(Bitmap.CompressFormat.JPEG, jpegQuality, baos)
+                if (finalBmp !== sampled) sampled.recycle()
+                val out = baos.toByteArray()
+                baos.close()
+                if (finalBmp !== sampled) finalBmp.recycle()
+                return Base64.encodeToString(out, Base64.NO_WRAP)
+            }
+
+            // --- Path C: Ultimate fallback via Glide (handles cloud/HEIC/etc.) ---
+            val glideBmp = Glide.with(this)
+                .asBitmap()
+                .load(uri)
+                .submit(maxWidth, maxWidth) // Glide will keep aspect ratio
+                .get() // called on Dispatchers.IO by our caller
+
+            val baos = ByteArrayOutputStream()
+            glideBmp.compress(Bitmap.CompressFormat.JPEG, jpegQuality, baos)
+            val bytes = baos.toByteArray()
+            baos.close()
+            glideBmp.recycle()
+            return Base64.encodeToString(bytes, Base64.NO_WRAP)
+
+        } catch (e: OutOfMemoryError) {
+            return ""
+        } catch (e: Exception) {
+            // As a last attempt, try Glide if not already tried
+            return try {
+                val glideBmp = Glide.with(this)
+                    .asBitmap()
+                    .load(uri)
+                    .submit(maxWidth, maxWidth)
+                    .get()
+                val baos = ByteArrayOutputStream()
+                glideBmp.compress(Bitmap.CompressFormat.JPEG, jpegQuality, baos)
+                val bytes = baos.toByteArray()
+                baos.close()
+                glideBmp.recycle()
+                Base64.encodeToString(bytes, Base64.NO_WRAP)
+            } catch (_: Exception) {
+                ""
+            }
+        }
     }
+
 
     // ---------- Gallery Adapter ----------
     private class GalleryAdapter(
@@ -315,7 +434,8 @@ class posting : AppCompatActivity() {
 
         override fun onBindViewHolder(holder: VH, position: Int) {
             val uri = data[position]
-            holder.img.setImageURI(uri)
+            // use Glide for thumbnails as well (smooth scroll)
+            Glide.with(holder.img.context).load(uri).into(holder.img)
             holder.img.setOnClickListener { onClick(uri) }
         }
 
