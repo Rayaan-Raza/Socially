@@ -1,53 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    xmlns:tools="http://schemas.android.com/tools"
     android:background="#FFFFFF"
-    tools:context=".specific_search"
-    android:id="@+id/main">
+    tools:context=".specific_search">
 
     <RelativeLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
         android:layout_alignParentTop="true"
-        android:layout_marginTop="20dp">
-
-
+        android:layout_marginTop="20dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp">
 
         <EditText
             android:id="@+id/search"
-            android:layout_width="350dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_centerVertical="true"
-            android:layout_centerHorizontal="true"
-            android:layout_toLeftOf="@id/scan"
+            android:layout_toStartOf="@id/cancel_button"
             android:layout_marginEnd="12dp"
             android:background="@drawable/acc_bar"
-            android:hint="internshala"
-            android:textColorHint="@color/black"
+            android:hint="Search for users..."
+            android:textColorHint="#766D6D"
             android:paddingStart="12dp"
             android:paddingEnd="12dp"
             android:drawableStart="@drawable/search"
-            android:drawableEnd="@drawable/close"
-            android:drawableTint="#766D6D"
             android:drawablePadding="8dp"
             android:inputType="text"/>
 
         <TextView
-            android:id="@+id/scan"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
+            android:id="@+id/cancel_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_alignParentEnd="true"
             android:layout_centerVertical="true"
-            android:text="Clear"
-            android:gravity="center"
-            android:fontFamily="@font/instagram_sans_bold"
+            android:text="Cancel"
             android:textColor="@color/smd_theme"
-            android:textSize="18dp"/>
+            android:textSize="16sp"
+            android:visibility="gone"/>
     </RelativeLayout>
 
     <LinearLayout
@@ -56,49 +50,25 @@
         android:layout_height="44dp"
         android:layout_below="@id/topBar"
         android:gravity="center"
-        android:orientation="horizontal"
-        android:weightSum="4"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="Top"
-            android:textStyle="bold"
-            android:textSize="14sp"
-            android:id="@+id/top"/>
-
-
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="Accounts"
+        android:orientation="horizontal">
+        <!-- Your tabs remain the same -->
+        <TextView android:text="Top"
+            android:layout_height="match_parent" android:layout_width="0dp"
+            android:layout_weight="1" android:gravity="center"
+            android:textStyle="bold" android:textSize="14sp"/>
+        <TextView android:text="Accounts"
+            android:layout_height="match_parent" android:layout_width="0dp"
+            android:layout_weight="1" android:gravity="center"
             android:textSize="14sp"/>
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="Tags"
+        <TextView android:text="Tags"
+            android:layout_height="match_parent" android:layout_width="0dp"
+            android:layout_weight="1" android:gravity="center"
             android:textSize="14sp"/>
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="Places"
+        <TextView android:text="Places"
+            android:layout_height="match_parent" android:layout_width="0dp"
+            android:layout_weight="1" android:gravity="center"
             android:textSize="14sp"/>
     </LinearLayout>
-
-
 
     <View
         android:id="@+id/dividerTabs"
@@ -107,289 +77,12 @@
         android:layout_below="@id/tabs"
         android:background="#1A000000"/>
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_below="@+id/topBar"
-        android:layout_marginRight="300dp"
-        android:layout_marginTop="45dp"
-        android:backgroundTint="@color/black"
-        android:background="@color/black"
-
-
-        />
-
-    <ScrollView
-        android:id="@+id/resultsScroll"
+    <!-- The ScrollView has been replaced by a RecyclerView -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/searchResultsRecyclerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_below="@id/dividerTabs"
-        android:fillViewport="true">
+        tools:listitem="@layout/item_user_search" />
 
-        <LinearLayout
-            android:id="@+id/resultsCol"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:id="@+id/clickable">
-
-                <TextView
-                    android:id="@+id/icon1"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:layout_centerVertical="true"
-                    android:layout_marginTop="10dp"
-                    android:gravity="center"
-                    android:text="IS"
-                    android:background="@drawable/circular_background"
-                    android:backgroundTint="#03A9F4"
-                    android:textSize="20dp"
-                    android:textStyle="bold"
-                    android:textColor="@color/white"/>
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_toRightOf="@id/icon1"
-                    android:layout_centerVertical="true"
-                    android:layout_marginStart="12dp"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="internshala"
-                        android:textStyle="bold"
-                        android:textSize="14sp"
-                        android:id="@+id/usr_name"/>
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="internshala"
-                        android:textColor="#7A7A7A"
-                        android:textSize="12sp"/>
-                </LinearLayout>
-            </RelativeLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#0F000000"/>
-
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp">
-
-                <ImageView
-                    android:id="@+id/icon2"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:layout_centerVertical="true"
-                    android:src="@drawable/hash_circle"/>
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_toRightOf="@id/icon2"
-                    android:layout_centerVertical="true"
-                    android:layout_marginStart="12dp"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="#internshala"
-                        android:textStyle="bold"
-                        android:textSize="14sp"/>
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="1000+ post"
-                        android:textColor="#7A7A7A"
-                        android:textSize="12sp"/>
-                </LinearLayout>
-            </RelativeLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#0F000000"/>
-
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp">
-
-                <ImageView
-                    android:id="@+id/icon3"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:layout_centerVertical="true"
-                    android:src="@drawable/hash_circle"/>
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_toRightOf="@id/icon3"
-                    android:layout_centerVertical="true"
-                    android:layout_marginStart="12dp"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="#internshala_nomoretheory_challage"
-                        android:textStyle="bold"
-                        android:textSize="14sp"/>
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="500+ post"
-                        android:textColor="#7A7A7A"
-                        android:textSize="12sp"/>
-                </LinearLayout>
-            </RelativeLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#0F000000"/>
-
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp">
-
-                <ImageView
-                    android:id="@+id/icon4"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:layout_centerVertical="true"
-                    android:src="@drawable/hash_circle"/>
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_toRightOf="@id/icon4"
-                    android:layout_centerVertical="true"
-                    android:layout_marginStart="12dp"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Internshala"
-                        android:textStyle="bold"
-                        android:textSize="14sp"/>
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Internshala, B-610, Untech Business Zone,…"
-                        android:textColor="#7A7A7A"
-                        android:textSize="12sp"
-                        android:singleLine="true"
-                        android:ellipsize="end"/>
-                </LinearLayout>
-            </RelativeLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#0F000000"/>
-
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp">
-
-                <ImageView
-                    android:id="@+id/icon5"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:layout_centerVertical="true"
-                    android:src="@drawable/hash_circle"/>
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_toRightOf="@id/icon5"
-                    android:layout_centerVertical="true"
-                    android:layout_marginStart="12dp"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="internshalastudentpartner"
-                        android:textStyle="bold"
-                        android:textSize="14sp"/>
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="500+ post"
-                        android:textColor="#7A7A7A"
-                        android:textSize="12sp"/>
-                </LinearLayout>
-            </RelativeLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#0F000000"/>
-
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp">
-
-                <ImageView
-                    android:id="@+id/icon6"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:layout_centerVertical="true"
-                    android:src="@drawable/hash_circle"/>
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_toRightOf="@id/icon6"
-                    android:layout_centerVertical="true"
-                    android:layout_marginStart="12dp"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="internshalaincampus"
-                        android:textStyle="bold"
-                        android:textSize="14sp"/>
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="100+ post"
-                        android:textColor="#7A7A7A"
-                        android:textSize="12sp"/>
-                </LinearLayout>
-            </RelativeLayout>
-
-        </LinearLayout>
-    </ScrollView>
 </RelativeLayout>

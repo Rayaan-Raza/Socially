@@ -85,16 +85,47 @@ class signup_page : AppCompatActivity() {
                     profile["username"] = username
                     profile["firstName"] = first
                     profile["lastName"] = last
+                    profile["fullName"] = "$first $last"
                     profile["dob"] = dob
                     profile["email"] = email
+                    profile["bio"] = "Hey there! I'm using Socially"
+                    profile["website"] = ""
+                    profile["phoneNumber"] = ""
+                    profile["gender"] = ""
                     profile["createdAt"] = System.currentTimeMillis()
                     profile["profileCompleted"] = true
-                    if (selectedImageBase64 != null) profile["photo"] = selectedImageBase64!!
+
+                    // Online/Offline Status
+                    profile["isOnline"] = true
+                    profile["lastSeen"] = System.currentTimeMillis()
+
+                    // FCM Token - will be updated later when you add FCM
+                    profile["fcmToken"] = ""
+
+                    // Follow System Counters
+                    profile["followersCount"] = 0
+                    profile["followingCount"] = 0
+                    profile["postsCount"] = 0
+
+                    // Privacy Settings
+                    profile["accountPrivate"] = false
+
+                    // Profile Picture
+                    if (selectedImageBase64 != null) {
+                        profile["profilePictureUrl"] = selectedImageBase64!!
+                        profile["photo"] = selectedImageBase64!!
+                    } else {
+                        profile["profilePictureUrl"] = ""
+                        profile["photo"] = ""
+                    }
 
                     FirebaseDatabase.getInstance().getReference("users")
                         .child(uid)
                         .setValue(profile)
                         .addOnSuccessListener {
+                            // Set user as online
+                            setUserOnlineStatus(uid, true)
+
                             Toast.makeText(this, "Account created!", Toast.LENGTH_SHORT).show()
                             startActivity(Intent(this, home_page::class.java))
                             finish()
@@ -107,6 +138,17 @@ class signup_page : AppCompatActivity() {
                     Toast.makeText(this, "Signup failed: ${e.message}", Toast.LENGTH_LONG).show()
                 }
         }
+    }
+
+    // Set user online status
+    private fun setUserOnlineStatus(uid: String, isOnline: Boolean) {
+        val statusMap = HashMap<String, Any>()
+        statusMap["isOnline"] = isOnline
+        statusMap["lastSeen"] = System.currentTimeMillis()
+
+        FirebaseDatabase.getInstance().getReference("users")
+            .child(uid)
+            .updateChildren(statusMap)
     }
 
     // Image picker result

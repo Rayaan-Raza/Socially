@@ -1,16 +1,39 @@
 package com.rayaanraza.i230535
 
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.util.Base64
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.*
 
 class my_profile : AppCompatActivity() {
+
+    private lateinit var auth: FirebaseAuth
+    private lateinit var database: FirebaseDatabase
+    private lateinit var userRef: DatabaseReference
+
+    private lateinit var usernameText: TextView
+    private lateinit var displayNameText: TextView
+    private lateinit var bioLine1: TextView
+    private lateinit var bioLine2: TextView
+    private lateinit var postsCountText: TextView
+    private lateinit var followersCountText: TextView
+    private lateinit var followingCountText: TextView
+    private lateinit var profileImageView: ImageView
+    private lateinit var editProfileBtn: TextView
+
+    private var currentUserId: String = ""
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -21,28 +44,57 @@ class my_profile : AppCompatActivity() {
             insets
         }
 
+        auth = FirebaseAuth.getInstance()
+        database = FirebaseDatabase.getInstance()
+        currentUserId = auth.currentUser?.uid ?: ""
+
+        if (currentUserId.isEmpty()) {
+            Toast.makeText(this, "Not logged in", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+
+        userRef = database.getReference("users").child(currentUserId)
+
+        initViews() // This function is now corrected
+        setupClickListeners()
+        loadUserData()
+    }
+
+    // --- THIS IS THE CORRECTED FUNCTION ---
+    private fun initViews() {
+        usernameText = findViewById(R.id.username)
+        displayNameText = findViewById(R.id.displayName)
+        bioLine1 = findViewById(R.id.bioLine1)
+        bioLine2 = findViewById(R.id.bioLine2)
+        postsCountText = findViewById(R.id.postsCount)
+        followersCountText = findViewById(R.id.followersCount)
+        followingCountText = findViewById(R.id.followingCount)
+        editProfileBtn = findViewById(R.id.editProfileBtn)
+
+        // FIX: The ImageView has a unique ID, 'designHighlightIcon'.
+        // We find it directly, which is safe and avoids crashes from incorrect nesting logic.
+        profileImageView = findViewById(R.id.designHighlightIcon)
+    }
+
+    private fun setupClickListeners() {
         findViewById<TextView>(R.id.editProfileBtn).setOnClickListener {
             startActivity(Intent(this, edit_profile::class.java))
-            finish()
-
         }
 
         findViewById<ImageView>(R.id.nav_home).setOnClickListener {
             startActivity(Intent(this, home_page::class.java))
             finish()
-
         }
 
         findViewById<ImageView>(R.id.nav_search).setOnClickListener {
             startActivity(Intent(this, search_feed::class.java))
             finish()
-
         }
 
         findViewById<ImageView>(R.id.nav_create).setOnClickListener {
             startActivity(Intent(this, posting::class.java))
             finish()
-
         }
 
         findViewById<ImageView>(R.id.nav_like).setOnClickListener {
@@ -56,9 +108,67 @@ class my_profile : AppCompatActivity() {
 
         findViewById<FrameLayout>(R.id.profileImage).setOnClickListener {
             startActivity(Intent(this, my_story_view::class.java))
-            finish()
         }
 
+        // Other listeners
+        findViewById<ImageView>(R.id.dropdown_icon).setOnClickListener {
+            Toast.makeText(this, "Account options coming soon", Toast.LENGTH_SHORT).show()
+        }
+        findViewById<ImageView>(R.id.menu_icon).setOnClickListener {
+            Toast.makeText(this, "Menu coming soon", Toast.LENGTH_SHORT).show()
+        }
+    }
 
+    private fun loadUserData() {
+        userRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.exists()) {
+                    usernameText.text = snapshot.child("username").getValue(String::class.java) ?: ""
+                    displayNameText.text = snapshot.child("fullName").getValue(String::class.java) ?: ""
+
+                    val bio = snapshot.child("bio").getValue(String::class.java) ?: ""
+                    if (bio.isNotEmpty()) {
+                        val bioLines = bio.split("\n", limit = 2)
+                        bioLine1.text = bioLines.getOrNull(0) ?: ""
+                        bioLine2.text = bioLines.getOrNull(1) ?: ""
+                    } else {
+                        bioLine1.text = ""
+                        bioLine2.text = ""
+                    }
+
+                    followersCountText.text = (snapshot.child("followersCount").getValue(Int::class.java) ?: 0).toString()
+                    followingCountText.text = (snapshot.child("followingCount").getValue(Int::class.java) ?: 0).toString()
+                    postsCountText.text = (snapshot.child("postsCount").getValue(Int::class.java) ?: 0).toString()
+
+                    val profilePic = snapshot.child("profilePictureUrl").getValue(String::class.java)
+                        ?: snapshot.child("photo").getValue(String::class.java)
+
+                    if (!profilePic.isNullOrEmpty()) {
+                        try {
+                            val bitmap = decodeBase64(profilePic)
+                            profileImageView.setImageBitmap(bitmap)
+                        } catch (e: Exception) {
+                            // Keep default image if decoding fails
+                        }
+                    }
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Toast.makeText(this@my_profile, "Failed to load profile: ${error.message}", Toast.LENGTH_SHORT).show()
+            }
+        })
+    }
+
+    private fun decodeBase64(base64: String): Bitmap {
+        val decodedBytes = Base64.decode(base64, Base64.DEFAULT)
+        return BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (currentUserId.isNotEmpty()) {
+            loadUserData()
+        }
     }
 }

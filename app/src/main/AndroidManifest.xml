@@ -2,18 +2,26 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Feature declaration (optional but good practice) -->
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
 
-    <uses-permission android:name="android.permission.INTERNET">
+    <!--
+        CORRECTED PERMISSIONS BLOCK:
+        - All tags are self-closing (ending with />).
+        - No tags are nested inside other permission tags.
+        - Duplicate permissions have been removed for clarity.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
-
-    </uses-permission>
-
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-<uses-permission android:name="android.permission.CAMERA">
-</uses-permission>
 
     <application
         android:allowBackup="true"
@@ -24,6 +32,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.I230535">
+
+        <!-- All your activities -->
         <activity
             android:name=".view_profile_2"
             android:exported="false" />
@@ -106,7 +116,6 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
