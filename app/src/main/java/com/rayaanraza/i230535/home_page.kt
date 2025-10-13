@@ -12,6 +12,8 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -23,6 +25,9 @@ class home_page : AppCompatActivity() {
 
     // --- Caches & State ---
     private val usernameCache = mutableMapOf<String, String>()
+
+    // --- Views ---
+    private lateinit var navProfileImage: ImageView // MERGED: For bottom nav profile pic
 
     // Stories
     private lateinit var rvStories: RecyclerView
@@ -46,6 +51,16 @@ class home_page : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_home_page)
 
+        // --- MERGED: Apply window insets to the main layout for edge-to-edge support ---
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
+
+        // --- Initialize Views ---
+        navProfileImage = findViewById(R.id.profile) // MERGED: Initialize bottom nav profile pic view
+
         // STORIES
         rvStories = findViewById(R.id.rvStories)
         rvStories.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
@@ -61,7 +76,11 @@ class home_page : AppCompatActivity() {
         )
         rvFeed.adapter = postAdapter
 
-        // Nav
+        // Setup Navigation Click Listeners
+        setupClickListeners()
+    }
+
+    private fun setupClickListeners() {
         findViewById<ImageView>(R.id.heart).setOnClickListener {
             startActivity(Intent(this, following_page::class.java))
         }
@@ -120,6 +139,18 @@ class home_page : AppCompatActivity() {
             val myPic = snapshot.child("profilePic").getValue(String::class.java)
             storyList.add(0, StoryBubble(uid, myName, myPic))
             storyAdapter.notifyDataSetChanged()
+
+            // --- MERGED: Set profile picture in the bottom navigation bar ---
+            if (!myPic.isNullOrEmpty()) {
+                Glide.with(this)
+                    .load(myPic)
+                    .circleCrop()
+                    .placeholder(R.drawable.oval)
+                    .error(R.drawable.oval)
+                    .into(navProfileImage)
+            } else {
+                navProfileImage.setImageResource(R.drawable.oval)
+            }
         }
 
         db.child("users").child(uid).child("following")
@@ -173,11 +204,11 @@ class home_page : AppCompatActivity() {
         override fun getItemCount() = items.size
     }
 
-    // ---------------- FEED (POSTS) ----------------
+    // ---------------- FEED (POSTS) - (Logic from RecyclerView version is kept as is) ----------------
+
     private fun loadFeed() {
         val myUid = auth.currentUser?.uid ?: return
 
-        // Clear current view to avoid stale duplication between sessions
         currentPosts.clear()
         postAdapter.submitList(emptyList())
 
@@ -188,10 +219,7 @@ class home_page : AppCompatActivity() {
                     uids.add(myUid)
                     for (c in snapshot.children) c.key?.let { uids.add(it) }
 
-                    // Initial load (posts -> comments) then show
                     readPostsFor(uids)
-
-                    // Realtime: new/changed/removed posts
                     attachRealtimeFeed(uids)
                 }
                 override fun onCancelled(error: DatabaseError) {}
@@ -224,7 +252,6 @@ class home_page : AppCompatActivity() {
         }
     }
 
-    /** Fetch last 2 comments for every post, then submit the list once. */
     private fun fetchInitialCommentsAndShow(posts: MutableList<Post>) {
         if (posts.isEmpty()) {
             currentPosts.clear()
@@ -278,18 +305,17 @@ class home_page : AppCompatActivity() {
         }
     }
 
-    // Realtime: listen for new/changed/removed posts for each uid — with dedupe + bookkeeping
     private fun attachRealtimeFeed(uids: List<String>) {
         watchingUids = uids
 
         for (u in uids) {
-            if (postChildListeners.containsKey(u)) continue // already attached for this uid
+            if (postChildListeners.containsKey(u)) continue
 
             val listener = object : ChildEventListener {
                 override fun onChildAdded(s: DataSnapshot, previousChildName: String?) {
                     val p = s.getValue(Post::class.java) ?: return
                     upsertPost(p)
-                    attachRealtimeFor(p) // likes + comment previews
+                    attachRealtimeFor(p)
                 }
                 override fun onChildChanged(s: DataSnapshot, previousChildName: String?) {
                     val p = s.getValue(Post::class.java) ?: return
@@ -299,7 +325,6 @@ class home_page : AppCompatActivity() {
                     val p = s.getValue(Post::class.java) ?: return
                     val idx = currentPosts.indexOfFirst { it.postId == p.postId }
                     if (idx >= 0) {
-                        // Also detach per-post listeners we were tracking
                         detachRealtimeFor(p.postId)
                         currentPosts.removeAt(idx)
                         postAdapter.submitList(currentPosts.toList())
@@ -321,11 +346,9 @@ class home_page : AppCompatActivity() {
         postAdapter.submitList(currentPosts.toList())
     }
 
-    // Realtime per-post listeners for likes + last 2 comments. We track and remove in onStop().
     private fun attachRealtimeFor(p: Post) {
         val myUid = auth.currentUser?.uid ?: return
 
-        // Likes (attach once per post)
         if (!likeListeners.containsKey(p.postId)) {
             val likeListener = object : ValueEventListener {
                 override fun onDataChange(s: DataSnapshot) {
@@ -340,7 +363,6 @@ class home_page : AppCompatActivity() {
             likeListeners[p.postId] = likeListener
         }
 
-        // Latest 2 comments (preview) + total (prefer posts/.../commentCount if kept fresh)
         if (!commentPreviewListeners.containsKey(p.postId)) {
             val commentsListener = object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
@@ -372,7 +394,6 @@ class home_page : AppCompatActivity() {
         }
     }
 
-    // Optimistic like write + counter sync
     private fun toggleLike(post: Post, wantLike: Boolean) {
         val myUid = auth.currentUser?.uid ?: return
         val likeRef = db.child("postLikes").child(post.postId).child(myUid)
@@ -400,7 +421,6 @@ class home_page : AppCompatActivity() {
             })
     }
 
-    // ---------- Comments ----------
     private fun showAddCommentDialog(post: Post) {
         val input = android.widget.EditText(this).apply {
             hint = "Write a comment…"
@@ -438,7 +458,6 @@ class home_page : AppCompatActivity() {
                         "/postComments/${post.postId}/$commentId" to comment
                     )
                     db.updateChildren(updates).addOnSuccessListener {
-                        // bump counters
                         db.child("posts").child(post.uid).child(post.postId).child("commentCount")
                             .runTransaction(object : Transaction.Handler {
                                 override fun doTransaction(cur: MutableData): Transaction.Result {
@@ -461,7 +480,6 @@ class home_page : AppCompatActivity() {
             })
     }
 
-    // --- Utils ---
     private fun decodeBase64ToBitmap(raw: String?): Bitmap? {
         if (raw.isNullOrBlank()) return null
         val clean = raw.substringAfter("base64,", raw)
@@ -473,17 +491,16 @@ class home_page : AppCompatActivity() {
         }
     }
 
-    // ----- FEED ADAPTER (kept as your inner adapter so item_post works as-is) -----
     inner class PostAdapter(
         private val onLikeToggle: (post: Post, liked: Boolean) -> Unit,
         private val onCommentClick: (post: Post) -> Unit
     ) : RecyclerView.Adapter<PostAdapter.PostVH>() {
 
         private val items = mutableListOf<Post>()
-        private val likeState = mutableMapOf<String, Boolean>()            // postId -> I liked
-        private val likeCounts = mutableMapOf<String, Int>()               // postId -> likes
-        private val commentPreviews = mutableMapOf<String, List<Comment>>()// postId -> 2 latest
-        private val commentTotals = mutableMapOf<String, Int>()            // postId -> total comments
+        private val likeState = mutableMapOf<String, Boolean>()
+        private val likeCounts = mutableMapOf<String, Int>()
+        private val commentPreviews = mutableMapOf<String, List<Comment>>()
+        private val commentTotals = mutableMapOf<String, Int>()
 
         fun submitList(list: List<Post>) {
             items.clear()
@@ -537,7 +554,6 @@ class home_page : AppCompatActivity() {
         override fun onBindViewHolder(h: PostVH, position: Int) {
             val item = items[position]
 
-            // Username / caption with fallback + cache
             val shownName = if (item.username.isNotBlank()) item.username
             else usernameCache[item.uid] ?: "user"
             h.username.text = shownName
@@ -558,10 +574,8 @@ class home_page : AppCompatActivity() {
                     })
             }
 
-            // Avatar
             h.avatar.setImageResource(R.drawable.oval)
 
-            // Image: prefer URL, else Base64 (strip prefix)
             if (item.imageUrl.isNotEmpty()) {
                 Glide.with(h.postImage.context)
                     .load(item.imageUrl)
@@ -575,14 +589,12 @@ class home_page : AppCompatActivity() {
                 h.postImage.setImageResource(R.drawable.person1)
             }
 
-            // Likes (realtime may overwrite)
             val initialLikes = item.likeCount.toInt()
             val liked = likeState[item.postId] == true
             h.likeBtn.setImageResource(if (liked) R.drawable.liked else R.drawable.like)
             val liveCount = likeCounts[item.postId] ?: initialLikes
             h.tvLikes.text = if (liveCount == 1) "1 like" else "$liveCount likes"
 
-            // Comment previews (up to 2)
             val previews = commentPreviews[item.postId] ?: emptyList()
             if (previews.isNotEmpty()) {
                 h.tvC1.visibility = View.VISIBLE
@@ -599,16 +611,13 @@ class home_page : AppCompatActivity() {
                 h.tvC2.text = ""
             }
 
-            // "View all"
             val total = commentTotals[item.postId] ?: item.commentCount.toInt()
             h.tvViewAll.visibility = if (total > 2) View.VISIBLE else View.GONE
 
-            // Actions
             h.likeBtn.setOnClickListener {
                 val currentlyLiked = likeState[item.postId] == true
                 val wantLike = !currentlyLiked
 
-                // Optimistic UI
                 likeState[item.postId] = wantLike
                 val base = likeCounts[item.postId] ?: item.likeCount.toInt()
                 val newCount = (base + if (wantLike) 1 else -1).coerceAtLeast(0)

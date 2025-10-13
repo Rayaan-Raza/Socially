@@ -2,38 +2,148 @@ package com.rayaanraza.i230535
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.activity.enableEdgeToEdge
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.rayaanraza.i230535.R.id.clickable
-import com.rayaanraza.i230535.R.id.main
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.*
 
 class dms : AppCompatActivity() {
+
+    private lateinit var auth: FirebaseAuth
+    private lateinit var database: FirebaseDatabase
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var chatAdapter: ChatAdapter
+    private lateinit var noChatsMessage: TextView
+
+    private val chatList = mutableListOf<ChatSession>()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContentView(R.layout.activity_dms)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(main)) { v, insets ->
+
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
 
+        auth = FirebaseAuth.getInstance()
+        database = FirebaseDatabase.getInstance()
 
-        findViewById<LinearLayout>(clickable).setOnClickListener {
-            startActivity(Intent(this, chat::class.java))
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            Toast.makeText(this, "You must be logged in to view messages.", Toast.LENGTH_LONG).show()
+            startActivity(Intent(this, login_sign::class.java))
             finish()
-
+            return
         }
 
-        findViewById<ImageView>(R.id.back).setOnClickListener {
-            startActivity(Intent(this, home_page::class.java))
-            finish()
+        setupRecyclerView(currentUser.uid)
+        loadChats(currentUser.uid)
 
-        }
+        findViewById<ImageView>(R.id.back)?.setOnClickListener { finish() }
+    }
+
+    private fun setupRecyclerView(currentUserId: String) {
+        recyclerView = findViewById(R.id.chatsRecyclerView)
+        noChatsMessage = findViewById(R.id.no_chats_message)
+        recyclerView.layoutManager = LinearLayoutManager(this)
+
+        chatAdapter = ChatAdapter(chatList, currentUserId)
+        recyclerView.adapter = chatAdapter
+    }
+
+    private fun loadChats(currentUserId: String) {
+        val chatsRef = database.getReference("chats")
+
+        chatsRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                chatList.clear()
+
+                Toast.makeText(this@dms, "Current User ID: $currentUserId", Toast.LENGTH_LONG).show()
+
+                // Loop through ALL chats in Firebase
+                for (chatSnapshot in snapshot.children) {
+                    try {
+                        // Read individual fields from Firebase
+                        val chatId = chatSnapshot.child("chatId").getValue(String::class.java) ?: ""
+                        val lastMessage = chatSnapshot.child("lastMessage").getValue(String::class.java) ?: ""
+                        val lastMessageTimestamp = chatSnapshot.child("lastMessageTimestamp").getValue(Long::class.java) ?: 0L
+                        val lastMessageSenderId = chatSnapshot.child("lastMessageSenderId").getValue(String::class.java) ?: ""
+
+                        // Read participants array (0 and 1 indices)
+                        val participantsSnapshot = chatSnapshot.child("participants")
+                        val participant0 = participantsSnapshot.child("0").getValue(String::class.java) ?: ""
+                        val participant1 = participantsSnapshot.child("1").getValue(String::class.java) ?: ""
+
+                        // DEBUG: Print what we found
+                        android.util.Log.d("DMS_DEBUG", "Chat found:")
+                        android.util.Log.d("DMS_DEBUG", "  participant[0]: '$participant0'")
+                        android.util.Log.d("DMS_DEBUG", "  participant[1]: '$participant1'")
+                        android.util.Log.d("DMS_DEBUG", "  currentUserId: '$currentUserId'")
+                        android.util.Log.d("DMS_DEBUG", "  Match 0: ${participant0 == currentUserId}")
+                        android.util.Log.d("DMS_DEBUG", "  Match 1: ${participant1 == currentUserId}")
+
+                        // Check if current user is in the participants array
+                        if (participant0 == currentUserId || participant1 == currentUserId) {
+
+                            // Determine the other user
+                            val otherUserId = if (participant0 == currentUserId) participant1 else participant0
+
+                            // Create participants map for your ChatSession object
+                            val participantsMap = hashMapOf(
+                                participant0 to true,
+                                participant1 to true
+                            )
+
+                            // Create ChatSession object
+                            val chat = ChatSession(
+                                chatId = chatId,
+                                participants = participantsMap,
+                                lastMessage = lastMessage,
+                                lastMessageTimestamp = lastMessageTimestamp,
+                                lastMessageSenderId = lastMessageSenderId
+                            )
+
+                            chatList.add(chat)
+
+                            Toast.makeText(this@dms, "✅ Added chat with: $otherUserId", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(this@dms, "❌ Skipped chat - not your chat", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(this@dms, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                        e.printStackTrace()
+                    }
+                }
+
+                // Sort by newest first
+                chatList.sortByDescending { it.lastMessageTimestamp }
+
+                // Update UI
+                chatAdapter.notifyDataSetChanged()
+
+                if (chatList.isEmpty()) {
+                    recyclerView.visibility = View.GONE
+                    noChatsMessage.visibility = View.VISIBLE
+                    Toast.makeText(this@dms, "❌ No chats matched for your user ID", Toast.LENGTH_LONG).show()
+                } else {
+                    recyclerView.visibility = View.VISIBLE
+                    noChatsMessage.visibility = View.GONE
+                    Toast.makeText(this@dms, "✅ Loaded ${chatList.size} chat(s)", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Toast.makeText(this@dms, "Failed to load chats: ${error.message}", Toast.LENGTH_LONG).show()
+            }
+        })
     }
 }

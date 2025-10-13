@@ -1,0 +1,65 @@
+<!-- File: res/layout/item_dms_conversation.xml -->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="12dp"
+    android:background="?android:attr/selectableItemBackground">
+
+    <!-- THIS IS THE AVATAR -->
+    <TextView
+        android:id="@+id/chat_avatar"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:background="@drawable/circular_background"
+        android:backgroundTint="@color/smd_theme"
+        android:gravity="center"
+        android:text="UN"
+        android:textColor="@android:color/white"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_toEndOf="@id/chat_avatar"
+        android:layout_toStartOf="@id/chat_timestamp"
+        android:layout_centerVertical="true"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:orientation="vertical">
+
+        <!-- THIS IS THE USERNAME -->
+        <TextView
+            android:id="@+id/chat_user_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Username"
+            android:textColor="@android:color/black"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <!-- THIS IS THE LAST MESSAGE -->
+        <TextView
+            android:id="@+id/chat_last_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="This was the last message"
+            android:textColor="@android:color/darker_gray"
+            android:textSize="14sp"
+            android:maxLines="1"
+            android:ellipsize="end"/>
+    </LinearLayout>
+
+    <!-- THIS IS THE TIMESTAMP -->
+    <TextView
+        android:id="@+id/chat_timestamp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="4dp"
+        android:text="10:42 PM"
+        android:textColor="@android:color/darker_gray"
+        android:textSize="12sp" />
+
+</RelativeLayout>

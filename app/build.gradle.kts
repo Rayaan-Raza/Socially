@@ -45,6 +45,8 @@ dependencies {
 
 
     implementation("androidx.gridlayout:gridlayout:1.0.0")
+    implementation("io.agora.rtc:full-sdk:4.2.6") // Or the latest 3.x version for stability
+    implementation("io.agora.rtm:rtm-sdk:2.2.4")   // For signaling (optional but recommended)
     implementation(libs.androidx.core.ktx)
     implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
     implementation("com.google.firebase:firebase-auth")
@@ -63,10 +65,11 @@ dependencies {
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
     implementation(libs.firebase.database)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
+    implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-database-ktx")
 

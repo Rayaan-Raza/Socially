@@ -8,6 +8,7 @@
     tools:context=".dms"
     android:id="@+id/main">
 
+    <!-- Header Section -->
     <ImageView
         android:id="@+id/back"
         android:layout_width="24dp"
@@ -28,19 +29,7 @@
         android:text="@string/jacob_w"
         android:textSize="18sp"
         android:textStyle="bold"
-        android:textColor="#7B3B3B"/>
-
-    <ImageView
-        android:id="@+id/titleChevron"
-        android:layout_width="16dp"
-        android:layout_height="16dp"
-        android:layout_toRightOf="@id/title"
-        android:layout_marginStart="8dp"
-        android:src="@drawable/chev_down"
-        app:tint="@color/smd_theme"
-        android:layout_above="@+id/search"
-        android:layout_marginBottom="3dp"
-        android:layout_marginLeft="8dp"/>
+        android:textColor="@color/black"/>
 
     <ImageView
         android:id="@+id/newMsg"
@@ -51,8 +40,6 @@
         android:layout_marginEnd="12dp"
         android:layout_marginTop="12dp"
         android:src="@drawable/plus"
-
-
         app:tint="@color/smd_theme" />
 
     <EditText
@@ -67,456 +54,42 @@
         android:hint="@string/search"
         android:textColorHint="#7A7171"
         android:paddingStart="12dp"
-        android:paddingEnd="100dp"
+        android:paddingEnd="12dp"
         android:drawableStart="@drawable/search"
         android:drawablePadding="8dp"
         android:inputType="text"/>
 
-    <ScrollView
-        android:id="@+id/listScroll"
+
+    <TextView
+        android:id="@+id/no_chats_message"
         android:layout_width="match_parent"
-        android:layout_marginTop="15dp"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_marginStart="35dp"
+        android:layout_marginEnd="35dp"
+        android:layout_marginTop="12dp"
+        android:layout_below="@id/search"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:text="No chats found."
+        android:textSize="18sp"
+        android:layout_centerInParent="true"
+        android:visibility="gone" />
+
+    <!--
+    THIS IS THE MAIN CHANGE:
+    The old ScrollView and LinearLayout are replaced by a single RecyclerView.
+    -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/chatsRecyclerView"
+        android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_below="@id/search"
-        android:layout_above="@+id/cameraBar">
+        android:layout_above="@+id/cameraBar"
+        android:layout_marginTop="15dp"
+        tools:listitem="@layout/item_chat" />
 
-        <LinearLayout
-            android:id="@+id/listCol"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingTop="10dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="72dp"
-                android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:gravity="center_vertical"
-                android:id="@+id/clickable">
-
-                <FrameLayout
-                    android:layout_width="44dp"
-                    android:layout_height="44dp">
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:src="@drawable/story_circle"
-                        android:alpha=".5"
-                        app:tint="@color/gray" />
-
-                    <androidx.cardview.widget.CardView
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:layout_gravity="center"
-                        app:cardCornerRadius="18dp"
-                        app:cardUseCompatPadding="false"
-                        app:cardPreventCornerOverlap="true">
-
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/italian_man"/>
-                    </androidx.cardview.widget.CardView>
-                </FrameLayout>
-
-
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:layout_marginStart="12dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="joshua_l"
-                        android:textStyle="bold"
-                        android:textSize="14sp"/>
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:maxWidth="220dp"
-                        android:singleLine="true"
-                        android:ellipsize="end"
-                        android:text="Have a nice day, bro!"/>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="· now"
-                        android:textColor="#7A7A7A"
-                        android:textSize="12sp"/>
-
-                    <ImageView
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:layout_marginStart="10dp"
-                        android:src="@drawable/cam"
-                        app:tint="@color/smd_theme" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="72dp"
-                android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:gravity="center_vertical">
-
-                <ImageView
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:background="@drawable/hash_circle"
-                    android:src="@drawable/karenne"
-                    android:clipToOutline="true"
-                    android:scaleType="centerCrop"/>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:layout_marginStart="12dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="karennne"
-                        android:textStyle="bold"
-                        android:textSize="14sp"/>
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:maxWidth="220dp"
-                        android:singleLine="true"
-                        android:ellipsize="end"
-                        android:text="I heard this is a good movie, s..."/>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="· now"
-                        android:textColor="#7A7A7A"
-                        android:textSize="12sp"/>
-
-                    <ImageView
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:layout_marginStart="10dp"
-                        android:src="@drawable/cam"
-                        app:tint="@color/smd_theme"/>
-                </LinearLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="72dp"
-                android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:gravity="center_vertical">
-
-                <ImageView
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:background="@drawable/hash_circle"
-                    android:src="@drawable/black_man"
-                    android:clipToOutline="true"
-                    android:scaleType="centerCrop"/>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:layout_marginStart="12dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="martini_rond"
-                        android:textStyle="bold"
-                        android:textSize="14sp"/>
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:maxWidth="220dp"
-                        android:singleLine="true"
-                        android:ellipsize="end"
-                        android:text="See you on the next meeting!"/>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="· 15m"
-                        android:textColor="#7A7A7A"
-                        android:textSize="12sp"/>
-
-                    <ImageView
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:layout_marginStart="10dp"
-                        android:src="@drawable/cam"
-                        app:tint="@color/smd_theme"/>
-                </LinearLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="72dp"
-                android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:gravity="center_vertical">
-
-                <ImageView
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:background="@drawable/hash_circle"
-                    android:src="@drawable/white_woman"
-                    android:clipToOutline="true"
-                    android:scaleType="centerCrop"/>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:layout_marginStart="12dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="andrewww_"
-                        android:textStyle="bold"
-                        android:textSize="14sp"/>
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:maxWidth="220dp"
-                        android:singleLine="true"
-                        android:ellipsize="end"
-                        android:text="Sounds good 😂😂😂"/>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="· 20m"
-                        android:textColor="#7A7A7A"
-                        android:textSize="12sp"/>
-
-                    <ImageView
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:layout_marginStart="10dp"
-                        android:src="@drawable/cam"
-                        app:tint="@color/smd_theme"/>
-                </LinearLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="72dp"
-                android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:gravity="center_vertical">
-
-                <FrameLayout
-                    android:layout_width="44dp"
-                    android:layout_height="44dp">
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:src="@drawable/story_circle"
-                        android:alpha=".5"
-                        app:tint="@color/gray" />
-
-                    <androidx.cardview.widget.CardView
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:layout_gravity="center"
-                        app:cardCornerRadius="18dp"
-                        app:cardUseCompatPadding="false"
-                        app:cardPreventCornerOverlap="true">
-
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/person1"/>
-                    </androidx.cardview.widget.CardView>
-                </FrameLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:layout_marginStart="12dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="kiero_d"
-                        android:textStyle="bold"
-                        android:textSize="14sp"/>
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:maxWidth="220dp"
-                        android:singleLine="true"
-                        android:ellipsize="end"
-                        android:text="The new design looks cool, b..."/>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="· 1m"
-                        android:textColor="#7A7A7A"
-                        android:textSize="12sp"/>
-
-                    <ImageView
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:layout_marginStart="10dp"
-                        android:src="@drawable/cam"
-                        app:tint="@color/smd_theme"/>
-                </LinearLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="72dp"
-                android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="12dp">
-
-                <FrameLayout
-                    android:layout_width="44dp"
-                    android:layout_height="44dp">
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:src="@drawable/story_circle"
-                        android:alpha=".5"
-                        app:tint="@color/gray" />
-
-                    <androidx.cardview.widget.CardView
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:layout_gravity="center"
-                        app:cardCornerRadius="18dp"
-                        app:cardUseCompatPadding="false"
-                        app:cardPreventCornerOverlap="true">
-
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/white_man"/>
-                    </androidx.cardview.widget.CardView>
-                </FrameLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:layout_marginStart="12dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="maxjacobson"
-                        android:textStyle="bold"
-                        android:textSize="14sp"/>
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:maxWidth="220dp"
-                        android:singleLine="true"
-                        android:ellipsize="end"
-                        android:text="Thank you, bro!"/>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="· 2h"
-                        android:textColor="#7A7A7A"
-                        android:textSize="12sp"/>
-
-                    <ImageView
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:layout_marginStart="10dp"
-                        android:src="@drawable/cam"
-                        app:tint="@color/smd_theme"/>
-                </LinearLayout>
-            </LinearLayout>
-
-        </LinearLayout>
-    </ScrollView>
-
+    <!-- Bottom Camera Bar -->
     <LinearLayout
         android:id="@+id/cameraBar"
         android:layout_width="match_parent"
@@ -531,17 +104,13 @@
             android:layout_height="40dp"
             android:layout_marginTop="16dp"
             android:gravity="center"
-            android:orientation="horizontal"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            >
+            android:orientation="horizontal">
 
             <ImageView
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:src="@drawable/cam"
-                app:tint="@color/smd_theme"
-              />
+                app:tint="@color/smd_theme" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -552,5 +121,4 @@
                 android:textSize="14sp"/>
         </LinearLayout>
     </LinearLayout>
-
 </RelativeLayout>

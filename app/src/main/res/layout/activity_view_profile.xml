@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    xmlns:tools="http://schemas.android.com/tools"
-    tools:context=".view_profile"
     android:background="@color/white"
-    android:id="@+id/main">
+    tools:context=".view_profile">
 
+    <!-- Top Bar remains the same -->
     <RelativeLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:layout_alignParentTop="true"
+        android:gravity="center_vertical"
         android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:gravity="center_vertical">
+        android:paddingEnd="16dp">
 
         <ImageView
             android:id="@+id/backButton"
@@ -31,21 +31,12 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_centerInParent="true"
-            android:text="kyan.coleman"
+            android:textColor="@color/black"
             android:textSize="18sp"
             android:textStyle="bold"
-            android:textColor="@color/black" />
+            tools:text="dynamic_username" />
 
-        <ImageView
-            android:id="@+id/verifiedBadge"
-            android:layout_width="16dp"
-            android:layout_height="16dp"
-            android:layout_toEndOf="@id/username"
-            android:layout_centerVertical="true"
-            android:layout_marginStart="8dp"
-            android:src="@drawable/verified"
-            app:tint="#03A9F4" />
-
+        <!-- Other top bar icons... -->
         <ImageView
             android:id="@+id/menuButton"
             android:layout_width="24dp"
@@ -57,148 +48,139 @@
 
     </RelativeLayout>
 
+    <!--
+        CHANGE 1:
+        The ScrollView now only contains the profile header info. The RecyclerView
+        for posts will be placed outside and below it to allow for independent scrolling,
+        which is much more efficient.
+    -->
     <ScrollView
-        android:id="@+id/scrollView"
+        android:id="@+id/header_scroll_view"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_below="@id/topBar"
-        android:layout_above="@id/bottomBar">
+        android:layout_height="wrap_content"
+        android:layout_below="@id/topBar">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <!-- Profile Header with Stats -->
             <RelativeLayout
                 android:id="@+id/profileHeader"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:paddingTop="16dp"
-                android:paddingBottom="16dp">
+                android:padding="16dp">
 
-                <FrameLayout
-                    android:id="@+id/profileImage"
+                <!--
+                    CHANGE 2: Simplified Profile Image Structure.
+                    The FrameLayout now holds a single CardView with a nested ImageView.
+                    The inner ImageView now has the correct ID 'profile_image' for your Kotlin code.
+                -->
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/profileImageContainer"
                     android:layout_width="80dp"
-                    android:layout_height="80dp">
+                    android:layout_height="80dp"
+                    app:cardCornerRadius="40dp"
+                    app:cardElevation="0dp">
 
                     <ImageView
+                        android:id="@+id/profile_image"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:src="@drawable/story_circle" />
+                        android:scaleType="centerCrop"
+                        tools:src="@drawable/default_avatar" />
+                </androidx.cardview.widget.CardView>
 
-                    <androidx.cardview.widget.CardView
-                        android:layout_width="65dp"
-                        android:layout_height="65dp"
-                        android:layout_gravity="center"
-                        app:cardCornerRadius="34dp"
-                        app:cardUseCompatPadding="false"
-                        app:cardPreventCornerOverlap="true">
-
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/black_man" />
-                    </androidx.cardview.widget.CardView>
-                </FrameLayout>
-
-
-
+                <!-- Stats Container (remains mostly the same, but with tools:text for preview) -->
                 <LinearLayout
                     android:id="@+id/statsContainer"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_toEndOf="@id/profileImage"
+                    android:layout_alignParentEnd="true"
                     android:layout_centerVertical="true"
-                    android:layout_marginStart="32dp"
+                    android:layout_marginStart="16dp"
+                    android:layout_toEndOf="@id/profileImageContainer"
+                    android:gravity="center"
                     android:orientation="horizontal">
 
                     <LinearLayout
-                        android:id="@+id/postsStats"
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
+                        android:layout_weight="1"
                         android:gravity="center"
-                        android:layout_marginEnd="24dp">
+                        android:orientation="vertical">
 
                         <TextView
                             android:id="@+id/postsCount"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="151"
+                            android:textColor="@color/black"
                             android:textSize="18sp"
                             android:textStyle="bold"
-                            android:textColor="@color/black" />
+                            tools:text="151" />
 
                         <TextView
-                            android:id="@+id/postsLabel"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="posts"
-                            android:textSize="14sp"
-                            android:textColor="@color/black" />
-
+                            android:text="Posts"
+                            android:textColor="@color/black"
+                            android:textSize="14sp" />
                     </LinearLayout>
-
+                    <!-- Followers -->
                     <LinearLayout
-                        android:id="@+id/followersStats"
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
+                        android:layout_weight="1"
                         android:gravity="center"
-                        android:layout_marginEnd="24dp">
+                        android:orientation="vertical">
 
                         <TextView
                             android:id="@+id/followersCount"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="112K"
+                            android:textColor="@color/black"
                             android:textSize="18sp"
                             android:textStyle="bold"
-                            android:textColor="@color/black" />
+                            tools:text="112K" />
 
                         <TextView
-                            android:id="@+id/followersLabel"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="followers"
-                            android:textSize="14sp"
-                            android:textColor="@color/black" />
-
+                            android:text="Followers"
+                            android:textColor="@color/black"
+                            android:textSize="14sp" />
                     </LinearLayout>
-
+                    <!-- Following -->
                     <LinearLayout
-                        android:id="@+id/followingStats"
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:gravity="center">
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
 
                         <TextView
                             android:id="@+id/followingCount"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="162"
+                            android:textColor="@color/black"
                             android:textSize="18sp"
                             android:textStyle="bold"
-                            android:textColor="@color/black" />
+                            tools:text="162" />
 
                         <TextView
-                            android:id="@+id/followingLabel"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="following"
-                            android:textSize="14sp"
-                            android:textColor="@color/black" />
-
+                            android:text="Following"
+                            android:textColor="@color/black"
+                            android:textSize="14sp" />
                     </LinearLayout>
 
                 </LinearLayout>
 
             </RelativeLayout>
 
+            <!-- Bio Section -->
             <LinearLayout
                 android:id="@+id/bioSection"
                 android:layout_width="match_parent"
@@ -212,122 +194,24 @@
                     android:id="@+id/displayName"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Kyan Coleman"
+                    android:textColor="@color/black"
                     android:textSize="14sp"
                     android:textStyle="bold"
-                    android:textColor="@color/black" />
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:id="@+id/location"
-                        android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
-                        android:background="@drawable/message_bar"
-                        android:drawableStart="@drawable/mention"
-                        android:drawablePadding="10dp"
-                        android:drawableTint="@color/black"
-                        android:text="kyan.coleman"
-                        android:textColor="@color/black"
-
-                        android:textSize="14sp" />
-
-                </LinearLayout>
-
-                <TextView
-                    android:id="@+id/bioCategory"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Blogger"
-                    android:textSize="14sp"
-                    android:textColor="@color/gray" />
+                    tools:text="Dynamic Name" />
 
                 <TextView
                     android:id="@+id/bioText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint occaecat... more"
-                    android:textSize="14sp"
+                    android:layout_marginTop="4dp"
+                    android:lineSpacingExtra="2dp"
                     android:textColor="@color/black"
-                    android:lineSpacingExtra="2dp" />
-
-                <TextView
-                    android:id="@+id/websiteLink"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="kyan.co"
                     android:textSize="14sp"
-                    android:drawableStart="@drawable/link"
-                    android:drawablePadding="10dp"
-                    android:layout_marginTop="4dp" />
-
-                <RelativeLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp">
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
-
-                        <LinearLayout
-                            android:id="@+id/user_group"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:layout_centerHorizontal="true"
-                            android:layout_marginLeft="3dp">
-
-                            <ImageView
-                                android:id="@+id/usrimg1"
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
-                                android:src="@drawable/usrimg1"
-                                android:scaleType="centerCrop"
-                                android:clipToOutline="true"
-                                android:background="@drawable/circular_background"
-                                android:layout_marginEnd="-12dp"/>
-
-                            <ImageView
-                                android:id="@+id/usrimg2"
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
-                                android:src="@drawable/usrimg2"
-                                android:scaleType="centerCrop"
-                                android:clipToOutline="true"
-                                android:background="@drawable/circular_background"
-                                android:layout_marginEnd="-12dp"/>
-
-                            <ImageView
-                                android:id="@+id/usrimg3"
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
-                                android:src="@drawable/usrimg3"
-                                android:scaleType="centerCrop"
-                                android:clipToOutline="true"
-                                android:background="@drawable/circular_background"/>
-                        </LinearLayout>
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Followed by your friend, another friend and 297 others"
-                            android:textSize="12sp"
-                            android:textColor="@color/black"
-                            android:layout_marginStart="4dp" />
-
-                    </LinearLayout>
-
-                </RelativeLayout>
+                    tools:text="This is a dynamic bio loaded from Firebase." />
 
             </LinearLayout>
 
+            <!-- Action Buttons Section -->
             <LinearLayout
                 android:id="@+id/actionButtonsSection"
                 android:layout_width="match_parent"
@@ -335,51 +219,35 @@
                 android:orientation="horizontal"
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
-                android:paddingBottom="16dp"
-                android:gravity="center">
+                android:paddingBottom="16dp">
 
                 <TextView
                     android:id="@+id/followingButton"
-                    android:layout_width="10dp"
+                    style="@style/Widget.AppCompat.Button.Borderless"
+                    android:layout_width="0dp"
                     android:layout_height="32dp"
+                    android:layout_marginEnd="8dp"
                     android:layout_weight="1"
-                    android:text="Following"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/black"
                     android:background="@drawable/follow_button"
-                    android:drawableEnd="@drawable/chev_down"
-                    android:drawablePadding="-10dp"
-                    android:backgroundTint="#EBE9E9"
-                    android:gravity="center"
-                    android:layout_marginEnd="8dp" />
+                    android:text="Follow"
+                    android:textAllCaps="false"
+                    android:textColor="@color/black"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/messageButton"
+                    style="@style/Widget.AppCompat.Button.Borderless"
                     android:layout_width="0dp"
                     android:layout_height="32dp"
+                    android:layout_marginEnd="8dp"
                     android:layout_weight="1"
+                    android:background="@drawable/follow_button"
                     android:text="Message"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
+                    android:textAllCaps="false"
                     android:textColor="@color/black"
-                    android:background="@drawable/follow_button"
-                    android:backgroundTint="#EBE9E9"                    android:gravity="center"
-                    android:layout_marginEnd="8dp" />
-
-                <TextView
-                    android:id="@+id/emailButton"
-                    android:layout_width="0dp"
-                    android:layout_height="32dp"
-                    android:layout_weight="1"
-                    android:text="Email"
                     android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/black"
-                    android:background="@drawable/follow_button"
-                    android:backgroundTint="#EBE9E9"
-                    android:gravity="center"
-                    android:layout_marginEnd="8dp" />
+                    android:textStyle="bold" />
 
                 <ImageView
                     android:id="@+id/moreOptionsButton"
@@ -387,412 +255,70 @@
                     android:layout_height="32dp"
                     android:src="@drawable/add_usr"
                     android:background="@drawable/follow_button"
-                    android:backgroundTint="#EBE9E9"
                     android:padding="8dp"
                     app:tint="@color/black" />
 
             </LinearLayout>
 
-            <LinearLayout
-                android:id="@+id/highlightsSection"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:paddingBottom="16dp"
-                android:gravity="start">
-
-                <LinearLayout
-                    android:id="@+id/highlight1"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:layout_marginEnd="16dp">
-
-                    <FrameLayout
-                        android:layout_width="60dp"
-                        android:layout_height="60dp">
-
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:src="@drawable/highlight_circle" />
-
-                        <androidx.cardview.widget.CardView
-                            android:layout_width="52dp"
-                            android:layout_height="52dp"
-                            android:layout_gravity="center"
-                            android:layout_margin="4dp"
-                            app:cardCornerRadius="26dp"
-                            app:cardUseCompatPadding="false"
-                            app:cardPreventCornerOverlap="true">
-
-                            <ImageView
-                                android:id="@+id/highlight1Icon"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:scaleType="centerCrop"
-                                android:src="@drawable/man_coffee" />
-                        </androidx.cardview.widget.CardView>
-                    </FrameLayout>
-
-                    <TextView
-                        android:id="@+id/highlight1Label"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Highlight 1"
-                        android:textSize="12sp"
-                        android:textColor="@color/black"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-
-                <!-- Highlight 2 -->
-                <LinearLayout
-                    android:id="@+id/highlight2"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:layout_marginEnd="16dp">
-
-                    <FrameLayout
-                        android:layout_width="60dp"
-                        android:layout_height="60dp">
-
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:src="@drawable/highlight_circle" />
-
-                        <androidx.cardview.widget.CardView
-                            android:layout_width="52dp"
-                            android:layout_height="52dp"
-                            android:layout_gravity="center"
-                            android:layout_margin="4dp"
-                            app:cardCornerRadius="26dp"
-                            app:cardUseCompatPadding="false"
-                            app:cardPreventCornerOverlap="true">
-
-                            <ImageView
-                                android:id="@+id/highlight2Icon"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:scaleType="centerCrop"
-                                android:src="@drawable/bird" />
-                        </androidx.cardview.widget.CardView>
-                    </FrameLayout>
-
-                    <TextView
-                        android:id="@+id/highlight2Label"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Highlight 2"
-                        android:textSize="12sp"
-                        android:textColor="@color/black"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-
-                <!-- Highlight 3 -->
-                <LinearLayout
-                    android:id="@+id/highlight3"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:layout_marginEnd="16dp">
-
-                    <FrameLayout
-                        android:layout_width="60dp"
-                        android:layout_height="60dp">
-
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:src="@drawable/highlight_circle" />
-
-                        <androidx.cardview.widget.CardView
-                            android:layout_width="52dp"
-                            android:layout_height="52dp"
-                            android:layout_gravity="center"
-                            android:layout_margin="4dp"
-                            app:cardCornerRadius="26dp"
-                            app:cardUseCompatPadding="false"
-                            app:cardPreventCornerOverlap="true">
-
-                            <ImageView
-                                android:id="@+id/highlight3Icon"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:scaleType="centerCrop"
-                                android:src="@drawable/people" />
-                        </androidx.cardview.widget.CardView>
-                    </FrameLayout>
-
-                    <TextView
-                        android:id="@+id/highlight3Label"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Highlight 3"
-                        android:textSize="12sp"
-                        android:textColor="@color/black"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-
-                <!-- Highlight 4 -->
-                <LinearLayout
-                    android:id="@+id/highlight4"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:layout_marginEnd="16dp">
-
-                    <FrameLayout
-                        android:layout_width="60dp"
-                        android:layout_height="60dp">
-
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:src="@drawable/highlight_circle" />
-
-                        <androidx.cardview.widget.CardView
-                            android:layout_width="52dp"
-                            android:layout_height="52dp"
-                            android:layout_gravity="center"
-                            android:layout_margin="4dp"
-                            app:cardCornerRadius="26dp"
-                            app:cardUseCompatPadding="false"
-                            app:cardPreventCornerOverlap="true">
-
-                            <ImageView
-                                android:id="@+id/highlight4Icon"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:scaleType="centerCrop"
-                                android:src="@drawable/italian_man" />
-                        </androidx.cardview.widget.CardView>
-                    </FrameLayout>
-
-                    <TextView
-                        android:id="@+id/highlight4Label"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Highlight 4"
-                        android:textSize="12sp"
-                        android:textColor="@color/black"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-
-                <!-- New highlight (kept as simple icon, like your source) -->
-                <LinearLayout
-                    android:id="@+id/newHighlight"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center">
-
-                    <ImageView
-                        android:id="@+id/newHighlightIcon"
-                        android:layout_width="60dp"
-                        android:layout_height="60dp"
-                        android:src="@drawable/plus"
-                        android:background="@drawable/highlight_circle"
-                        android:clipToOutline="true"
-                        android:padding="20dp"
-                        app:tint="@color/gray" />
-
-                    <TextView
-                        android:id="@+id/newHighlightLabel"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="New"
-                        android:textSize="12sp"
-                        android:textColor="@color/black"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-
-            </LinearLayout>
-
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="@color/gray" />
-
+            <!-- Tabs Section (Grid/Tagged) -->
             <LinearLayout
                 android:id="@+id/tabsSection"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="48dp"
                 android:orientation="horizontal"
-                android:gravity="center">
+                >
 
-                <RelativeLayout
+                <ImageView
+                    android:id="@+id/gridTab"
                     android:layout_width="0dp"
-                    android:layout_height="48dp"
+                    android:layout_height="match_parent"
                     android:layout_weight="1"
-                    android:gravity="center">
+                    android:padding="12dp"
+                    android:src="@drawable/grid"
+                    app:tint="@color/black" />
 
-                    <ImageView
-                        android:id="@+id/gridTab"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/grid"
-                        android:layout_centerInParent="true"
-                        app:tint="@color/black" />
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_alignParentBottom="true"
-                        android:background="@color/black" />
-
-                </RelativeLayout>
-
-                <RelativeLayout
+                <ImageView
+                    android:id="@+id/taggedTab"
                     android:layout_width="0dp"
-                    android:layout_height="48dp"
+                    android:layout_height="match_parent"
                     android:layout_weight="1"
-                    android:gravity="center">
-
-                    <ImageView
-                        android:id="@+id/taggedTab"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/tagged"
-                        android:layout_centerInParent="true"
-                        app:tint="#666666" />
-
-                </RelativeLayout>
-
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/postsGridLinear"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:layout_marginBottom="72dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_margin="1dp">
-
-                    <ImageView
-                        android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_weight="1"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/karenne"
-                        android:layout_margin="1dp" />
-
-                    <ImageView
-                        android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_weight="1"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/lake"
-                        android:layout_margin="1dp" />
-
-                    <ImageView
-                        android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_weight="1"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/city"
-                        android:layout_margin="1dp" />
-
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_margin="1dp">
-
-                    <ImageView
-                        android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_weight="1"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/landscape"
-                        android:layout_margin="1dp" />
-
-                    <ImageView
-                        android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_weight="1"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/people"
-                        android:layout_margin="1dp" />
-
-                    <ImageView
-                        android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_weight="1"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/bird"
-                        android:layout_margin="1dp" />
-
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_margin="1dp">
-
-                    <ImageView
-                        android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_weight="1"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/man_coffee"
-                        android:layout_margin="1dp" />
-
-                    <ImageView
-                        android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_weight="1"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/people"
-                        android:layout_margin="1dp" />
-
-                    <ImageView
-                        android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_weight="1"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/person1"
-                        android:layout_margin="1dp" />
-
-                </LinearLayout>
-
+                    android:padding="12dp"
+                    android:src="@drawable/tagged"
+                    app:tint="#666666" />
             </LinearLayout>
 
         </LinearLayout>
-
     </ScrollView>
 
+    <!--
+        CHANGE 3: Posts Grid RecyclerView.
+        This replaces your hardcoded grid of ImageViews with a proper, dynamic RecyclerView.
+        It is placed BELOW the header ScrollView and will fill the remaining space.
+    -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/posts_recycler_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_above="@id/bottomBar"
+        android:layout_below="@id/header_scroll_view"
+        tools:itemCount="9"
+        tools:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
+        tools:listitem="@layout/item_post_grid"
+        tools:spanCount="3" />
+
+    <!-- Bottom Navigation Bar remains the same -->
     <RelativeLayout
         android:id="@+id/bottomBar"
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:layout_alignParentBottom="true"
-        android:background="@color/white"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp">
-
+        android:background="@color/white">
+        <!-- ... your nav icons ... -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="horizontal"
             android:gravity="center"
-
             android:weightSum="5">
 
             <ImageView
@@ -801,9 +327,8 @@
                 android:layout_height="24dp"
                 android:layout_weight="1"
                 android:src="@drawable/home_un"
-
                 app:tint="@color/smd_theme" />
-
+            <!-- ... other nav icons ... -->
             <ImageView
                 android:id="@+id/navSearch"
                 android:layout_width="0dp"
@@ -811,15 +336,13 @@
                 android:layout_weight="1"
                 android:src="@drawable/search"
                 app:tint="@color/smd_theme" />
-
             <ImageView
                 android:id="@+id/navCreate"
                 android:layout_width="0dp"
                 android:layout_height="24dp"
                 android:layout_weight="1"
                 android:src="@drawable/create"
-                app:tint="@color/smd_theme" />
-
+                 />
             <ImageView
                 android:id="@+id/navLike"
                 android:layout_width="0dp"
@@ -827,17 +350,13 @@
                 android:layout_weight="1"
                 android:src="@drawable/like"
                 app:tint="@color/smd_theme" />
-
             <ImageView
                 android:id="@+id/navProfile"
                 android:layout_width="0dp"
                 android:layout_height="28dp"
                 android:layout_weight="1"
-                android:src="@drawable/oval"
-                />
-
+                android:src="@drawable/oval" />
         </LinearLayout>
-
     </RelativeLayout>
 
 </RelativeLayout>

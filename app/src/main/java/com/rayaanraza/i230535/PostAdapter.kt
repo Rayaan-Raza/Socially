@@ -1,7 +1,9 @@
 package com.rayaanraza.i230535
 
+import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.Base64
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -9,17 +11,49 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 
-class PostAdapter(
-    private val onLikeToggle: (postId: String, liked: Boolean) -> Unit,
-    private val onCommentClick: (postId: String) -> Unit
-) : RecyclerView.Adapter<PostAdapter.PostVH>() {
+// NOTE: These data classes are required for the adapter to work.
+// Place them in this file or in a separate "Models" file.
+data class Post(
+    val postId: String = "",
+    val uid: String = "",
+    var username: String = "", // 'var' so it can be updated if fetched later
+    val imageUrl: String = "",
+    val imageBase64: String = "",
+    val caption: String = "",
+    val createdAt: Long = 0L,
+    var likeCount: Long = 0L,
+    var commentCount: Long = 0L
+)
+
+data class Comment(
+    val commentId: String = "",
+    val postId: String = "",
+    val uid: String = "",
+    val username: String = "",
+    val text: String = "",
+    val createdAt: Long = 0L
+)
+
+/**
+ * This adapter is designed for the main feed, showing full post details.
+ * It connects to a layout like `item_post.xml`.
+ */
+class PostFeedAdapter(
+    private val onLikeToggle: (post: Post, liked: Boolean) -> Unit,
+    private val onCommentClick: (post: Post) -> Unit
+) : RecyclerView.Adapter<PostFeedAdapter.PostVH>() {
 
     private val items = mutableListOf<Post>()
-    private val likeState = mutableMapOf<String, Boolean>()             // postId -> did I like
-    private val likeCounts = mutableMapOf<String, Int>()                // postId -> count
-    private val commentPreviews = mutableMapOf<String, List<Comment>>() // postId -> latest 2
-    private val commentTotals = mutableMapOf<String, Int>()             // postId -> total count
+    private val usernameCache = mutableMapOf<String, String>()
+    private val likeState = mutableMapOf<String, Boolean>()      // postId -> I liked
+    private val likeCounts = mutableMapOf<String, Int>()         // postId -> total likes
+    private val commentPreviews = mutableMapOf<String, List<Comment>>() // postId -> 2 latest comments
+    private val commentTotals = mutableMapOf<String, Int>()      // postId -> total comments
 
     fun submitList(list: List<Post>) {
         items.clear()
@@ -29,26 +63,22 @@ class PostAdapter(
 
     fun setLikeCount(postId: String, count: Int) {
         likeCounts[postId] = count
-        val idx = items.indexOfFirst { it.postId == postId }
-        if (idx >= 0) notifyItemChanged(idx)
+        items.indexOfFirst { it.postId == postId }.takeIf { it != -1 }?.let { notifyItemChanged(it) }
     }
 
     fun setLiked(postId: String, liked: Boolean) {
         likeState[postId] = liked
-        val idx = items.indexOfFirst { it.postId == postId }
-        if (idx >= 0) notifyItemChanged(idx)
+        items.indexOfFirst { it.postId == postId }.takeIf { it != -1 }?.let { notifyItemChanged(it) }
     }
 
     fun setCommentPreview(postId: String, comments: List<Comment>) {
         commentPreviews[postId] = comments
-        val idx = items.indexOfFirst { it.postId == postId }
-        if (idx >= 0) notifyItemChanged(idx)
+        items.indexOfFirst { it.postId == postId }.takeIf { it != -1 }?.let { notifyItemChanged(it) }
     }
 
     fun setCommentTotal(postId: String, total: Int) {
         commentTotals[postId] = total
-        val idx = items.indexOfFirst { it.postId == postId }
-        if (idx >= 0) notifyItemChanged(idx)
+        items.indexOfFirst { it.postId == postId }.takeIf { it != -1 }?.let { notifyItemChanged(it) }
     }
 
     inner class PostVH(v: View) : RecyclerView.ViewHolder(v) {
@@ -69,77 +99,80 @@ class PostAdapter(
         return PostVH(v)
     }
 
+    @SuppressLint("SetTextI18n", "RecyclerView")
     override fun onBindViewHolder(h: PostVH, position: Int) {
         val item = items[position]
 
-        // Username / caption
-        h.username.text = item.username.ifEmpty { "user" }
-        h.tvCaption.text = "${item.username}  ${item.caption}"
+        // --- Username and Caption ---
+        val shownName = usernameCache[item.uid] ?: item.username.takeIf { it.isNotBlank() } ?: "user"
+        h.username.text = shownName
+        h.tvCaption.text = "$shownName  ${item.caption}"
 
-        // Avatar placeholder
+        // If username is missing from post, fetch, cache, and update UI
+        if (item.username.isBlank() && !usernameCache.containsKey(item.uid)) {
+            val userRef = FirebaseDatabase.getInstance().getReference("users").child(item.uid)
+            userRef.child("username").addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(s: DataSnapshot) {
+                    val name = (s.getValue(String::class.java) ?: "user").ifBlank { "user" }
+                    usernameCache[item.uid] = name // Cache it
+                    item.username = name // Update item in list
+                    notifyItemChanged(position) // Re-bind this view
+                }
+                override fun onCancelled(error: DatabaseError) {}
+            })
+        }
+
+        // --- Avatar (can be enhanced to load user's real avatar) ---
         h.avatar.setImageResource(R.drawable.oval)
 
-        // Post image (Firebase URL or fallback)
-        if (!item.imageUrl.isNullOrEmpty()) {
+        // --- Post Image (URL preferred, Base64 as fallback) ---
+        if (item.imageUrl.isNotEmpty()) {
             Glide.with(h.postImage.context)
                 .load(item.imageUrl)
                 .placeholder(R.drawable.person1)
                 .error(R.drawable.person1)
                 .into(h.postImage)
+        } else if (item.imageBase64.isNotEmpty()) {
+            val bmp = decodeBase64(item.imageBase64)
+            if (bmp != null) h.postImage.setImageBitmap(bmp) else h.postImage.setImageResource(R.drawable.person1)
         } else {
             h.postImage.setImageResource(R.drawable.person1)
         }
 
-        // Likes
+        // --- Likes ---
         val liked = likeState[item.postId] == true
         h.likeBtn.setImageResource(if (liked) R.drawable.liked else R.drawable.like)
-        val count = likeCounts[item.postId] ?: item.likeCount.toInt()
-        h.tvLikes.text = if (count == 1) "1 like" else "$count likes"
+        val liveCount = likeCounts[item.postId] ?: item.likeCount.toInt()
+        h.tvLikes.text = if (liveCount == 1) "1 like" else "$liveCount likes"
 
-        // Comments (up to 2)
+        // --- Comment previews ---
         val previews = commentPreviews[item.postId] ?: emptyList()
-        if (previews.isNotEmpty()) {
-            h.tvC1.visibility = View.VISIBLE
-            h.tvC1.text = "${previews[0].username}: ${previews[0].text}"
-        } else {
-            h.tvC1.visibility = View.GONE
-            h.tvC1.text = ""
-        }
+        h.tvC1.visibility = if (previews.isNotEmpty()) View.VISIBLE else View.GONE
+        if (previews.isNotEmpty()) h.tvC1.text = "${previews[0].username}: ${previews[0].text}"
 
-        if (previews.size >= 2) {
-            h.tvC2.visibility = View.VISIBLE
-            h.tvC2.text = "${previews[1].username}: ${previews[1].text}"
-        } else {
-            h.tvC2.visibility = View.GONE
-            h.tvC2.text = ""
-        }
+        h.tvC2.visibility = if (previews.size >= 2) View.VISIBLE else View.GONE
+        if (previews.size >= 2) h.tvC2.text = "${previews[1].username}: ${previews[1].text}"
 
-        // "View all" visible if total comments > 2
-        val total = commentTotals[item.postId] ?: previews.size
+        // --- "View all" link ---
+        val total = commentTotals[item.postId] ?: item.commentCount.toInt()
         h.tvViewAll.visibility = if (total > 2) View.VISIBLE else View.GONE
 
-        // Like button click
+        // --- Click Listeners ---
         h.likeBtn.setOnClickListener {
-            val currentlyLiked = likeState[item.postId] == true
-            onLikeToggle(item.postId, !currentlyLiked)
+            onLikeToggle(item, !liked)
         }
-
-        // Comment clicks
-        h.commentBtn.setOnClickListener { onCommentClick(item.postId) }
-        h.tvViewAll.setOnClickListener { onCommentClick(item.postId) }
+        h.commentBtn.setOnClickListener { onCommentClick(item) }
+        h.tvViewAll.setOnClickListener { onCommentClick(item) }
     }
 
     override fun getItemCount() = items.size
 
-    private fun decodeBase64(b64: String?): Bitmap? {
+    private fun decodeBase64(base64String: String): Bitmap? {
         return try {
-            if (b64.isNullOrEmpty()) null
-            else {
-                val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            }
-        } catch (_: Exception) {
-            null
+            val decodedBytes = Base64.decode(base64String, Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+        } catch (e: IllegalArgumentException) {
+            null // Handle invalid Base64 string gracefully
         }
     }
 }
