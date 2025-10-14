@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.util.Base64
 import android.view.View
-import android.widget.Button // Assuming your messageButton is a Button or TextView
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -15,6 +14,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.google.firebase.database.*
 
 class view_profile : AppCompatActivity() {
@@ -29,11 +29,16 @@ class view_profile : AppCompatActivity() {
     private lateinit var postsCountTextView: TextView
     private lateinit var followersCountTextView: TextView
     private lateinit var followingCountTextView: TextView
+    private lateinit var postsRecyclerView: RecyclerView
+
+    // --- NEW: Adapter and list for posts ---
+    private lateinit var postsAdapter: ProfilePostGridAdapter
+    private val postList = mutableListOf<Post>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_view_profile)
-
+        enableEdgetoEdge()
         // Handle window insets for edge-to-edge display
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -42,50 +47,49 @@ class view_profile : AppCompatActivity() {
         }
 
         database = FirebaseDatabase.getInstance()
-        initializeViews() // Initialize all views first
+        initializeViews()
 
-        // --- THIS IS THE FIX ---
-        // Try to get the userId from multiple common keys to ensure compatibility.
-        val userId = intent.getStringExtra("userId") // The expected key
-            ?: intent.getStringExtra("USER_ID")    // A common alternative
-            ?: intent.getStringExtra("uid")        // Another common alternative
+        // Get the user ID from the intent
+        val userId = intent.getStringExtra("userId")
+            ?: intent.getStringExtra("USER_ID")
+            ?: intent.getStringExtra("uid")
 
         if (userId.isNullOrEmpty()) {
-            Toast.makeText(this, "User ID is missing. Cannot open profile.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "User ID is missing.", Toast.LENGTH_LONG).show()
             finish()
             return
         }
 
-        // Setup listeners that DON'T need user data
         findViewById<ImageView>(R.id.backButton).setOnClickListener { finish() }
 
-        // Load the profile, which will then set up the listeners that DO need user data
-        loadUserProfile(userId)
-
-        // Setup the placeholder grid for posts, this doesn't depend on user data
+        // Initialize the grid first with an empty adapter
         setupPostsGrid()
+
+        // Then load the profile and the posts from Firebase
+        loadUserProfile(userId)
+        loadUserPosts(userId) // NEW: Call function to load posts
     }
 
     private fun initializeViews() {
-        // Initialize views here to avoid repeated findViewById calls
-        profileImageView = findViewById(R.id.profile_image) // Assuming this is the ID for the profile ImageView
+        profileImageView = findViewById(R.id.profile_image)
         usernameTextView = findViewById(R.id.username)
         displayNameTextView = findViewById(R.id.displayName)
         bioTextView = findViewById(R.id.bioText)
         postsCountTextView = findViewById(R.id.postsCount)
         followersCountTextView = findViewById(R.id.followersCount)
         followingCountTextView = findViewById(R.id.followingCount)
+        postsRecyclerView = findViewById(R.id.posts_recycler_view)
     }
 
     private fun loadUserProfile(userId: String) {
         val userRef = database.getReference("users").child(userId)
-        userRef.addListenerForSingleValueEvent(object : ValueEventListener {
+        userRef.addValueEventListener(object : ValueEventListener { // Use addValueEventListener for real-time updates
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
+                    // Assuming you have a User data class that matches your Firebase structure
                     val user = snapshot.getValue(User::class.java)
                     if (user != null) {
                         populateProfileData(user)
-                        // Setup listeners that depend on user data
                         setupUserDependentListeners(user)
                     }
                 } else {
@@ -100,65 +104,82 @@ class view_profile : AppCompatActivity() {
     }
 
     private fun populateProfileData(user: User) {
-        // Set the text data from the 'user' object
         usernameTextView.text = user.username
         displayNameTextView.text = user.fullName
-        bioTextView.text = user.bio ?: "No bio available."
+        bioTextView.text = user.bio.takeIf { !it.isNullOrBlank() } ?: "No bio available."
+
+        // Use Glide for loading the profile image, as it's more efficient
+        if (!user.profilePictureUrl.isNullOrEmpty()) {
+            Glide.with(this)
+                .load(user.profilePictureUrl)
+                .placeholder(R.drawable.default_avatar)
+                .error(R.drawable.default_avatar)
+                .circleCrop() // Apply a circular mask
+                .into(profileImageView)
+        } else {
+            profileImageView.setImageResource(R.drawable.default_avatar)
+        }
+
+        // The counts can be fetched in real-time for better accuracy
+        // For now, using the values from the User object is fine.
         postsCountTextView.text = user.postsCount.toString()
         followersCountTextView.text = user.followersCount.toString()
         followingCountTextView.text = user.followingCount.toString()
+    }
 
-        // --- NEW: PROFILE PICTURE LOGIC ---
-        // Check if the user has a profile picture URL and it's not empty
-        if (!user.profilePictureUrl.isNullOrEmpty()) {
-            try {
-                // Decode the Base64 string to a Bitmap
-                val profileBitmap = decodeBase64(user.profilePictureUrl)
-                // Set the bitmap to your ImageView
-                profileImageView.setImageBitmap(profileBitmap)
-            } catch (e: IllegalArgumentException) {
-                // Handle cases where the Base64 string is invalid
-                Toast.makeText(this, "Failed to decode profile image.", Toast.LENGTH_SHORT).show()
-                profileImageView.setImageResource(R.drawable.default_avatar) // Set a default image on error
+    // --- NEW: Function to load user's posts ---
+    private fun loadUserPosts(userId: String) {
+        val postsRef = database.getReference("posts").child(userId)
+        postsRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                postList.clear() // Clear the list to avoid duplicates on update
+                for (postSnapshot in snapshot.children) {
+                    val post = postSnapshot.getValue(Post::class.java)
+                    if (post != null) {
+                        postList.add(post)
+                    }
+                }
+                // Sort by newest first and update the adapter
+                postList.sortByDescending { it.createdAt }
+                postsAdapter.notifyDataSetChanged()
+
+                // Update the post count text to the actual number of posts found
+                postsCountTextView.text = postList.size.toString()
             }
-        } else {
-            // If no profile picture is set, show a default avatar
-            profileImageView.setImageResource(R.drawable.default_avatar) // Make sure you have this drawable
+
+            override fun onCancelled(error: DatabaseError) {
+                Toast.makeText(this@view_profile, "Failed to load posts.", Toast.LENGTH_SHORT).show()
+            }
+        })
+    }
+
+    // --- UPDATED: Setup the grid with the functional adapter ---
+    private fun setupPostsGrid() {
+        postsRecyclerView.layoutManager = GridLayoutManager(this, 3)
+        // Initialize the adapter with the (initially empty) postList
+        postsAdapter = ProfilePostGridAdapter(postList) { clickedPost ->
+            // This is where you handle a click on a post in the grid
+            // For example, open a new activity to view the post in detail
+            Toast.makeText(this, "Clicked on post: ${clickedPost.caption}", Toast.LENGTH_SHORT).show()
+            // val intent = Intent(this, PostDetailActivity::class.java)
+            // intent.putExtra("postId", clickedPost.postId)
+            // intent.putExtra("userId", clickedPost.uid)
+            // startActivity(intent)
         }
+        postsRecyclerView.adapter = postsAdapter
     }
 
-    // Utility function to decode a Base64 string into a Bitmap
-    private fun decodeBase64(base64: String): Bitmap {
-        val decodedBytes = Base64.decode(base64, Base64.DEFAULT)
-        return BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
-    }
-
-    // This function handles clicks for buttons that need the user object
     private fun setupUserDependentListeners(user: User) {
-        findViewById<TextView>(R.id.followingButton).setOnClickListener {
-            // This probably should go to a list of followers, not another profile
-            // For now, it goes to view_profile_2 as per your original code
-            startActivity(Intent(this, view_profile_2::class.java))
-        }
-
         findViewById<View>(R.id.messageButton).setOnClickListener {
             val intent = Intent(this, chat::class.java).apply {
                 putExtra("userId", user.uid)
-                putExtra("username", user.username) // Passing username to the chat screen
+                putExtra("username", user.username)
             }
             startActivity(intent)
         }
+        // You might have other buttons like "Follow/Unfollow" here
 
-        // Setup bottom navigation bar
         setupBottomNavigationBar()
-    }
-
-    private fun setupPostsGrid() {
-        val postsRecyclerView = findViewById<RecyclerView>(R.id.posts_recycler_view)
-        postsRecyclerView.layoutManager = GridLayoutManager(this, 3)
-        // Use a simple adapter with placeholder data
-        val placeholderPosts = List(9) { "Post $it" }
-        postsRecyclerView.adapter = PostAdapter(placeholderPosts)
     }
 
     private fun setupBottomNavigationBar() {

@@ -18,6 +18,9 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.provider.MediaStore // <- only used on API < 28 (suppressed)
+import androidx.activity.enableEdgeToEdge
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 class camera_activiy : AppCompatActivity() {
 
@@ -49,6 +52,13 @@ class camera_activiy : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         // setContentView(R.layout.activity_camera_activiy) // optional
 
+        enableEdgeToEdge()
+
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
         // Must be logged in
         if (FirebaseAuth.getInstance().currentUser?.uid == null) {
             Toast.makeText(this, "Please log in first.", Toast.LENGTH_SHORT).show()
