@@ -99,7 +99,6 @@
                         app:cardPreventCornerOverlap="true"
                         app:cardUseCompatPadding="false">
 
-                        <!-- ID ADDED HERE so your code can find it -->
                         <ImageView
                             android:id="@+id/designHighlightIcon"
                             android:layout_width="match_parent"
@@ -108,7 +107,6 @@
                             android:src="@drawable/default_avatar_placeholder" />
                     </androidx.cardview.widget.CardView>
                 </FrameLayout>
-
 
                 <LinearLayout
                     android:id="@+id/statsContainer"
@@ -262,7 +260,6 @@
                 android:paddingEnd="16dp"
                 android:paddingBottom="16dp">
 
-                <!-- Your highlights content here... this section remains as you designed it -->
                 <LinearLayout
                     android:id="@+id/friendsHighlight"
                     android:layout_width="wrap_content"
@@ -271,12 +268,10 @@
                     android:gravity="center"
                     android:orientation="vertical">
 
-                    <!-- ID ADDED HERE so your code can find it -->
                     <FrameLayout
                         android:id="@+id/friendsHighlightContainer"
                         android:layout_width="60dp"
                         android:layout_height="60dp">
-                        <!-- Content of this highlight... -->
                         <ImageView
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
@@ -301,12 +296,11 @@
 
             </LinearLayout>
 
-            <!-- This section remains as you designed -->
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:layout_below="@id/highlightsSection"
                 android:background="@color/gray" />
+
             <LinearLayout
                 android:id="@+id/tabsSection"
                 android:layout_width="match_parent"
@@ -314,22 +308,22 @@
                 android:gravity="center"
                 android:orientation="horizontal"
                 android:paddingBottom="8dp">
-                <!-- Tabs content... -->
             </LinearLayout>
+
             <View
                 android:id="@+id/view_bar"
                 android:layout_width="205dp"
                 android:layout_height="1dp"
                 android:background="@color/smd_theme" />
-            <LinearLayout
-                android:id="@+id/postsGridLinear"
+
+            <!-- NEW: RecyclerView for posts grid -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/posts_recycler_view"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:layout_marginBottom="72dp"
-                android:orientation="vertical">
-                <!-- Your grid of posts... -->
-            </LinearLayout>
+                android:nestedScrollingEnabled="false" />
 
         </LinearLayout>
     </ScrollView>

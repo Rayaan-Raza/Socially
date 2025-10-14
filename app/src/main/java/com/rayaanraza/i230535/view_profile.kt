@@ -1,14 +1,12 @@
 package com.rayaanraza.i230535
 
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.os.Bundle
-import android.util.Base64
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -38,7 +36,7 @@ class view_profile : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_view_profile)
-        enableEdgetoEdge()
+        enableEdgeToEdge()
         // Handle window insets for edge-to-edge display
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -171,7 +169,7 @@ class view_profile : AppCompatActivity() {
 
     private fun setupUserDependentListeners(user: User) {
         findViewById<View>(R.id.messageButton).setOnClickListener {
-            val intent = Intent(this, chat::class.java).apply {
+            val intent = Intent(this, ChatActivity::class.java).apply {
                 putExtra("userId", user.uid)
                 putExtra("username", user.username)
             }

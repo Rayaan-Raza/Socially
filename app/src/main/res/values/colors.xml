@@ -4,5 +4,7 @@
     <color name="white">#FFFFFFFF</color>
     <color name="gray">#B3B3B3</color>
     <color name="smd_theme">#A13D36</color>
-
+    <!-- ADD THESE LINES -->
+    <color name="grey">#CCCCCC</color>
+    <color name="light_grey">#EFEFEF</color>
 </resources>

@@ -35,6 +35,9 @@ import kotlin.concurrent.thread
 import android.graphics.ImageDecoder
 import android.os.Build
 import android.util.Base64
+import androidx.activity.enableEdgeToEdge
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.bumptech.glide.Glide
 
 

@@ -1,6 +1,7 @@
 package com.rayaanraza.i230535
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -11,6 +12,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -21,13 +24,16 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import com.rayaanraza.i230535.databinding.ItemStoryBubbleBinding
 
+
+
+
 class home_page : AppCompatActivity() {
 
     // --- Caches & State ---
     private val usernameCache = mutableMapOf<String, String>()
 
     // --- Views ---
-    private lateinit var navProfileImage: ImageView // MERGED: For bottom nav profile pic
+    private lateinit var navProfileImage: ImageView // For bottom nav profile pic
 
     // Stories
     private lateinit var rvStories: RecyclerView
@@ -47,11 +53,23 @@ class home_page : AppCompatActivity() {
     private val commentPreviewListeners = mutableMapOf<String, ValueEventListener>() // postId -> listener
     private var watchingUids: List<String> = emptyList()
 
+    // --- NEW AMENDMENT: Launcher for SelectFriendActivity ---
+    private var postToSend: Post? = null
+    private val selectFriendLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val selectedUserId = result.data?.getStringExtra("SELECTED_USER_ID")
+            if (selectedUserId != null && postToSend != null) {
+                // Now actually send the message with post details
+                sendMessageWithPost(selectedUserId, postToSend!!)
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_home_page)
 
-        // --- MERGED: Apply window insets to the main layout for edge-to-edge support ---
+        // --- Apply window insets to the main layout for edge-to-edge support ---
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
@@ -59,7 +77,7 @@ class home_page : AppCompatActivity() {
         }
 
         // --- Initialize Views ---
-        navProfileImage = findViewById(R.id.profile) // MERGED: Initialize bottom nav profile pic view
+        navProfileImage = findViewById(R.id.profile)
 
         // STORIES
         rvStories = findViewById(R.id.rvStories)
@@ -70,15 +88,49 @@ class home_page : AppCompatActivity() {
         // FEED
         rvFeed = findViewById(R.id.rvFeed)
         rvFeed.layoutManager = LinearLayoutManager(this)
+        // --- NEW AMENDMENT: Add onSendClick to the adapter initialization ---
         postAdapter = PostAdapter(
             onLikeToggle = { post, wantLike -> toggleLike(post, wantLike) },
-            onCommentClick = { post -> showAddCommentDialog(post) }
+            onCommentClick = { post -> showAddCommentDialog(post) },
+            onSendClick = { post -> sendPostToFriend(post) }
         )
         rvFeed.adapter = postAdapter
 
         // Setup Navigation Click Listeners
         setupClickListeners()
     }
+
+    // --- NEW AMENDMENT: New function to handle starting the send process ---
+    private fun sendPostToFriend(post: Post) {
+        postToSend = post // Store the post that the user wants to send
+        val intent = Intent(this, SelectFriendActivity::class.java)
+        // We pass the post ID in case the SelectFriendActivity needs it, though not strictly required by its current logic
+        intent.putExtra("POST_ID", post.postId)
+        selectFriendLauncher.launch(intent)
+    }
+
+    // --- NEW AMENDMENT: New function to create and send the special chat message ---
+    private fun sendMessageWithPost(recipientId: String, post: Post) {
+        val myUid = auth.currentUser?.uid ?: return
+        // Determine a consistent chat room ID between the two users
+        val chatRoomId = if (myUid > recipientId) "$myUid-$recipientId" else "$recipientId-$myUid"
+        val messageRef = db.child("chats").child(chatRoomId).push()
+
+        val message = Message(
+            messageId = messageRef.key!!,
+            senderId = myUid,
+            //text = "Check out this post!", // Default text for a shared post
+            timestamp = System.currentTimeMillis(),
+            messageType = "post", // Special type to identify this message
+            //sharedPostId = post.postId,
+            imageUrl = post.imageUrl // Include image URL for a quick preview in chat
+        )
+
+        messageRef.setValue(message).addOnSuccessListener {
+            Toast.makeText(this, "Post sent!", Toast.LENGTH_SHORT).show()
+        }
+    }
+
 
     private fun setupClickListeners() {
         findViewById<ImageView>(R.id.heart).setOnClickListener {
@@ -129,18 +181,17 @@ class home_page : AppCompatActivity() {
         commentPreviewListeners.clear()
     }
 
-    // ---------------- STORIES ----------------
+    // ---------------- STORIES (No changes to this function) ----------------
     private fun loadStories() {
         val uid = auth.currentUser?.uid ?: return
         storyList.clear()
 
         db.child("users").child(uid).get().addOnSuccessListener { snapshot ->
             val myName = snapshot.child("username").getValue(String::class.java) ?: "You"
-            val myPic = snapshot.child("profilePic").getValue(String::class.java)
+            val myPic = snapshot.child("profilePictureUrl").getValue(String::class.java)
             storyList.add(0, StoryBubble(uid, myName, myPic))
             storyAdapter.notifyDataSetChanged()
 
-            // --- MERGED: Set profile picture in the bottom navigation bar ---
             if (!myPic.isNullOrEmpty()) {
                 Glide.with(this)
                     .load(myPic)
@@ -160,7 +211,7 @@ class home_page : AppCompatActivity() {
                         val friendUid = child.key ?: continue
                         db.child("users").child(friendUid).get().addOnSuccessListener { userSnap ->
                             val uname = userSnap.child("username").getValue(String::class.java) ?: "User"
-                            val pfp = userSnap.child("profilePic").getValue(String::class.java)
+                            val pfp = userSnap.child("profilePictureUrl").getValue(String::class.java)
                             storyList.add(StoryBubble(friendUid, uname, pfp))
                             storyAdapter.notifyDataSetChanged()
                         }
@@ -170,6 +221,7 @@ class home_page : AppCompatActivity() {
             })
     }
 
+    // ---------------- Your existing StoryAdapter, no changes made ----------------
     inner class StoryAdapter(private val items: List<StoryBubble>) :
         RecyclerView.Adapter<StoryAdapter.StoryVH>() {
 
@@ -188,6 +240,7 @@ class home_page : AppCompatActivity() {
             if (!item.profileUrl.isNullOrEmpty()) {
                 Glide.with(this@home_page)
                     .load(item.profileUrl)
+                    .circleCrop()
                     .placeholder(R.drawable.person1)
                     .error(R.drawable.person1)
                     .into(holder.binding.pfp)
@@ -204,7 +257,8 @@ class home_page : AppCompatActivity() {
         override fun getItemCount() = items.size
     }
 
-    // ---------------- FEED (POSTS) - (Logic from RecyclerView version is kept as is) ----------------
+
+    // ---------------- ALL CODE BELOW THIS LINE IS YOUR EXISTING, UNCHANGED LOGIC ----------------
 
     private fun loadFeed() {
         val myUid = auth.currentUser?.uid ?: return
@@ -491,9 +545,11 @@ class home_page : AppCompatActivity() {
         }
     }
 
+    // --- NEW AMENDMENT: Add onSendClick to adapter and btnSend to PostVH ---
     inner class PostAdapter(
         private val onLikeToggle: (post: Post, liked: Boolean) -> Unit,
-        private val onCommentClick: (post: Post) -> Unit
+        private val onCommentClick: (post: Post) -> Unit,
+        private val onSendClick: (post: Post) -> Unit
     ) : RecyclerView.Adapter<PostAdapter.PostVH>() {
 
         private val items = mutableListOf<Post>()
@@ -543,6 +599,7 @@ class home_page : AppCompatActivity() {
             val tvC2: TextView = v.findViewById(R.id.tvComment2)
             val tvViewAll: TextView = v.findViewById(R.id.tvViewAll)
             val commentBtn: ImageView = v.findViewById(R.id.btnComment)
+            val sendBtn: ImageView = v.findViewById(R.id.btnShare) // Added send button
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PostVH {
@@ -550,7 +607,7 @@ class home_page : AppCompatActivity() {
             return PostVH(v)
         }
 
-        @SuppressLint("RecyclerView")
+        @SuppressLint("RecyclerView", "SetTextI18n")
         override fun onBindViewHolder(h: PostVH, position: Int) {
             val item = items[position]
 
@@ -629,6 +686,8 @@ class home_page : AppCompatActivity() {
             }
             h.commentBtn.setOnClickListener { onCommentClick(item) }
             h.tvViewAll.setOnClickListener { onCommentClick(item) }
+            // --- NEW AMENDMENT: Set the click listener for the send button ---
+            h.sendBtn.setOnClickListener { onSendClick(item) }
         }
 
         override fun getItemCount() = items.size

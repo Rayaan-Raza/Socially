@@ -23,7 +23,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import java.io.ByteArrayOutputStream
 
-class chat : AppCompatActivity() {
+class ChatActivity : AppCompatActivity() {
 
     private lateinit var auth: FirebaseAuth
     private lateinit var database: FirebaseDatabase
@@ -61,11 +61,17 @@ class chat : AppCompatActivity() {
         // Get data from the intent that started this activity
         otherUserId = intent.getStringExtra("userId") ?: ""
         otherUserName = intent.getStringExtra("username") ?: ""
-        chatId = generateChatId(currentUserId, otherUserId)
 
-        // Set up database references
-        messagesRef = database.getReference("messages").child(chatId)
-        chatsRef = database.getReference("chats").child(chatId)
+        // Generate chatId compatible with home_page.kt format (larger uid first)
+        chatId = if (currentUserId > otherUserId) {
+            "$currentUserId-$otherUserId"
+        } else {
+            "$otherUserId-$currentUserId"
+        }
+
+        // Set up database references - using "chats" path to match home_page.kt
+        messagesRef = database.getReference("chats").child(chatId)
+        chatsRef = database.getReference("chatMetadata").child(chatId)
 
         // Set up UI and listeners
         setupViews()
@@ -116,7 +122,7 @@ class chat : AppCompatActivity() {
         }
 
         // Create a unique channel name for the Agora call
-        val channelName = generateChatId(currentUserId, otherUserId)
+        val channelName = chatId
 
         // Voice Call Button Listener
         findViewById<ImageView>(R.id.voice).setOnClickListener {
@@ -150,10 +156,6 @@ class chat : AppCompatActivity() {
         recyclerView.adapter = adapter
     }
 
-    private fun generateChatId(userId1: String, userId2: String): String {
-        return if (userId1 < userId2) "${userId1}_${userId2}" else "${userId2}_${userId1}"
-    }
-
     private fun createOrGetChat() {
         chatsRef.get().addOnSuccessListener { snapshot ->
             if (!snapshot.exists()) {
@@ -169,6 +171,10 @@ class chat : AppCompatActivity() {
         }
     }
 
+    /**
+     * Load messages from Firebase
+     * Compatible with Message objects sent from home_page.kt and regular chat messages
+     */
     private fun loadMessages() {
         messagesRef.orderByChild("timestamp")
             .addValueEventListener(object : ValueEventListener {
@@ -187,7 +193,7 @@ class chat : AppCompatActivity() {
                 }
 
                 override fun onCancelled(error: DatabaseError) {
-                    Toast.makeText(this@chat, "Failed to load messages", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@ChatActivity, "Failed to load messages", Toast.LENGTH_SHORT).show()
                 }
             })
     }
@@ -219,17 +225,28 @@ class chat : AppCompatActivity() {
         messageInput.setText("")
     }
 
+    /**
+     * Sends a message to Firebase using your Message data class
+     */
     private fun sendMessage(messageType: String, content: String, imageUrl: String, postId: String) {
-        val messageId = messagesRef.push().key ?: return
+        val messageRef = messagesRef.push()
+        val messageId = messageRef.key ?: return
         val timestamp = System.currentTimeMillis()
-        val editableUntil = timestamp + 300000 // 5 minutes
 
+        // Create Message object using your existing data class
         val message = Message(
-            messageId, currentUserId, otherUserId, messageType, content,
-            imageUrl, postId, timestamp, isEdited = false, isDeleted = false, editableUntil
+            messageId = messageId,
+            senderId = currentUserId,
+            text = content,
+            timestamp = timestamp,
+            messageType = messageType,
+            imageUrl = imageUrl,
+            sharedPostId = postId,
+            isEdited = false,
+            isDeleted = false
         )
 
-        messagesRef.child(messageId).setValue(message)
+        messageRef.setValue(message)
             .addOnSuccessListener {
                 val displayContent = when (messageType) {
                     "image" -> "📷 Photo"
@@ -237,38 +254,11 @@ class chat : AppCompatActivity() {
                     else -> content
                 }
                 updateLastMessage(displayContent, timestamp)
-
-                // Send push notification to the other user
-                //sendPushNotification(content, messageType)
             }
             .addOnFailureListener {
                 Toast.makeText(this, "Failed to send message: ${it.message}", Toast.LENGTH_SHORT).show()
             }
     }
-
-//    private fun sendPushNotification(messageContent: String, messageType: String) {
-//        // Get current user's name from Firebase
-//        database.getReference("users").child(currentUserId)
-//            .child("username")
-//            .get()
-//            .addOnSuccessListener { snapshot ->
-//                val senderName = snapshot.getValue(String::class.java) ?: "Someone"
-//
-//                // Format message for notification
-//                val notificationBody = when (messageType) {
-//                    "image" -> "📷 Sent a photo"
-//                    "post" -> "📝 Shared a post"
-//                    else -> messageContent
-//                }
-//
-//                // Send notification
-//                NotificationHelper.sendMessageNotification(
-//                    receiverId = otherUserId,
-//                    senderName = senderName,
-//                    messageContent = notificationBody
-//                )
-//            }
-//    }
 
     private fun updateLastMessage(content: String, timestamp: Long) {
         val updates = hashMapOf<String, Any>(
@@ -279,12 +269,19 @@ class chat : AppCompatActivity() {
         chatsRef.updateChildren(updates)
     }
 
+    /**
+     * Opens the gallery to select an image
+     */
     private fun openGallery() {
         val intent = Intent(Intent.ACTION_PICK)
         intent.type = "image/*"
         startActivityForResult(intent, PICK_IMAGE)
     }
 
+    /**
+     * Handles the result from the gallery picker
+     * Converts the selected image to Base64 and sends it as a message
+     */
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -293,6 +290,7 @@ class chat : AppCompatActivity() {
             val imageUri: Uri? = data.data
             if (imageUri != null) {
                 try {
+                    // Convert URI to Bitmap
                     val bitmap = if (Build.VERSION.SDK_INT >= 29) {
                         val source = ImageDecoder.createSource(contentResolver, imageUri)
                         ImageDecoder.decodeBitmap(source)
@@ -301,7 +299,10 @@ class chat : AppCompatActivity() {
                         MediaStore.Images.Media.getBitmap(contentResolver, imageUri)
                     }
 
+                    // Encode the bitmap to Base64 string
                     val base64Image = encodeImage(bitmap)
+
+                    // Send the image as a message
                     sendMessage(
                         messageType = "image",
                         content = "Sent an image",
@@ -309,13 +310,19 @@ class chat : AppCompatActivity() {
                         postId = ""
                     )
 
+                    Toast.makeText(this, "Image sent!", Toast.LENGTH_SHORT).show()
+
                 } catch (e: Exception) {
-                    Toast.makeText(this, "Failed to load image", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Failed to load image: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
         }
     }
 
+    /**
+     * Encodes a Bitmap image to a Base64 string
+     * Compresses the image to 50% quality to reduce size
+     */
     private fun encodeImage(bitmap: Bitmap): String {
         val output = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.JPEG, 50, output)
@@ -324,13 +331,15 @@ class chat : AppCompatActivity() {
     }
 
     private fun showMessageOptions(message: Message) {
+        // Only allow editing/deleting your own messages
         if (message.senderId != currentUserId) {
             Toast.makeText(this, "You can only edit your own messages", Toast.LENGTH_SHORT).show()
             return
         }
 
-        if (!message.canEditOrDelete()) {
-            Toast.makeText(this, "Can only edit/delete within 5 minutes", Toast.LENGTH_SHORT).show()
+        // Only allow editing/deleting text messages
+        if (message.messageType != "text") {
+            Toast.makeText(this, "Can only edit/delete text messages", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -348,13 +357,8 @@ class chat : AppCompatActivity() {
     }
 
     private fun editMessage(message: Message) {
-        if (message.messageType != "text") {
-            Toast.makeText(this, "Can only edit text messages", Toast.LENGTH_SHORT).show()
-            return
-        }
-
         val input = EditText(this)
-        input.setText(message.content)
+        input.setText(message.text)
         input.setPadding(50, 30, 50, 30)
 
         AlertDialog.Builder(this)
@@ -364,7 +368,7 @@ class chat : AppCompatActivity() {
                 val newContent = input.text.toString().trim()
                 if (newContent.isNotEmpty()) {
                     val updates = hashMapOf<String, Any>(
-                        "content" to newContent,
+                        "text" to newContent,
                         "isEdited" to true
                     )
                     messagesRef.child(message.messageId).updateChildren(updates)
@@ -375,11 +379,18 @@ class chat : AppCompatActivity() {
     }
 
     private fun deleteMessage(message: Message) {
-        val updates = hashMapOf<String, Any>(
-            "content" to "This message was deleted",
-            "isDeleted" to true
-        )
-        messagesRef.child(message.messageId).updateChildren(updates)
+        AlertDialog.Builder(this)
+            .setTitle("Delete Message")
+            .setMessage("Are you sure you want to delete this message?")
+            .setPositiveButton("Delete") { _, _ ->
+                val updates = hashMapOf<String, Any>(
+                    "text" to "This message was deleted",
+                    "isDeleted" to true
+                )
+                messagesRef.child(message.messageId).updateChildren(updates)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showUserInfo() {

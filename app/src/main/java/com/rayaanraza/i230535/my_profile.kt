@@ -13,6 +13,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 
@@ -31,6 +33,11 @@ class my_profile : AppCompatActivity() {
     private lateinit var followingCountText: TextView
     private lateinit var profileImageView: ImageView
     private lateinit var editProfileBtn: TextView
+
+    // NEW: RecyclerView for posts grid
+    private lateinit var postsRecyclerView: RecyclerView
+    private lateinit var postsAdapter: ProfilePostGridAdapter
+    private val postList = mutableListOf<Post>()
 
     private var currentUserId: String = ""
 
@@ -56,12 +63,13 @@ class my_profile : AppCompatActivity() {
 
         userRef = database.getReference("users").child(currentUserId)
 
-        initViews() // This function is now corrected
+        initViews()
         setupClickListeners()
+        setupPostsGrid() // NEW: Setup posts grid
         loadUserData()
+        loadMyPosts() // NEW: Load user's posts
     }
 
-    // --- THIS IS THE CORRECTED FUNCTION ---
     private fun initViews() {
         usernameText = findViewById(R.id.username)
         displayNameText = findViewById(R.id.displayName)
@@ -71,10 +79,10 @@ class my_profile : AppCompatActivity() {
         followersCountText = findViewById(R.id.followersCount)
         followingCountText = findViewById(R.id.followingCount)
         editProfileBtn = findViewById(R.id.editProfileBtn)
-
-        // FIX: The ImageView has a unique ID, 'designHighlightIcon'.
-        // We find it directly, which is safe and avoids crashes from incorrect nesting logic.
         profileImageView = findViewById(R.id.designHighlightIcon)
+
+        // NEW: Initialize RecyclerView for posts
+        postsRecyclerView = findViewById(R.id.posts_recycler_view)
     }
 
     private fun setupClickListeners() {
@@ -119,13 +127,58 @@ class my_profile : AppCompatActivity() {
         }
     }
 
+    // NEW: Setup the posts grid layout
+    private fun setupPostsGrid() {
+        postsRecyclerView.layoutManager = GridLayoutManager(this, 3) // 3 columns
+        postsAdapter = ProfilePostGridAdapter(postList) { clickedPost ->
+            // Handle post click - open post detail or show full view
+            Toast.makeText(this, "Post: ${clickedPost.caption}", Toast.LENGTH_SHORT).show()
+            // You can navigate to a post detail activity here if you have one
+            // val intent = Intent(this, PostDetailActivity::class.java)
+            // intent.putExtra("postId", clickedPost.postId)
+            // intent.putExtra("userId", clickedPost.uid)
+            // startActivity(intent)
+        }
+        postsRecyclerView.adapter = postsAdapter
+    }
+
+    // NEW: Load user's own posts
+    private fun loadMyPosts() {
+        val postsRef = database.getReference("posts").child(currentUserId)
+        postsRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                postList.clear()
+                for (postSnapshot in snapshot.children) {
+                    val post = postSnapshot.getValue(Post::class.java)
+                    if (post != null) {
+                        postList.add(post)
+                    }
+                }
+                // Sort by newest first
+                postList.sortByDescending { it.createdAt }
+                postsAdapter.notifyDataSetChanged()
+
+                // Update the actual post count
+                postsCountText.text = postList.size.toString()
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Toast.makeText(this@my_profile, "Failed to load posts.", Toast.LENGTH_SHORT).show()
+            }
+        })
+    }
+
     private fun loadUserData() {
         userRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
+                    // Username
                     usernameText.text = snapshot.child("username").getValue(String::class.java) ?: ""
+
+                    // Display name
                     displayNameText.text = snapshot.child("fullName").getValue(String::class.java) ?: ""
 
+                    // Bio
                     val bio = snapshot.child("bio").getValue(String::class.java) ?: ""
                     if (bio.isNotEmpty()) {
                         val bioLines = bio.split("\n", limit = 2)
@@ -136,10 +189,13 @@ class my_profile : AppCompatActivity() {
                         bioLine2.text = ""
                     }
 
+                    // Followers and Following counts
                     followersCountText.text = (snapshot.child("followersCount").getValue(Int::class.java) ?: 0).toString()
                     followingCountText.text = (snapshot.child("followingCount").getValue(Int::class.java) ?: 0).toString()
-                    postsCountText.text = (snapshot.child("postsCount").getValue(Int::class.java) ?: 0).toString()
 
+                    // Posts count will be updated from loadMyPosts()
+
+                    // Profile picture
                     val profilePic = snapshot.child("profilePictureUrl").getValue(String::class.java)
                         ?: snapshot.child("photo").getValue(String::class.java)
 
@@ -149,7 +205,10 @@ class my_profile : AppCompatActivity() {
                             profileImageView.setImageBitmap(bitmap)
                         } catch (e: Exception) {
                             // Keep default image if decoding fails
+                            profileImageView.setImageResource(R.drawable.default_avatar)
                         }
+                    } else {
+                        profileImageView.setImageResource(R.drawable.default_avatar)
                     }
                 }
             }
@@ -169,6 +228,7 @@ class my_profile : AppCompatActivity() {
         super.onResume()
         if (currentUserId.isNotEmpty()) {
             loadUserData()
+            loadMyPosts()
         }
     }
 }

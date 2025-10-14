@@ -8,6 +8,8 @@ data class Message(
     val content: String = "",
     val imageUrl: String = "",
     val postId: String = "",
+    val sharedPostId: String = "",
+    val text : String = "",
     val timestamp: Long = 0L,
     val isEdited: Boolean = false,
     val isDeleted: Boolean = false,

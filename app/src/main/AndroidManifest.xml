@@ -86,7 +86,7 @@
             android:name=".notification_following"
             android:exported="false" />
         <activity
-            android:name=".chat"
+            android:name=".ChatActivity"
             android:exported="false" />
         <activity
             android:name=".dms"

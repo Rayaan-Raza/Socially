@@ -8,7 +8,6 @@
     tools:context=".search_feed"
     android:background="@color/white">
 
-
     <RelativeLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
@@ -57,209 +56,95 @@
         android:scrollbars="none"
         android:paddingStart="12dp"
         android:paddingEnd="12dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/chipShop"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:gravity="center"
+                android:textColor="@color/smd_theme"
+                android:layout_marginStart="8dp"
+                android:text="Shop"
+                android:textSize="12sp"
+                android:fontFamily="@font/instagram_sans_bold"
+                android:background="@drawable/follow_button"
+                android:drawableStart="@drawable/shopping_bag"
+                android:drawableTint="@color/smd_theme"/>
+
+            <TextView
+                android:id="@+id/chipStyle"
+                android:layout_width="wrap_content"
+                android:background="@drawable/follow_button"
+                android:layout_height="32dp"
+                android:layout_marginStart="8dp"
+                android:fontFamily="@font/instagram_sans_bold"
+                android:gravity="center"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="Style"
+                android:textColor="@color/smd_theme"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/chipSports"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:background="@drawable/follow_button"
+                android:layout_marginStart="8dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:gravity="center"
+                android:textColor="@color/smd_theme"
+                android:text="Sports"
+                android:textSize="12sp"
+                android:fontFamily="@font/instagram_sans_bold"/>
+
+            <TextView
+                android:id="@+id/chipAuto"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/follow_button"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:textColor="@color/smd_theme"
+                android:gravity="center"
+                android:text="Auto"
+                android:textSize="12sp"
+                android:fontFamily="@font/instagram_sans_bold"/>
+
+            <TextView
+                android:id="@+id/chipMusic"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginStart="8dp"
+                android:paddingStart="14dp"
+                android:textColor="@color/smd_theme"
+                android:paddingEnd="14dp"
+                android:background="@drawable/follow_button"
+                android:gravity="center"
+                android:text="Music"
+                android:textSize="12sp"
+                android:fontFamily="@font/instagram_sans_bold"/>
+        </LinearLayout>
     </HorizontalScrollView>
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:weightSum="10"
-        android:layout_below="@id/topBar"
-        android:layout_marginTop="10dp">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="32dp"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            android:gravity="center"
-            android:textColor="@color/smd_theme"
-            android:layout_marginLeft="8dp"
-            android:text="Shop"
-            android:textSize="12dp"
-            android:fontFamily="@font/instagram_sans_bold"
-            android:layout_weight="2"
-            android:background="@drawable/follow_button"
-            android:drawableStart="@drawable/shopping_bag"
-            android:drawableTint="@color/smd_theme"/>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:background="@drawable/follow_button"
-            android:layout_height="32dp"
-            android:layout_marginStart="8dp"
-            android:layout_weight="2"
-            android:fontFamily="@font/instagram_sans_bold"
-            android:gravity="center"
-
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            android:text="Style"
-            android:textColor="@color/smd_theme"
-            android:textSize="12dp"
-            tools:ignore="TextSizeCheck" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="32dp"
-            android:background="@drawable/follow_button"
-            android:layout_marginStart="8dp"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            android:gravity="center"
-            android:textColor="@color/smd_theme"
-            android:layout_weight="2"
-
-            android:text="Sports"
-            android:textSize="12dp"
-            android:fontFamily="@font/instagram_sans_bold"/>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="32dp"
-            android:layout_marginStart="8dp"
-            android:background="@drawable/follow_button"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            android:textColor="@color/smd_theme"
-
-            android:gravity="center"
-            android:text="Auto"
-            android:textSize="12dp"
-            android:layout_weight="2"
-            android:fontFamily="@font/instagram_sans_bold"/>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="32dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginRight="8dp"
-            android:paddingStart="14dp"
-            android:textColor="@color/smd_theme"
-            android:paddingEnd="14dp"
-            android:background="@drawable/follow_button"
-            android:gravity="center"
-            android:text="Music"
-            android:textSize="12dp"
-            android:fontFamily="@font/instagram_sans_bold"/>
-    </LinearLayout>
-
-    <ScrollView
-        android:id="@+id/gridScroll"
+    <!-- NEW: RecyclerView instead of GridLayout -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/postsRecyclerView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_below="@id/chips"
         android:layout_above="@+id/bottomBar"
-        android:fillViewport="true"
-        android:overScrollMode="never">
-
-        <androidx.gridlayout.widget.GridLayout
-            android:id="@+id/grid"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="1dp"
-            android:useDefaultMargins="true"
-            app:rowCount="4"
-            app:columnCount="3"
-            tools:ignore="GridLayout">
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="120dp"
-                android:scaleType="centerCrop"
-                android:src="@drawable/landscape"
-                app:layout_row="0"
-                app:layout_column="0"
-                app:layout_columnWeight="1"
-                app:layout_gravity="fill"/>
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="240dp"
-                android:scaleType="centerCrop"
-                android:src="@drawable/people"
-                app:layout_row="0"
-                app:layout_rowSpan="2"
-                app:layout_column="1"
-                app:layout_columnSpan="2"
-                app:layout_gravity="fill"/>
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="120dp"
-                android:scaleType="centerCrop"
-                android:src="@drawable/man_coffee"
-                app:layout_row="1"
-                app:layout_column="0"
-                app:layout_columnWeight="1"
-                app:layout_gravity="fill"/>
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="120dp"
-                android:scaleType="centerCrop"
-                android:src="@drawable/white_woman"
-                app:layout_row="2"
-                app:layout_column="0"
-                app:layout_columnWeight="1"
-                app:layout_gravity="fill"/>
-
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="120dp"
-                android:scaleType="centerCrop"
-                android:src="@drawable/karenne"
-                app:layout_row="2"
-                app:layout_column="1"
-                app:layout_columnWeight="1"
-                app:layout_gravity="fill"/>
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="120dp"
-                android:scaleType="centerCrop"
-                android:src="@drawable/italian_man"
-                app:layout_row="2"
-                app:layout_column="2"
-                app:layout_columnWeight="1"
-                app:layout_gravity="fill"/>
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="120dp"
-                android:scaleType="centerCrop"
-                android:src="@drawable/bird"
-                app:layout_row="3"
-                app:layout_column="0"
-                app:layout_columnWeight="1"
-                app:layout_gravity="fill"/>
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="120dp"
-                android:scaleType="centerCrop"
-                android:src="@drawable/black_man"
-                app:layout_row="3"
-                app:layout_column="1"
-                app:layout_columnWeight="1"
-                app:layout_gravity="fill"/>
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="120dp"
-                android:scaleType="centerCrop"
-                android:src="@drawable/white_man"
-                app:layout_row="3"
-                app:layout_column="2"
-                app:layout_columnWeight="1"
-                app:layout_gravity="fill"/>
-
-
-
-        </androidx.gridlayout.widget.GridLayout>
-    </ScrollView>
+        android:padding="1dp" />
 
     <RelativeLayout
         android:id="@+id/bottomBar"
@@ -314,11 +199,8 @@
                 android:layout_height="28dp"
                 android:layout_weight="1"
                 android:src="@drawable/oval"
-                android:id="@+id/profile"
-                />
+                android:id="@+id/profile" />
         </LinearLayout>
     </RelativeLayout>
-
-
 
 </RelativeLayout>
