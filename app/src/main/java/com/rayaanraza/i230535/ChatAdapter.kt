@@ -21,15 +21,23 @@ class ChatAdapter(
 ) : RecyclerView.Adapter<ChatAdapter.ChatViewHolder>() {
 
     inner class ChatViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val profileImage: ImageView = itemView.findViewById(R.id.avatar)
+        val profileImage: ImageView = itemView.findViewById(R.id.chat_avatar)
         val userName: TextView = itemView.findViewById(R.id.chat_user_name)
         val lastMessage: TextView = itemView.findViewById(R.id.chat_last_message)
         val timestamp: TextView = itemView.findViewById(R.id.chat_timestamp)
         //val unreadBadge: View? = itemView.findViewById(R.id.unread_badge) // Optional
 
         fun bind(chat: ChatSession) {
-            // Get the other user's ID
-            val otherUserId = chat.participants.keys.firstOrNull { it != currentUserId } ?: return
+            // Get the other user's ID using the helper method
+            val otherUserId = chat.getOtherUserId(currentUserId)
+
+            if (otherUserId.isEmpty()) {
+                // Fallback: something went wrong with participants
+                userName.text = "Unknown User"
+                profileImage.setImageResource(R.drawable.circular_background)
+                lastMessage.text = "Error loading chat"
+                return
+            }
 
             // Load other user's details from Firebase
             loadUserDetails(otherUserId)
@@ -109,13 +117,26 @@ class ChatAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChatViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_chat, parent, false)
-        return ChatViewHolder(view)
+        try {
+            android.util.Log.d("ChatAdapter", "Creating ViewHolder")
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_chat, parent, false)
+            android.util.Log.d("ChatAdapter", "ViewHolder created successfully")
+            return ChatViewHolder(view)
+        } catch (e: Exception) {
+            android.util.Log.e("ChatAdapter", "Error creating ViewHolder: ${e.message}", e)
+            throw e
+        }
     }
 
     override fun onBindViewHolder(holder: ChatViewHolder, position: Int) {
-        holder.bind(chatList[position])
+        try {
+            android.util.Log.d("ChatAdapter", "Binding position: $position")
+            holder.bind(chatList[position])
+            android.util.Log.d("ChatAdapter", "Bound position: $position successfully")
+        } catch (e: Exception) {
+            android.util.Log.e("ChatAdapter", "Error binding position $position: ${e.message}", e)
+        }
     }
 
     override fun getItemCount(): Int = chatList.size

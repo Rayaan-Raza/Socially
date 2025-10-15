@@ -55,39 +55,11 @@
         android:textColorHint="#7A7171"
         android:paddingStart="12dp"
         android:paddingEnd="12dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
         android:drawableStart="@drawable/search"
         android:drawablePadding="8dp"
         android:inputType="text"/>
-
-
-    <TextView
-        android:id="@+id/no_chats_message"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:layout_marginStart="35dp"
-        android:layout_marginEnd="35dp"
-        android:layout_marginTop="12dp"
-        android:layout_below="@id/search"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:text="No chats found."
-        android:textSize="18sp"
-        android:layout_centerInParent="true"
-        android:visibility="gone" />
-
-    <!--
-    THIS IS THE MAIN CHANGE:
-    The old ScrollView and LinearLayout are replaced by a single RecyclerView.
-    -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/chatsRecyclerView"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_below="@id/search"
-        android:layout_above="@+id/cameraBar"
-        android:layout_marginTop="15dp"
-        tools:listitem="@layout/item_chat" />
 
     <!-- Bottom Camera Bar -->
     <LinearLayout
@@ -121,4 +93,34 @@
                 android:textSize="14sp"/>
         </LinearLayout>
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/no_chats_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/search"
+        android:layout_above="@id/cameraBar"
+        android:layout_marginStart="35dp"
+        android:layout_marginEnd="35dp"
+        android:layout_marginTop="50dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:text="No chats found."
+        android:textSize="18sp"
+        android:textAlignment="center"
+        android:gravity="center"
+        android:visibility="gone" />
+
+    <!-- FIXED: RecyclerView now uses match_parent for height -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/chatsRecyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/search"
+        android:layout_above="@+id/cameraBar"
+        android:layout_marginTop="15dp"
+        android:clipToPadding="false"
+        android:paddingBottom="8dp"
+        tools:listitem="@layout/item_chat" />
+
 </RelativeLayout>

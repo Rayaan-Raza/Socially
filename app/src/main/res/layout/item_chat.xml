@@ -1,80 +1,64 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="72dp"
-    android:orientation="horizontal"
-    android:paddingStart="12dp"
-    android:paddingEnd="12dp"
-    android:gravity="center_vertical"
-    android:background="?android:attr/selectableItemBackground"> <!-- Adds a ripple effect on click -->
+    android:layout_height="wrap_content"
+    android:padding="12dp"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
 
-    <!-- Avatar -->
-    <FrameLayout
-        android:layout_width="44dp"
-        android:layout_height="44dp">
+    <ImageView
+        android:id="@+id/chat_avatar"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:src="@drawable/circular_background"
+        android:scaleType="centerCrop"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"/>
 
-        <TextView
-            android:id="@+id/chat_avatar"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@drawable/circular_background"
-            android:backgroundTint="@color/smd_theme"
-            android:gravity="center"
-            android:text="IS"
-            android:textColor="@android:color/white"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-    </FrameLayout>
-
-    <!-- Name and Last Message -->
-    <LinearLayout
+    <TextView
+        android:id="@+id/chat_user_name"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:layout_marginStart="12dp">
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="8dp"
+        android:text="Username"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textColor="#000000"
+        android:maxLines="1"
+        android:ellipsize="end"
+        app:layout_constraintStart_toEndOf="@id/chat_avatar"
+        app:layout_constraintEnd_toStartOf="@id/chat_timestamp"
+        app:layout_constraintTop_toTopOf="@id/chat_avatar"
+        app:layout_constraintHorizontal_bias="0"/>
 
-        <TextView
-            android:id="@+id/chat_user_name"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Username"
-            android:textColor="@android:color/black"
-            android:textStyle="bold"
-            android:textSize="14sp"/>
+    <TextView
+        android:id="@+id/chat_last_message"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Last message preview"
+        android:textSize="14sp"
+        android:textColor="#666666"
+        android:maxLines="1"
+        android:ellipsize="end"
+        app:layout_constraintStart_toStartOf="@id/chat_user_name"
+        app:layout_constraintEnd_toEndOf="@id/chat_user_name"
+        app:layout_constraintTop_toBottomOf="@id/chat_user_name"
+        app:layout_constraintBottom_toBottomOf="@id/chat_avatar"/>
 
-        <TextView
-            android:id="@+id/chat_last_message"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:maxWidth="220dp"
-            android:singleLine="true"
-            android:ellipsize="end"
-            android:text="Last message preview..."/>
-    </LinearLayout>
-
-    <!-- Timestamp and Camera Icon -->
-    <LinearLayout
+    <TextView
+        android:id="@+id/chat_timestamp"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:text="5m"
+        android:textSize="12sp"
+        android:textColor="#999999"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/chat_user_name"/>
 
-        <TextView
-            android:id="@+id/chat_timestamp"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="· now"
-            android:textColor="#7A7A7A"
-            android:textSize="12sp"/>
-
-        <ImageView
-            android:id="@+id/chat_camera_icon"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:layout_marginStart="10dp"
-            android:src="@drawable/cam"
-            app:tint="@color/smd_theme" />
-    </LinearLayout>
-</LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

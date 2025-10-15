@@ -85,7 +85,10 @@ class search_feed : AppCompatActivity() {
             startActivity(Intent(this, home_page::class.java))
             finish()
         }
-
+        findViewById<EditText>(R.id.search).setOnClickListener {
+            startActivity(Intent(this, specific_search::class.java))
+            finish()
+        }
         findViewById<ImageView>(R.id.create_account).setOnClickListener {
             startActivity(Intent(this, posting::class.java))
             finish()
