@@ -13,13 +13,16 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 
 class view_profile : AppCompatActivity() {
 
     private lateinit var database: FirebaseDatabase
+    private val rtdb: DatabaseReference by lazy { FirebaseDatabase.getInstance().reference }
+    private val meUid: String? get() = FirebaseAuth.getInstance().currentUser?.uid
 
-    // --- Views ---
+    // Views
     private lateinit var profileImageView: ImageView
     private lateinit var usernameTextView: TextView
     private lateinit var displayNameTextView: TextView
@@ -28,16 +31,18 @@ class view_profile : AppCompatActivity() {
     private lateinit var followersCountTextView: TextView
     private lateinit var followingCountTextView: TextView
     private lateinit var postsRecyclerView: RecyclerView
+    private lateinit var followButton: TextView
 
-    // --- NEW: Adapter and list for posts ---
+    // Posts
     private lateinit var postsAdapter: ProfilePostGridAdapter
     private val postList = mutableListOf<Post>()
+
+    private var targetUid: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_view_profile)
         enableEdgeToEdge()
-        // Handle window insets for edge-to-edge display
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
@@ -47,12 +52,11 @@ class view_profile : AppCompatActivity() {
         database = FirebaseDatabase.getInstance()
         initializeViews()
 
-        // Get the user ID from the intent
-        val userId = intent.getStringExtra("userId")
+        targetUid = intent.getStringExtra("userId")
             ?: intent.getStringExtra("USER_ID")
-            ?: intent.getStringExtra("uid")
+                    ?: intent.getStringExtra("uid")
 
-        if (userId.isNullOrEmpty()) {
+        if (targetUid.isNullOrEmpty()) {
             Toast.makeText(this, "User ID is missing.", Toast.LENGTH_LONG).show()
             finish()
             return
@@ -60,12 +64,11 @@ class view_profile : AppCompatActivity() {
 
         findViewById<ImageView>(R.id.backButton).setOnClickListener { finish() }
 
-        // Initialize the grid first with an empty adapter
         setupPostsGrid()
-
-        // Then load the profile and the posts from Firebase
-        loadUserProfile(userId)
-        loadUserPosts(userId) // NEW: Call function to load posts
+        loadUserProfile(targetUid!!)
+        loadUserPosts(targetUid!!)
+        setupFollowSection(targetUid!!)
+        setupBottomNavigationBar()
     }
 
     private fun initializeViews() {
@@ -77,24 +80,20 @@ class view_profile : AppCompatActivity() {
         followersCountTextView = findViewById(R.id.followersCount)
         followingCountTextView = findViewById(R.id.followingCount)
         postsRecyclerView = findViewById(R.id.posts_recycler_view)
+        followButton = findViewById(R.id.followingButton)
     }
 
     private fun loadUserProfile(userId: String) {
         val userRef = database.getReference("users").child(userId)
-        userRef.addValueEventListener(object : ValueEventListener { // Use addValueEventListener for real-time updates
+        userRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                if (snapshot.exists()) {
-                    // Assuming you have a User data class that matches your Firebase structure
-                    val user = snapshot.getValue(User::class.java)
-                    if (user != null) {
-                        populateProfileData(user)
-                        setupUserDependentListeners(user)
-                    }
-                } else {
+                if (!snapshot.exists()) {
                     Toast.makeText(this@view_profile, "User data not found.", Toast.LENGTH_SHORT).show()
+                    return
                 }
+                val user = snapshot.getValue(User::class.java) ?: return
+                populateProfileData(user)
             }
-
             override fun onCancelled(error: DatabaseError) {
                 Toast.makeText(this@view_profile, "Failed to load profile: ${error.message}", Toast.LENGTH_SHORT).show()
             }
@@ -106,79 +105,142 @@ class view_profile : AppCompatActivity() {
         displayNameTextView.text = user.fullName
         bioTextView.text = user.bio.takeIf { !it.isNullOrBlank() } ?: "No bio available."
 
-        // Use Glide for loading the profile image, as it's more efficient
         if (!user.profilePictureUrl.isNullOrEmpty()) {
             Glide.with(this)
                 .load(user.profilePictureUrl)
                 .placeholder(R.drawable.default_avatar)
                 .error(R.drawable.default_avatar)
-                .circleCrop() // Apply a circular mask
+                .circleCrop()
                 .into(profileImageView)
         } else {
             profileImageView.setImageResource(R.drawable.default_avatar)
         }
-
-        // The counts can be fetched in real-time for better accuracy
-        // For now, using the values from the User object is fine.
-        postsCountTextView.text = user.postsCount.toString()
-        followersCountTextView.text = user.followersCount.toString()
-        followingCountTextView.text = user.followingCount.toString()
+        // post count is set from loadUserPosts(); follower/following counts are live observers
     }
 
-    // --- NEW: Function to load user's posts ---
     private fun loadUserPosts(userId: String) {
         val postsRef = database.getReference("posts").child(userId)
         postsRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                postList.clear() // Clear the list to avoid duplicates on update
+                postList.clear()
                 for (postSnapshot in snapshot.children) {
-                    val post = postSnapshot.getValue(Post::class.java)
-                    if (post != null) {
-                        postList.add(post)
-                    }
+                    postSnapshot.getValue(Post::class.java)?.let { postList.add(it) }
                 }
-                // Sort by newest first and update the adapter
                 postList.sortByDescending { it.createdAt }
                 postsAdapter.notifyDataSetChanged()
-
-                // Update the post count text to the actual number of posts found
                 postsCountTextView.text = postList.size.toString()
             }
-
             override fun onCancelled(error: DatabaseError) {
                 Toast.makeText(this@view_profile, "Failed to load posts.", Toast.LENGTH_SHORT).show()
             }
         })
     }
 
-    // --- UPDATED: Setup the grid with the functional adapter ---
     private fun setupPostsGrid() {
         postsRecyclerView.layoutManager = GridLayoutManager(this, 3)
-        // Initialize the adapter with the (initially empty) postList
         postsAdapter = ProfilePostGridAdapter(postList) { clickedPost ->
-            // This is where you handle a click on a post in the grid
-            // For example, open a new activity to view the post in detail
             Toast.makeText(this, "Clicked on post: ${clickedPost.caption}", Toast.LENGTH_SHORT).show()
-            // val intent = Intent(this, PostDetailActivity::class.java)
-            // intent.putExtra("postId", clickedPost.postId)
-            // intent.putExtra("userId", clickedPost.uid)
-            // startActivity(intent)
         }
         postsRecyclerView.adapter = postsAdapter
     }
 
-    private fun setupUserDependentListeners(user: User) {
-        findViewById<View>(R.id.messageButton).setOnClickListener {
-            val intent = Intent(this, ChatActivity::class.java).apply {
-                putExtra("userId", user.uid)
-                putExtra("username", user.username)
-            }
-            startActivity(intent)
-        }
-        // You might have other buttons like "Follow/Unfollow" here
+    // ---------------- FOLLOW / UNFOLLOW USING TOP-LEVEL NODES ----------------
 
-        setupBottomNavigationBar()
+    private fun setupFollowSection(targetUid: String) {
+        val me = meUid
+        if (me == null || me == targetUid) {
+            // hide when not logged in or viewing own profile
+            followButton.visibility = View.GONE
+            return
+        }
+
+        followButton.visibility = View.VISIBLE
+
+        // Reflect current state live: /following/<me>/<target>
+        rtdb.child("following").child(me).child(targetUid)
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(s: DataSnapshot) {
+                    val isFollowing = s.getValue(Boolean::class.java) == true
+                    applyFollowStyle(isFollowing)
+                }
+                override fun onCancelled(error: DatabaseError) {}
+            })
+
+        // Live counts from top-level trees
+        observeCounts(targetUid)
+
+        followButton.setOnClickListener {
+            // Flip state by reading once
+            rtdb.child("following").child(me).child(targetUid)
+                .addListenerForSingleValueEvent(object : ValueEventListener {
+                    override fun onDataChange(s: DataSnapshot) {
+                        val currentlyFollowing = s.getValue(Boolean::class.java) == true
+                        if (currentlyFollowing) {
+                            unfollow(me, targetUid)
+                        } else {
+                            follow(me, targetUid)
+                        }
+                    }
+                    override fun onCancelled(error: DatabaseError) {}
+                })
+        }
     }
+
+    private fun follow(me: String, target: String) {
+        if (me == target) return
+        val updates = hashMapOf<String, Any?>(
+            "/following/$me/$target" to true,
+            "/followers/$target/$me" to true
+        )
+        rtdb.updateChildren(updates).addOnFailureListener {
+            Toast.makeText(this, "Follow failed: ${it.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun unfollow(me: String, target: String) {
+        if (me == target) return
+        val updates = hashMapOf<String, Any?>(
+            "/following/$me/$target" to null,
+            "/followers/$target/$me" to null
+        )
+        rtdb.updateChildren(updates).addOnFailureListener {
+            Toast.makeText(this, "Unfollow failed: ${it.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun observeCounts(targetUid: String) {
+        // Followers count = children under /followers/<target>
+        rtdb.child("followers").child(targetUid)
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(s: DataSnapshot) {
+                    followersCountTextView.text = s.childrenCount.toString()
+                }
+                override fun onCancelled(error: DatabaseError) {}
+            })
+
+        // Following count = children under /following/<target>
+        rtdb.child("following").child(targetUid)
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(s: DataSnapshot) {
+                    followingCountTextView.text = s.childrenCount.toString()
+                }
+                override fun onCancelled(error: DatabaseError) {}
+            })
+    }
+
+    private fun applyFollowStyle(isFollowing: Boolean) {
+        if (isFollowing) {
+            followButton.text = "Following"
+            followButton.setBackgroundResource(R.drawable.follow_button) // white/outlined
+            followButton.setTextColor(getColor(R.color.black))
+        } else {
+            followButton.text = "Follow"
+            followButton.setBackgroundResource(R.drawable.message_bttn)  // blue filled
+            followButton.setTextColor(getColor(R.color.white))
+        }
+    }
+
+    // ---------------- NAV ----------------
 
     private fun setupBottomNavigationBar() {
         findViewById<ImageView>(R.id.navHome).setOnClickListener { startActivity(Intent(this, home_page::class.java)) }

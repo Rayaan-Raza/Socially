@@ -29,8 +29,14 @@ class my_profile : AppCompatActivity() {
     private lateinit var userRef: DatabaseReference
     private var postsRef: DatabaseReference? = null
 
+    // NEW: top-level refs for live follower/following counts
+    private var followersRef: DatabaseReference? = null
+    private var followingRef: DatabaseReference? = null
+
     private var userListener: ValueEventListener? = null
     private var postListener: ValueEventListener? = null
+    private var followersCountListener: ValueEventListener? = null
+    private var followingCountListener: ValueEventListener? = null
 
     private lateinit var usernameText: TextView
     private lateinit var displayNameText: TextView
@@ -65,8 +71,7 @@ class my_profile : AppCompatActivity() {
 
         if (currentUserId.isEmpty()) {
             Toast.makeText(this, "Not logged in", Toast.LENGTH_SHORT).show()
-            finish()
-            return
+            finish(); return
         }
 
         userRef = database.getReference("users").child(currentUserId)
@@ -74,10 +79,7 @@ class my_profile : AppCompatActivity() {
         initViews()
         setupClickListeners()
         setupPostsGrid()
-
-        // NOTE: Do NOT attach listeners here; they’ll be attached in onStart()
-        // attachUserListener()
-        // attachPostsListener()
+        // listeners attached in onStart()
     }
 
     private fun initViews() {
@@ -99,29 +101,21 @@ class my_profile : AppCompatActivity() {
         }
 
         findViewById<ImageView>(R.id.nav_home).setOnClickListener {
-            startActivity(Intent(this, home_page::class.java))
-            finish()
+            startActivity(Intent(this, home_page::class.java)); finish()
         }
-
         findViewById<ImageView>(R.id.nav_search).setOnClickListener {
-            startActivity(Intent(this, search_feed::class.java))
-            finish()
+            startActivity(Intent(this, search_feed::class.java)); finish()
         }
-
         findViewById<ImageView>(R.id.nav_create).setOnClickListener {
-            startActivity(Intent(this, posting::class.java))
-            finish()
+            startActivity(Intent(this, posting::class.java)); finish()
         }
-
         findViewById<ImageView>(R.id.nav_like).setOnClickListener {
-            startActivity(Intent(this, following_page::class.java))
-            finish()
+            startActivity(Intent(this, following_page::class.java)); finish()
         }
 
         findViewById<FrameLayout>(R.id.friendsHighlightContainer).setOnClickListener {
             startActivity(Intent(this, story::class.java))
         }
-
         findViewById<FrameLayout>(R.id.profileImage).setOnClickListener {
             startActivity(Intent(this, my_story_view::class.java))
         }
@@ -139,12 +133,10 @@ class my_profile : AppCompatActivity() {
         val spanCount = 3
         postsRecyclerView.layoutManager = GridLayoutManager(this, spanCount)
         postsRecyclerView.setHasFixedSize(true)
-        // (Your XML already sets nestedScrollingEnabled=false, which is great inside a ScrollView)
         postsRecyclerView.addItemDecoration(GridSpacingDecoration(spanCount, dp(1), includeEdge = false))
 
         postsAdapter = ProfilePostGridAdapter(postList) { clickedPost ->
             Toast.makeText(this, "Post: ${clickedPost.caption}", Toast.LENGTH_SHORT).show()
-            // Optionally open a PostDetail screen
         }
         postsRecyclerView.adapter = postsAdapter
     }
@@ -156,14 +148,12 @@ class my_profile : AppCompatActivity() {
             override fun onDataChange(snapshot: DataSnapshot) {
                 postList.clear()
                 for (postSnapshot in snapshot.children) {
-                    val post = postSnapshot.getValue(Post::class.java)
-                    if (post != null) postList.add(post)
+                    postSnapshot.getValue(Post::class.java)?.let { postList.add(it) }
                 }
                 postList.sortByDescending { it.createdAt }
                 postsAdapter.notifyDataSetChanged()
                 postsCountText.text = postList.size.toString()
             }
-
             override fun onCancelled(error: DatabaseError) {
                 Toast.makeText(this@my_profile, "Failed to load posts.", Toast.LENGTH_SHORT).show()
             }
@@ -172,7 +162,7 @@ class my_profile : AppCompatActivity() {
         postListener = listener
     }
 
-    // Listen to user profile data
+    // Listen to user profile data (name, bio, photo, username)
     private fun attachUserListener() {
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -180,7 +170,7 @@ class my_profile : AppCompatActivity() {
 
                 usernameText.text = snapshot.child("username").getValue(String::class.java) ?: ""
 
-                // Display name: use fullName or firstName + lastName
+                // Display name: prefer fullName, else first+last
                 val fullName = snapshot.child("fullName").getValue(String::class.java)
                 val first = snapshot.child("firstName").getValue(String::class.java)
                 val last  = snapshot.child("lastName").getValue(String::class.java)
@@ -200,12 +190,9 @@ class my_profile : AppCompatActivity() {
                     bioLine2.text = ""
                 }
 
-                followersCountText.text =
-                    (snapshot.child("followersCount").getValue(Int::class.java) ?: 0).toString()
-                followingCountText.text =
-                    (snapshot.child("followingCount").getValue(Int::class.java) ?: 0).toString()
+                // NOTE: follower/following counts now come from top-level nodes (see attachCountsListeners)
 
-                // Profile picture: try multiple keys. Prefer URL; else Base64.
+                // Profile picture: prefer URL; else Base64 (supports data URL prefix)
                 val pic = listOf(
                     snapshot.child("profilePictureUrl").getValue(String::class.java),
                     snapshot.child("profileImageUrl").getValue(String::class.java),
@@ -223,7 +210,6 @@ class my_profile : AppCompatActivity() {
                         .error(R.drawable.default_avatar)
                         .into(profileImageView)
                 } else if (!pic.isNullOrEmpty()) {
-                    // Base64 fallback: decode off main thread; support "data:image/...;base64," prefix
                     lifecycleScope.launch {
                         val bmp = withContext(Dispatchers.IO) {
                             try {
@@ -248,7 +234,6 @@ class my_profile : AppCompatActivity() {
                         .into(profileImageView)
                 }
             }
-
             override fun onCancelled(error: DatabaseError) {
                 Toast.makeText(this@my_profile, "Failed to load profile: ${error.message}", Toast.LENGTH_SHORT).show()
             }
@@ -257,9 +242,32 @@ class my_profile : AppCompatActivity() {
         userListener = listener
     }
 
+    // NEW: attach live listeners for top-level followers/following
+    private fun attachCountsListeners() {
+        followersRef = database.getReference("followers").child(currentUserId)
+        followingRef = database.getReference("following").child(currentUserId)
+
+        val folL = object : ValueEventListener {
+            override fun onDataChange(s: DataSnapshot) {
+                followersCountText.text = s.childrenCount.toString()
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        val fingL = object : ValueEventListener {
+            override fun onDataChange(s: DataSnapshot) {
+                followingCountText.text = s.childrenCount.toString()
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+
+        followersRef?.addValueEventListener(folL)
+        followingRef?.addValueEventListener(fingL)
+        followersCountListener = folL
+        followingCountListener = fingL
+    }
+
     override fun onResume() {
         super.onResume()
-        // Optional: if something changed while paused and you want to redraw lists
         postsAdapter.notifyDataSetChanged()
     }
 
@@ -267,6 +275,7 @@ class my_profile : AppCompatActivity() {
         super.onStart()
         attachUserListener()
         attachPostsListener()
+        attachCountsListeners() // NEW: keep counts live from top-level trees
     }
 
     override fun onStop() {
@@ -282,14 +291,17 @@ class my_profile : AppCompatActivity() {
     private fun detachListeners() {
         userListener?.let { userRef.removeEventListener(it) }
         postListener?.let { postsRef?.removeEventListener(it) }
+        followersCountListener?.let { followersRef?.removeEventListener(it) }
+        followingCountListener?.let { followingRef?.removeEventListener(it) }
         userListener = null
         postListener = null
+        followersCountListener = null
+        followingCountListener = null
     }
 
     // ---- Utilities ----
 
-    private fun dp(v: Int): Int =
-        (v * resources.displayMetrics.density).toInt()
+    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
     class GridSpacingDecoration(
         private val spanCount: Int,

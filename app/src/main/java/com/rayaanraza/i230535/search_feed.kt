@@ -101,6 +101,11 @@ class search_feed : AppCompatActivity() {
             finish()
         }
 
+        findViewById<EditText>(R.id.search).setOnClickListener {
+            startActivity(Intent(this, specific_search::class.java))
+            finish()
+        }
+
         findViewById<ImageView>(R.id.scan).setOnClickListener {
             Toast.makeText(this, "Scan feature coming soon", Toast.LENGTH_SHORT).show()
         }
