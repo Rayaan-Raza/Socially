@@ -1,7 +1,6 @@
 package com.rayaanraza.i230535
 
 import android.content.Intent
-import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.util.Base64
@@ -13,16 +12,25 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class my_profile : AppCompatActivity() {
 
     private lateinit var auth: FirebaseAuth
     private lateinit var database: FirebaseDatabase
     private lateinit var userRef: DatabaseReference
+    private var postsRef: DatabaseReference? = null
+
+    private var userListener: ValueEventListener? = null
+    private var postListener: ValueEventListener? = null
 
     private lateinit var usernameText: TextView
     private lateinit var displayNameText: TextView
@@ -34,7 +42,7 @@ class my_profile : AppCompatActivity() {
     private lateinit var profileImageView: ImageView
     private lateinit var editProfileBtn: TextView
 
-    // NEW: RecyclerView for posts grid
+    // RecyclerView for posts grid
     private lateinit var postsRecyclerView: RecyclerView
     private lateinit var postsAdapter: ProfilePostGridAdapter
     private val postList = mutableListOf<Post>()
@@ -65,9 +73,11 @@ class my_profile : AppCompatActivity() {
 
         initViews()
         setupClickListeners()
-        setupPostsGrid() // NEW: Setup posts grid
-        loadUserData()
-        loadMyPosts() // NEW: Load user's posts
+        setupPostsGrid()
+
+        // NOTE: Do NOT attach listeners here; they’ll be attached in onStart()
+        // attachUserListener()
+        // attachPostsListener()
     }
 
     private fun initViews() {
@@ -80,8 +90,6 @@ class my_profile : AppCompatActivity() {
         followingCountText = findViewById(R.id.followingCount)
         editProfileBtn = findViewById(R.id.editProfileBtn)
         profileImageView = findViewById(R.id.designHighlightIcon)
-
-        // NEW: Initialize RecyclerView for posts
         postsRecyclerView = findViewById(R.id.posts_recycler_view)
     }
 
@@ -118,7 +126,6 @@ class my_profile : AppCompatActivity() {
             startActivity(Intent(this, my_story_view::class.java))
         }
 
-        // Other listeners
         findViewById<ImageView>(R.id.dropdown_icon).setOnClickListener {
             Toast.makeText(this, "Account options coming soon", Toast.LENGTH_SHORT).show()
         }
@@ -127,108 +134,186 @@ class my_profile : AppCompatActivity() {
         }
     }
 
-    // NEW: Setup the posts grid layout
+    // 3-column Instagram-like grid with tight spacing
     private fun setupPostsGrid() {
-        postsRecyclerView.layoutManager = GridLayoutManager(this, 3) // 3 columns
+        val spanCount = 3
+        postsRecyclerView.layoutManager = GridLayoutManager(this, spanCount)
+        postsRecyclerView.setHasFixedSize(true)
+        // (Your XML already sets nestedScrollingEnabled=false, which is great inside a ScrollView)
+        postsRecyclerView.addItemDecoration(GridSpacingDecoration(spanCount, dp(1), includeEdge = false))
+
         postsAdapter = ProfilePostGridAdapter(postList) { clickedPost ->
-            // Handle post click - open post detail or show full view
             Toast.makeText(this, "Post: ${clickedPost.caption}", Toast.LENGTH_SHORT).show()
-            // You can navigate to a post detail activity here if you have one
-            // val intent = Intent(this, PostDetailActivity::class.java)
-            // intent.putExtra("postId", clickedPost.postId)
-            // intent.putExtra("userId", clickedPost.uid)
-            // startActivity(intent)
+            // Optionally open a PostDetail screen
         }
         postsRecyclerView.adapter = postsAdapter
     }
 
-    // NEW: Load user's own posts
-    private fun loadMyPosts() {
-        val postsRef = database.getReference("posts").child(currentUserId)
-        postsRef.addValueEventListener(object : ValueEventListener {
+    // Listen to user's own posts under posts/<uid>
+    private fun attachPostsListener() {
+        postsRef = database.getReference("posts").child(currentUserId)
+        val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 postList.clear()
                 for (postSnapshot in snapshot.children) {
                     val post = postSnapshot.getValue(Post::class.java)
-                    if (post != null) {
-                        postList.add(post)
-                    }
+                    if (post != null) postList.add(post)
                 }
-                // Sort by newest first
                 postList.sortByDescending { it.createdAt }
                 postsAdapter.notifyDataSetChanged()
-
-                // Update the actual post count
                 postsCountText.text = postList.size.toString()
             }
 
             override fun onCancelled(error: DatabaseError) {
                 Toast.makeText(this@my_profile, "Failed to load posts.", Toast.LENGTH_SHORT).show()
             }
-        })
+        }
+        postsRef?.addValueEventListener(listener)
+        postListener = listener
     }
 
-    private fun loadUserData() {
-        userRef.addValueEventListener(object : ValueEventListener {
+    // Listen to user profile data
+    private fun attachUserListener() {
+        val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                if (snapshot.exists()) {
-                    // Username
-                    usernameText.text = snapshot.child("username").getValue(String::class.java) ?: ""
+                if (!snapshot.exists()) return
 
-                    // Display name
-                    displayNameText.text = snapshot.child("fullName").getValue(String::class.java) ?: ""
+                usernameText.text = snapshot.child("username").getValue(String::class.java) ?: ""
 
-                    // Bio
-                    val bio = snapshot.child("bio").getValue(String::class.java) ?: ""
-                    if (bio.isNotEmpty()) {
-                        val bioLines = bio.split("\n", limit = 2)
-                        bioLine1.text = bioLines.getOrNull(0) ?: ""
-                        bioLine2.text = bioLines.getOrNull(1) ?: ""
-                    } else {
-                        bioLine1.text = ""
-                        bioLine2.text = ""
-                    }
+                // Display name: use fullName or firstName + lastName
+                val fullName = snapshot.child("fullName").getValue(String::class.java)
+                val first = snapshot.child("firstName").getValue(String::class.java)
+                val last  = snapshot.child("lastName").getValue(String::class.java)
+                displayNameText.text = when {
+                    !fullName.isNullOrBlank() -> fullName
+                    !first.isNullOrBlank() || !last.isNullOrBlank() -> listOfNotNull(first, last).joinToString(" ")
+                    else -> ""
+                }
 
-                    // Followers and Following counts
-                    followersCountText.text = (snapshot.child("followersCount").getValue(Int::class.java) ?: 0).toString()
-                    followingCountText.text = (snapshot.child("followingCount").getValue(Int::class.java) ?: 0).toString()
+                val bio = snapshot.child("bio").getValue(String::class.java) ?: ""
+                if (bio.isNotEmpty()) {
+                    val bioLines = bio.split("\n", limit = 2)
+                    bioLine1.text = bioLines.getOrNull(0) ?: ""
+                    bioLine2.text = bioLines.getOrNull(1) ?: ""
+                } else {
+                    bioLine1.text = ""
+                    bioLine2.text = ""
+                }
 
-                    // Posts count will be updated from loadMyPosts()
+                followersCountText.text =
+                    (snapshot.child("followersCount").getValue(Int::class.java) ?: 0).toString()
+                followingCountText.text =
+                    (snapshot.child("followingCount").getValue(Int::class.java) ?: 0).toString()
 
-                    // Profile picture
-                    val profilePic = snapshot.child("profilePictureUrl").getValue(String::class.java)
-                        ?: snapshot.child("photo").getValue(String::class.java)
+                // Profile picture: try multiple keys. Prefer URL; else Base64.
+                val pic = listOf(
+                    snapshot.child("profilePictureUrl").getValue(String::class.java),
+                    snapshot.child("profileImageUrl").getValue(String::class.java),
+                    snapshot.child("profilePic").getValue(String::class.java),
+                    snapshot.child("photo").getValue(String::class.java),
+                    snapshot.child("profilePhoto").getValue(String::class.java),
+                    snapshot.child("profileBase64").getValue(String::class.java),
+                    snapshot.child("photoBase64").getValue(String::class.java)
+                ).firstOrNull { !it.isNullOrBlank() }
 
-                    if (!profilePic.isNullOrEmpty()) {
-                        try {
-                            val bitmap = decodeBase64(profilePic)
-                            profileImageView.setImageBitmap(bitmap)
-                        } catch (e: Exception) {
-                            // Keep default image if decoding fails
-                            profileImageView.setImageResource(R.drawable.default_avatar)
+                if (!pic.isNullOrEmpty() && pic.startsWith("http", true)) {
+                    Glide.with(this@my_profile)
+                        .load(pic)
+                        .placeholder(R.drawable.oval)
+                        .error(R.drawable.default_avatar)
+                        .into(profileImageView)
+                } else if (!pic.isNullOrEmpty()) {
+                    // Base64 fallback: decode off main thread; support "data:image/...;base64," prefix
+                    lifecycleScope.launch {
+                        val bmp = withContext(Dispatchers.IO) {
+                            try {
+                                val clean = pic.substringAfter("base64,", pic)
+                                val bytes = Base64.decode(clean, Base64.DEFAULT)
+                                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                            } catch (_: Exception) { null }
                         }
-                    } else {
-                        profileImageView.setImageResource(R.drawable.default_avatar)
+                        if (bmp != null) {
+                            profileImageView.setImageBitmap(bmp)
+                        } else {
+                            Glide.with(this@my_profile)
+                                .load(R.drawable.default_avatar)
+                                .placeholder(R.drawable.oval)
+                                .into(profileImageView)
+                        }
                     }
+                } else {
+                    Glide.with(this@my_profile)
+                        .load(R.drawable.default_avatar)
+                        .placeholder(R.drawable.oval)
+                        .into(profileImageView)
                 }
             }
 
             override fun onCancelled(error: DatabaseError) {
                 Toast.makeText(this@my_profile, "Failed to load profile: ${error.message}", Toast.LENGTH_SHORT).show()
             }
-        })
-    }
-
-    private fun decodeBase64(base64: String): Bitmap {
-        val decodedBytes = Base64.decode(base64, Base64.DEFAULT)
-        return BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+        }
+        userRef.addValueEventListener(listener)
+        userListener = listener
     }
 
     override fun onResume() {
         super.onResume()
-        if (currentUserId.isNotEmpty()) {
-            loadUserData()
-            loadMyPosts()
+        // Optional: if something changed while paused and you want to redraw lists
+        postsAdapter.notifyDataSetChanged()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        attachUserListener()
+        attachPostsListener()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        detachListeners()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        detachListeners()
+    }
+
+    private fun detachListeners() {
+        userListener?.let { userRef.removeEventListener(it) }
+        postListener?.let { postsRef?.removeEventListener(it) }
+        userListener = null
+        postListener = null
+    }
+
+    // ---- Utilities ----
+
+    private fun dp(v: Int): Int =
+        (v * resources.displayMetrics.density).toInt()
+
+    class GridSpacingDecoration(
+        private val spanCount: Int,
+        private val spacingPx: Int,
+        private val includeEdge: Boolean
+    ) : RecyclerView.ItemDecoration() {
+        override fun getItemOffsets(
+            outRect: android.graphics.Rect,
+            view: android.view.View,
+            parent: RecyclerView,
+            state: RecyclerView.State
+        ) {
+            val position = parent.getChildAdapterPosition(view)
+            val column = position % spanCount
+            if (includeEdge) {
+                outRect.left = spacingPx - column * spacingPx / spanCount
+                outRect.right = (column + 1) * spacingPx / spanCount
+                if (position < spanCount) outRect.top = spacingPx
+                outRect.bottom = spacingPx
+            } else {
+                outRect.left = column * spacingPx / spanCount
+                outRect.right = spacingPx - (column + 1) * spacingPx / spanCount
+                if (position >= spanCount) outRect.top = spacingPx
+            }
         }
     }
 }

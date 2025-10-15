@@ -18,17 +18,7 @@ import com.google.firebase.database.ValueEventListener
 
 // NOTE: These data classes are required for the adapter to work.
 // Place them in this file or in a separate "Models" file.
-data class Post(
-    val postId: String = "",
-    val uid: String = "",
-    var username: String = "", // 'var' so it can be updated if fetched later
-    val imageUrl: String = "",
-    val imageBase64: String = "",
-    val caption: String = "",
-    val createdAt: Long = 0L,
-    var likeCount: Long = 0L,
-    var commentCount: Long = 0L
-)
+
 
 data class Comment(
     val commentId: String = "",

@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ImageView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.rayaanraza.i230535.SquareImageView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/post_image"
     android:layout_width="match_parent"
-    android:layout_height="120dp"
+    android:layout_height="wrap_content"
     android:scaleType="centerCrop"
-    android:src="@drawable/placeholder_image" />
-    
+    android:foreground="?attr/selectableItemBackgroundBorderless"
+    android:contentDescription="Image" />

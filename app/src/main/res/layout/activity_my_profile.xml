@@ -383,7 +383,7 @@
                 android:layout_height="28dp"
                 android:layout_weight="1"
                 android:src="@drawable/oval"
-                app:tint="@color/smd_theme" />
+                />
         </LinearLayout>
     </RelativeLayout>
 
