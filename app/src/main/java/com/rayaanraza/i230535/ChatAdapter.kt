@@ -25,69 +25,94 @@ class ChatAdapter(
         val userName: TextView = itemView.findViewById(R.id.chat_user_name)
         val lastMessage: TextView = itemView.findViewById(R.id.chat_last_message)
         val timestamp: TextView = itemView.findViewById(R.id.chat_timestamp)
-        //val unreadBadge: View? = itemView.findViewById(R.id.unread_badge) // Optional
 
         fun bind(chat: ChatSession) {
-            // Get the other user's ID using the helper method
-            val otherUserId = chat.getOtherUserId(currentUserId)
+            try {
+                android.util.Log.d("ChatAdapter", "Starting bind for chat: ${chat.chatId}")
 
-            if (otherUserId.isEmpty()) {
-                // Fallback: something went wrong with participants
-                userName.text = "Unknown User"
-                profileImage.setImageResource(R.drawable.circular_background)
-                lastMessage.text = "Error loading chat"
-                return
-            }
+                // Get the other user's ID using the helper method
+                val otherUserId = chat.getOtherUserId(currentUserId)
+                android.util.Log.d("ChatAdapter", "Other user ID: $otherUserId")
 
-            // Load other user's details from Firebase
-            loadUserDetails(otherUserId)
-
-            // Display last message
-            if (chat.lastMessage.isNotEmpty()) {
-                val messagePrefix = if (chat.lastMessageSenderId == currentUserId) "You: " else ""
-                lastMessage.text = messagePrefix + chat.lastMessage
-            } else {
-                lastMessage.text = "No messages yet"
-            }
-
-            // Format and display timestamp
-            timestamp.text = formatTimestamp(chat.lastMessageTimestamp)
-
-            // Handle click to open chat
-            itemView.setOnClickListener {
-                val context = itemView.context
-                val intent = Intent(context, ChatActivity::class.java).apply {
-                    putExtra("CHAT_ID", chat.chatId)
-                    putExtra("OTHER_USER_ID", otherUserId)
+                if (otherUserId.isEmpty()) {
+                    // Fallback: something went wrong with participants
+                    userName.text = "Unknown User"
+                    profileImage.setImageResource(R.drawable.circular_background)
+                    lastMessage.text = "Error loading chat"
+                    android.util.Log.e("ChatAdapter", "Empty other user ID")
+                    return
                 }
-                context.startActivity(intent)
+
+                // Load other user's details from Firebase
+                loadUserDetails(otherUserId)
+
+                // Display last message
+                if (chat.lastMessage.isNotEmpty()) {
+                    val messagePrefix = if (chat.lastMessageSenderId == currentUserId) "You: " else ""
+                    lastMessage.text = messagePrefix + chat.lastMessage
+                } else {
+                    lastMessage.text = "No messages yet"
+                }
+
+                // Format and display timestamp
+                timestamp.text = formatTimestamp(chat.lastMessageTimestamp)
+
+                android.util.Log.d("ChatAdapter", "Bind completed for chat: ${chat.chatId}")
+            } catch (e: Exception) {
+                android.util.Log.e("ChatAdapter", "Error in bind: ${e.message}", e)
             }
         }
 
         private fun loadUserDetails(userId: String) {
             val userRef = FirebaseDatabase.getInstance().getReference("users").child(userId)
 
+            android.util.Log.d("ChatAdapter", "Loading user details for: $userId")
+
             userRef.addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     val username = snapshot.child("username").getValue(String::class.java) ?: "Unknown User"
-                    val profileImageUrl = snapshot.child("profileImage").getValue(String::class.java)
+
+                    // Try multiple possible field names for profile picture
+                    val profileImageUrl = snapshot.child("profilePictureUrl").getValue(String::class.java)
+                        ?: snapshot.child("profileImage").getValue(String::class.java)
+                        ?: snapshot.child("profileImageUrl").getValue(String::class.java)
 
                     userName.text = username
 
+                    android.util.Log.d("ChatAdapter", "User: $username, Profile URL: $profileImageUrl")
+
                     // Load profile image using Glide
                     if (!profileImageUrl.isNullOrEmpty()) {
-                        Glide.with(itemView.context)
-                            .load(profileImageUrl)
-                            .circleCrop()
-                            .placeholder(R.drawable.circular_background)
-                            .error(R.drawable.circular_background)
-                            .into(profileImage)
+                        try {
+                            Glide.with(itemView.context)
+                                .load(profileImageUrl)
+                                .circleCrop()
+                                .placeholder(R.drawable.circular_background)
+                                .error(R.drawable.circular_background)
+                                .into(profileImage)
+                            android.util.Log.d("ChatAdapter", "Glide loading image for $username")
+                        } catch (e: Exception) {
+                            android.util.Log.e("ChatAdapter", "Error loading image: ${e.message}")
+                            profileImage.setImageResource(R.drawable.circular_background)
+                        }
                     } else {
+                        android.util.Log.d("ChatAdapter", "No profile image URL for $username")
                         profileImage.setImageResource(R.drawable.circular_background)
+                    }
+
+                    // IMPORTANT: Set click listener here after we have the username
+                    itemView.setOnClickListener {
+                        val context = itemView.context
+                        val intent = Intent(context, ChatActivity::class.java).apply {
+                            putExtra("userId", userId)
+                            putExtra("username", username)
+                        }
+                        context.startActivity(intent)
                     }
                 }
 
                 override fun onCancelled(error: DatabaseError) {
+                    android.util.Log.e("ChatAdapter", "Failed to load user: ${error.message}")
                     userName.text = "Unknown User"
                     profileImage.setImageResource(R.drawable.circular_background)
                 }

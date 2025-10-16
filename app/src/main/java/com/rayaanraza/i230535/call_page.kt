@@ -3,47 +3,95 @@ package com.rayaanraza.i230535
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.view.View
-import android.widget.FrameLayout
+import android.util.Log
 import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import io.agora.rtc2.ChannelMediaOptions
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import io.agora.rtc2.Constants
 import io.agora.rtc2.IRtcEngineEventHandler
 import io.agora.rtc2.RtcEngine
-import io.agora.rtc2.RtcEngineConfig
-import io.agora.rtc2.video.VideoCanvas
-import java.util.Locale
 
 class call_page : AppCompatActivity() {
 
-    private val APP_ID = "e9d3c619be27400fb63d6293be8bf820"
-    private var rtcEngine: RtcEngine? = null
-    private var channelName: String? = null
+    private lateinit var database: FirebaseDatabase
+
+    private lateinit var muteBtn: ImageView
+    private lateinit var endCallBtn: ImageView
+    private lateinit var actionBtn: ImageView
+    private lateinit var timerText: TextView
+    private lateinit var nameText: TextView
+    private lateinit var avatarText: TextView
+
+    private var muted = false
+    private var speakerOn = false
+    private var channelName: String = ""
+    private var otherUserName: String = ""
+    private var otherUserId: String = ""
     private var isVideoCall: Boolean = false
 
-    private lateinit var timerText: TextView
-    private lateinit var remoteVideoContainer: FrameLayout
-    private lateinit var localVideoContainer: FrameLayout
-    private lateinit var voiceCallUI: LinearLayout
-    private lateinit var actionButton: ImageView
-    private lateinit var muteButton: ImageView
+    private val APP_ID = "e9d3c619be27400fb63d6293be8bf820"
+    private var rtcEngine: RtcEngine? = null
 
-    private val handler = Handler(Looper.getMainLooper())
-    private var seconds = 0
-    private var isCallConnected = false
-    private var isMuted = false
-    private var isSpeakerOn = false
+    private val rtcEventHandler = object : IRtcEngineEventHandler() {
+
+        override fun onJoinChannelSuccess(channel: String?, uid: Int, elapsed: Int) {
+            runOnUiThread {
+                timerText.text = "Connected"
+                Log.d("AgoraCall", "✅ Joined channel: $channel, uid: $uid")
+            }
+        }
+
+        override fun onUserJoined(uid: Int, elapsed: Int) {
+            runOnUiThread {
+                timerText.text = "Call in progress..."
+                Log.d("AgoraCall", "👤 Remote user joined: $uid")
+            }
+        }
+
+        override fun onUserOffline(uid: Int, reason: Int) {
+            runOnUiThread {
+                timerText.text = "Call ended"
+                Log.d("AgoraCall", "❌ Remote user left: $uid")
+                // End call after short delay
+                timerText.postDelayed({ endCall() }, 1500)
+            }
+        }
+
+        override fun onLeaveChannel(stats: RtcStats?) {
+            runOnUiThread {
+                timerText.text = "Call ended"
+                Log.d("AgoraCall", "📴 Left channel")
+            }
+        }
+
+        override fun onError(err: Int) {
+            runOnUiThread {
+                timerText.text = "Error: $err"
+                Log.e("AgoraCall", "⚠️ Agora error: $err")
+            }
+        }
+
+        override fun onConnectionLost() {
+            runOnUiThread {
+                timerText.text = "Connection lost"
+                Log.e("AgoraCall", "⚠️ Connection lost")
+            }
+        }
+
+        override fun onConnectionInterrupted() {
+            runOnUiThread {
+                timerText.text = "Connection interrupted"
+                Log.e("AgoraCall", "⚠️ Connection interrupted")
+            }
+        }
+    }
 
     private val PERMISSION_REQ_ID = 22
     private val REQUESTED_PERMISSIONS = arrayOf(
@@ -51,85 +99,58 @@ class call_page : AppCompatActivity() {
         Manifest.permission.CAMERA
     )
 
-    private val mRtcEventHandler = object : IRtcEngineEventHandler() {
-        override fun onUserJoined(uid: Int, elapsed: Int) {
-            runOnUiThread {
-                isCallConnected = true
-                startTimer()
-                if (isVideoCall) {
-                    setupRemoteVideo(uid)
-                }
-            }
-        }
-
-        override fun onUserOffline(uid: Int, reason: Int) {
-            runOnUiThread {
-                Toast.makeText(this@call_page, "Call ended", Toast.LENGTH_SHORT).show()
-                endCall()
-            }
-        }
-
-        override fun onJoinChannelSuccess(channel: String?, uid: Int, elapsed: Int) {
-            runOnUiThread {
-                Toast.makeText(this@call_page, "Joined channel successfully", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_call_page)
 
-        enableEdgeToEdge()
+        // Initialize Firebase
+        database = FirebaseDatabase.getInstance()
 
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
-        }
-        channelName = intent.getStringExtra("CHANNEL_NAME")
-        val otherUserName = intent.getStringExtra("USER_NAME")
+        // Initialize views - MATCHING YOUR XML IDs
+        muteBtn = findViewById(R.id.mute_audio_button)
+        endCallBtn = findViewById(R.id.endCall)
+        actionBtn = findViewById(R.id.action_button)
+        timerText = findViewById(R.id.timer)
+        nameText = findViewById(R.id.name)
+        avatarText = findViewById(R.id.avatar_text)
+
+        // Get intent data
+        channelName = intent.getStringExtra("CHANNEL_NAME") ?: ""
+        otherUserName = intent.getStringExtra("USER_NAME") ?: "Unknown"
+        otherUserId = intent.getStringExtra("USER_ID") ?: ""
         isVideoCall = intent.getBooleanExtra("IS_VIDEO_CALL", false)
 
-        if (channelName.isNullOrEmpty()) {
-            Toast.makeText(this, "Call information missing.", Toast.LENGTH_SHORT).show()
+        Log.d("AgoraCall", "=== Call Started ===")
+        Log.d("AgoraCall", "Channel: $channelName")
+        Log.d("AgoraCall", "Other user: $otherUserName ($otherUserId)")
+        Log.d("AgoraCall", "Video call: $isVideoCall")
+
+        if (channelName.isEmpty()) {
+            Toast.makeText(this, "Invalid call data", Toast.LENGTH_SHORT).show()
             finish()
             return
         }
 
-        initViews(otherUserName)
-        setupCallControls()
+        // Set up UI
+        nameText.text = otherUserName
+        timerText.text = "Calling..."
 
+        // Set avatar initials
+        val initials = if (otherUserName.isNotEmpty()) {
+            otherUserName.split(" ").take(2).map { it.first() }.joinToString("").uppercase()
+        } else "?"
+        avatarText.text = initials
+
+        // Set up button listeners
+        endCallBtn.setOnClickListener { endCall() }
+        muteBtn.setOnClickListener { toggleMute() }
+        actionBtn.setOnClickListener { toggleSpeaker() }
+
+        // Check permissions and join
         if (checkPermissions()) {
             initializeAndJoinChannel()
         } else {
             ActivityCompat.requestPermissions(this, REQUESTED_PERMISSIONS, PERMISSION_REQ_ID)
-        }
-    }
-
-    private fun initViews(userName: String?) {
-        findViewById<TextView>(R.id.name).text = userName ?: "Calling..."
-
-        val avatarText = userName?.split(" ")
-            ?.take(2)
-            ?.mapNotNull { it.firstOrNull()?.toString()?.uppercase() }
-            ?.joinToString("") ?: "U"
-        findViewById<TextView>(R.id.avatar_text).text = avatarText
-
-        timerText = findViewById(R.id.timer)
-        remoteVideoContainer = findViewById(R.id.remote_video_view_container)
-        localVideoContainer = findViewById(R.id.local_video_view_container)
-        voiceCallUI = findViewById(R.id.voice_call_ui)
-        actionButton = findViewById(R.id.action_button)
-        muteButton = findViewById(R.id.mute_audio_button)
-
-        if (isVideoCall) {
-            voiceCallUI.visibility = View.GONE
-            actionButton.setImageResource(R.drawable.ic_switch_camera)
-        } else {
-            localVideoContainer.visibility = View.GONE
-            remoteVideoContainer.visibility = View.GONE
-            actionButton.setImageResource(R.drawable.ic_speaker_on)
         }
     }
 
@@ -149,7 +170,7 @@ class call_page : AppCompatActivity() {
             if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
                 initializeAndJoinChannel()
             } else {
-                Toast.makeText(this, "Permissions required for this feature.", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Permissions required for call", Toast.LENGTH_LONG).show()
                 finish()
             }
         }
@@ -157,150 +178,81 @@ class call_page : AppCompatActivity() {
 
     private fun initializeAndJoinChannel() {
         try {
-            val config = RtcEngineConfig()
-            config.mContext = baseContext
-            config.mAppId = APP_ID
-            config.mEventHandler = mRtcEventHandler
-            rtcEngine = RtcEngine.create(config)
-        } catch (e: Exception) {
-            Toast.makeText(
-                this,
-                "Agora SDK failed to initialize. Error: ${e.message}",
-                Toast.LENGTH_LONG
-            ).show()
-            finish()
-            return
-        }
+            Log.d("AgoraCall", "Initializing Agora with APP_ID: $APP_ID")
 
-        if (isVideoCall) {
-            rtcEngine?.enableVideo()
-            setupLocalVideo()
-        } else {
-            rtcEngine?.disableVideo()
-        }
+            // Create RtcEngine
+            rtcEngine = RtcEngine.create(baseContext, APP_ID, rtcEventHandler)
 
-        // Always enable audio
-        rtcEngine?.enableAudio()
+            Log.d("AgoraCall", "✅ RtcEngine created")
 
-        val options = ChannelMediaOptions()
-        options.channelProfile = Constants.CHANNEL_PROFILE_COMMUNICATION
-        options.clientRoleType = Constants.CLIENT_ROLE_BROADCASTER
+            // Configure for voice call (IMPORTANT for two-way audio)
+            rtcEngine?.setChannelProfile(Constants.CHANNEL_PROFILE_COMMUNICATION)
+            rtcEngine?.enableAudio()
 
-        // Join channel with token (use null for testing, get real token in production)
-        rtcEngine?.joinChannel(null, channelName, 0, options)
-    }
-
-    private fun setupLocalVideo() {
-        try {
-            // Create texture view for local video
-            val surfaceView = RtcEngine.CreateRendererView(baseContext)
-            surfaceView.setZOrderMediaOverlay(true)
-
-            // Find the local video frame container
-            val videoFrame = findViewById<FrameLayout>(R.id.local_video_frame)
-            videoFrame.removeAllViews()
-            videoFrame.addView(surfaceView)
-
-            // Setup local video canvas
-            val canvas = VideoCanvas(surfaceView, VideoCanvas.RENDER_MODE_HIDDEN, 0)
-            rtcEngine?.setupLocalVideo(canvas)
-            rtcEngine?.startPreview()
-        } catch (e: Exception) {
-            Toast.makeText(this, "Failed to setup local video: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun setupRemoteVideo(uid: Int) {
-        runOnUiThread {
-            try {
-                // Create texture view for remote video
-                val surfaceView = RtcEngine.CreateRendererView(baseContext)
-
-                remoteVideoContainer.removeAllViews()
-                remoteVideoContainer.addView(surfaceView)
-
-                // Setup remote video canvas
-                val canvas = VideoCanvas(surfaceView, VideoCanvas.RENDER_MODE_HIDDEN, uid)
-                rtcEngine?.setupRemoteVideo(canvas)
-
-                remoteVideoContainer.visibility = View.VISIBLE
-            } catch (e: Exception) {
-                Toast.makeText(this, "Failed to setup remote video: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    private fun setupCallControls() {
-        // End call button
-        findViewById<ImageView>(R.id.endCall).setOnClickListener {
-            endCall()
-        }
-
-        // Mute/Unmute button
-        muteButton.setOnClickListener {
-            isMuted = !isMuted
-            rtcEngine?.muteLocalAudioStream(isMuted)
-            muteButton.setImageResource(
-                if (isMuted) R.drawable.ic_mic_off else R.drawable.ic_mic_on
-            )
-            Toast.makeText(
-                this,
-                if (isMuted) "Microphone muted" else "Microphone unmuted",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-
-        // Switch camera (video) or speaker (audio) button
-        actionButton.setOnClickListener {
             if (isVideoCall) {
-                // Switch camera
-                rtcEngine?.switchCamera()
-                Toast.makeText(this, "Camera switched", Toast.LENGTH_SHORT).show()
-            } else {
-                // Toggle speaker
-                isSpeakerOn = !isSpeakerOn
-                rtcEngine?.setEnableSpeakerphone(isSpeakerOn)
-                actionButton.setImageResource(
-                    if (isSpeakerOn) R.drawable.ic_speaker_on else R.drawable.ic_speaker_off
-                )
-                Toast.makeText(
-                    this,
-                    if (isSpeakerOn) "Speaker on" else "Speaker off",
-                    Toast.LENGTH_SHORT
-                ).show()
+                rtcEngine?.enableVideo()
+                // Setup video views if needed
+                // setupLocalVideo()
             }
+
+            Log.d("AgoraCall", "✅ Audio enabled, joining channel: $channelName")
+
+            // Join channel with random UID
+            val uid = (1000..9999).random()
+            rtcEngine?.joinChannel(null, channelName, "", uid)
+
+            Log.d("AgoraCall", "📞 Joining with UID: $uid")
+
+        } catch (e: Exception) {
+            Log.e("AgoraCall", "❌ Failed to initialize: ${e.message}", e)
+            Toast.makeText(this, "Failed to initialize call: ${e.message}", Toast.LENGTH_LONG).show()
+            finish()
         }
     }
 
-    private fun startTimer() {
-        val timerRunnable = object : Runnable {
-            override fun run() {
-                val minutes = seconds / 60
-                val secs = seconds % 60
-                timerText.text = String.format(Locale.getDefault(), "%02d:%02d", minutes, secs)
-                seconds++
-                handler.postDelayed(this, 1000)
-            }
-        }
-        handler.post(timerRunnable)
+    private fun toggleMute() {
+        muted = !muted
+        rtcEngine?.muteLocalAudioStream(muted)
+
+        val icon = if (muted) R.drawable.ic_mic_off else R.drawable.ic_mic_on
+        muteBtn.setImageResource(icon)
+
+        val status = if (muted) "Muted" else "Unmuted"
+        Toast.makeText(this, status, Toast.LENGTH_SHORT).show()
+        Log.d("AgoraCall", "🎤 Audio $status")
+    }
+
+    private fun toggleSpeaker() {
+        speakerOn = !speakerOn
+        rtcEngine?.setEnableSpeakerphone(speakerOn)
+
+        val icon = if (speakerOn) R.drawable.ic_speaker_on else R.drawable.ic_speaker_off
+        actionBtn.setImageResource(icon)
+
+        val status = if (speakerOn) "Speaker on" else "Speaker off"
+        Toast.makeText(this, status, Toast.LENGTH_SHORT).show()
+        Log.d("AgoraCall", "🔊 Speaker $status")
     }
 
     private fun endCall() {
-        handler.removeCallbacksAndMessages(null)
+        Log.d("AgoraCall", "Ending call...")
+
+        // Update Firebase call status
+        CallManager.endCall(channelName)
+
         rtcEngine?.leaveChannel()
-        rtcEngine?.stopPreview()
         Thread {
             RtcEngine.destroy()
             rtcEngine = null
         }.start()
+
         finish()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        handler.removeCallbacksAndMessages(null)
+        Log.d("AgoraCall", "Activity destroyed")
         rtcEngine?.leaveChannel()
-        rtcEngine?.stopPreview()
         Thread {
             RtcEngine.destroy()
         }.start()

@@ -23,7 +23,11 @@ import com.bumptech.glide.Glide
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import com.rayaanraza.i230535.databinding.ItemStoryBubbleBinding
-
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 
 
@@ -158,6 +162,7 @@ class home_page : AppCompatActivity() {
         // Refresh stories and feed whenever we (re)enter this screen.
         loadStories()
         loadFeed()
+        setupCallListener()
     }
 
     override fun onStop() {
@@ -186,24 +191,43 @@ class home_page : AppCompatActivity() {
         val uid = auth.currentUser?.uid ?: return
         storyList.clear()
 
+        // Load current user's profile first
         db.child("users").child(uid).get().addOnSuccessListener { snapshot ->
             val myName = snapshot.child("username").getValue(String::class.java) ?: "You"
+
+            // Try multiple field names for profile picture
             val myPic = snapshot.child("profilePictureUrl").getValue(String::class.java)
+                ?: snapshot.child("profileImage").getValue(String::class.java)
+                ?: snapshot.child("profileImageUrl").getValue(String::class.java)
+
+            android.util.Log.d("home_page", "My profile URL: $myPic")
+
             storyList.add(0, StoryBubble(uid, myName, myPic))
             storyAdapter.notifyDataSetChanged()
 
+            // Load profile picture in bottom nav
             if (!myPic.isNullOrEmpty()) {
-                Glide.with(this)
-                    .load(myPic)
-                    .circleCrop()
-                    .placeholder(R.drawable.oval)
-                    .error(R.drawable.oval)
-                    .into(navProfileImage)
+                try {
+                    Glide.with(this)
+                        .load(myPic)
+                        .circleCrop()
+                        .placeholder(R.drawable.oval)
+                        .error(R.drawable.oval)
+                        .into(navProfileImage)
+                    android.util.Log.d("home_page", "Loaded profile pic successfully")
+                } catch (e: Exception) {
+                    android.util.Log.e("home_page", "Error loading profile pic: ${e.message}")
+                    navProfileImage.setImageResource(R.drawable.oval)
+                }
             } else {
+                android.util.Log.d("home_page", "No profile pic URL found")
                 navProfileImage.setImageResource(R.drawable.oval)
             }
+        }.addOnFailureListener { e ->
+            android.util.Log.e("home_page", "Failed to load user data: ${e.message}")
         }
 
+        // Load following users' stories
         db.child("users").child(uid).child("following")
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
@@ -211,17 +235,25 @@ class home_page : AppCompatActivity() {
                         val friendUid = child.key ?: continue
                         db.child("users").child(friendUid).get().addOnSuccessListener { userSnap ->
                             val uname = userSnap.child("username").getValue(String::class.java) ?: "User"
+
+                            // Try multiple field names for profile picture
                             val pfp = userSnap.child("profilePictureUrl").getValue(String::class.java)
+                                ?: userSnap.child("profileImage").getValue(String::class.java)
+                                ?: userSnap.child("profileImageUrl").getValue(String::class.java)
+
                             storyList.add(StoryBubble(friendUid, uname, pfp))
                             storyAdapter.notifyDataSetChanged()
                         }
                     }
                 }
-                override fun onCancelled(error: DatabaseError) {}
+                override fun onCancelled(error: DatabaseError) {
+                    android.util.Log.e("home_page", "Failed to load following: ${error.message}")
+                }
             })
     }
 
     // ---------------- Your existing StoryAdapter, no changes made ----------------
+    // Update your StoryAdapter's onBindViewHolder method
     inner class StoryAdapter(private val items: List<StoryBubble>) :
         RecyclerView.Adapter<StoryAdapter.StoryVH>() {
 
@@ -237,16 +269,27 @@ class home_page : AppCompatActivity() {
         override fun onBindViewHolder(holder: StoryVH, position: Int) {
             val item = items[position]
             holder.binding.username.text = item.username
+
+            android.util.Log.d("StoryAdapter", "Loading story for ${item.username}, URL: ${item.profileUrl}")
+
             if (!item.profileUrl.isNullOrEmpty()) {
-                Glide.with(this@home_page)
-                    .load(item.profileUrl)
-                    .circleCrop()
-                    .placeholder(R.drawable.person1)
-                    .error(R.drawable.person1)
-                    .into(holder.binding.pfp)
+                try {
+                    Glide.with(this@home_page)
+                        .load(item.profileUrl)
+                        .circleCrop()
+                        .placeholder(R.drawable.person1)
+                        .error(R.drawable.person1)
+                        .into(holder.binding.pfp)
+                    android.util.Log.d("StoryAdapter", "Glide load initiated for ${item.username}")
+                } catch (e: Exception) {
+                    android.util.Log.e("StoryAdapter", "Error loading image: ${e.message}")
+                    holder.binding.pfp.setImageResource(R.drawable.person1)
+                }
             } else {
+                android.util.Log.d("StoryAdapter", "No profile URL for ${item.username}")
                 holder.binding.pfp.setImageResource(R.drawable.person1)
             }
+
             holder.binding.root.setOnClickListener {
                 val intent = Intent(this@home_page, camera_story::class.java)
                 intent.putExtra("uid", item.uid)
@@ -543,6 +586,35 @@ class home_page : AppCompatActivity() {
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun setupCallListener() {
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser == null) {
+            android.util.Log.e("home_page", "No current user for call listener")
+            return
+        }
+
+        android.util.Log.d("home_page", "Setting up call listener for user: ${currentUser.uid}")
+
+        CallManager.listenForIncomingCalls(currentUser.uid) { callId, callerName, isVideoCall ->
+            android.util.Log.d("home_page", "Incoming call from: $callerName")
+            showIncomingCall(callId, callerName, isVideoCall)
+        }
+    }
+
+    /**
+     * Show incoming call screen
+     */
+    private fun showIncomingCall(callId: String, callerName: String, isVideoCall: Boolean) {
+        val intent = Intent(this, IncomingCallActivity::class.java).apply {
+            putExtra("CALL_ID", callId)
+            putExtra("CALLER_NAME", callerName)
+            putExtra("IS_VIDEO_CALL", isVideoCall)
+            // These flags ensure the incoming call appears on top
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        startActivity(intent)
     }
 
     // --- NEW AMENDMENT: Add onSendClick to adapter and btnSend to PostVH ---
