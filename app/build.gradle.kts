@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.google.gms.google.services)
+    //id("com.google.gms.google-services")
+
 }
 
 android {
@@ -52,8 +54,18 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-database")
     implementation("com.google.firebase:firebase-storage")
+    implementation("com.google.firebase:firebase-messaging-ktx")
+    implementation("com.google.firebase:firebase-functions-ktx")
+    implementation("com.google.firebase:firebase-analytics-ktx")
     implementation("com.github.bumptech.glide:glide:4.16.0")
     annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
+
+    // Coroutines for async notifications
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+
+    // OkHttp for sending notifications
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.activity)
@@ -65,6 +77,12 @@ dependencies {
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
     implementation(libs.firebase.database)
+
+    // For making API calls
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+// For converting JSON data
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -5,6 +5,16 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.google.firebase.messaging.FirebaseMessagingService
+import com.google.firebase.messaging.RemoteMessage
+import com.google.firebase.messaging.FirebaseMessaging
+
 import android.os.Bundle
 import android.util.Base64
 import android.view.LayoutInflater
@@ -102,6 +112,8 @@ class home_page : AppCompatActivity() {
 
         // Setup Navigation Click Listeners
         setupClickListeners()
+        getFcmToken()
+        requestNotificationPermission()
     }
 
     // --- NEW AMENDMENT: New function to handle starting the send process ---
@@ -616,7 +628,42 @@ class home_page : AppCompatActivity() {
         }
         startActivity(intent)
     }
+    //notifs
 
+    private fun getFcmToken() {
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (!task.isSuccessful) {
+                Log.e("FCM", "Failed to get token", task.exception)
+                return@addOnCompleteListener
+            }
+
+            val token = task.result
+            Log.d("FCM", "FCM Token: $token")
+
+            val userId = auth.currentUser?.uid ?: return@addOnCompleteListener
+            db.child("users")
+                .child(userId)
+                .child("fcmToken")
+                .setValue(token)
+        }
+    }
+
+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    100
+                )
+            }
+        }
+    }
     // --- NEW AMENDMENT: Add onSendClick to adapter and btnSend to PostVH ---
     inner class PostAdapter(
         private val onLikeToggle: (post: Post, liked: Boolean) -> Unit,
