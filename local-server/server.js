@@ -72,5 +72,41 @@ messagesRef.on("child_added", (chatSnap) => {
     }
   });
 });
+// ✅ Listen for new screenshot events
+const screenshotsRef = db.ref("screenshots");
+
+screenshotsRef.on("child_added", async (snap) => {
+  const event = snap.val();
+  if (!event) return;
+
+  const { chatId, takerId, receiverId } = event;
+
+  try {
+    const tokenSnap = await usersRef.child(receiverId).child("fcmToken").once("value");
+    const token = tokenSnap.val();
+    if (!token) return console.log(`⚠️ No FCM token for receiver: ${receiverId}`);
+
+    const takerSnap = await usersRef.child(takerId).child("username").once("value");
+    const takerName = takerSnap.val() || "Someone";
+
+    const payload = {
+      notification: {
+        title: "📸 Screenshot Alert!",
+        body: `${takerName} took a screenshot in your chat.`,
+      },
+      data: {
+        type: "screenshot",
+        takerId,
+        chatId,
+      },
+      token,
+    };
+
+    await admin.messaging().send(payload);
+    console.log(`✅ Screenshot notification sent to ${receiverId}`);
+  } catch (err) {
+    console.error("❌ Error sending screenshot notification:", err);
+  }
+});
 
 app.listen(PORT, () => console.log(`🚀 Local FCM Server running on port ${PORT}`));

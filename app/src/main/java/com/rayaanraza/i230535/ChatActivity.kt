@@ -3,6 +3,7 @@ package com.rayaanraza.i230535
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
+import android.database.ContentObserver
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
@@ -10,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Base64
+import android.util.Log
 import android.view.inputmethod.EditorInfo
 import android.widget.*
 import androidx.activity.enableEdgeToEdge
@@ -92,6 +94,25 @@ class ChatActivity : AppCompatActivity() {
 
         android.util.Log.d("ChatActivity", "Messages path: messages/$chatId")
         android.util.Log.d("ChatActivity", "Chats path: chats/$chatId")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestPermissions(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES), 1)
+        } else {
+            requestPermissions(arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE), 1)
+        }
+
+        val contentObserver = object : ContentObserver(null) {
+            override fun onChange(selfChange: Boolean) {
+                super.onChange(selfChange)
+                Log.d("Screenshot", "Screenshot detected!")
+                sendScreenshotEventToFirebase()
+            }
+        }
+
+        contentResolver.registerContentObserver(
+            android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            true,
+            contentObserver
+        )
 
         setupViews()
         setupRecyclerView()
@@ -409,6 +430,28 @@ class ChatActivity : AppCompatActivity() {
         )
         messagesRef.child(message.messageId).updateChildren(updates)
     }
+    @SuppressLint("MissingPermission")
+    private fun sendScreenshotEventToFirebase() {
+        val currentUser = FirebaseAuth.getInstance().currentUser ?: return
+        val db = FirebaseDatabase.getInstance().getReference("screenshots")
+
+        val screenshotData = mapOf(
+            "chatId" to chatId,
+            "takerId" to currentUser.uid,
+            "receiverId" to otherUserId,
+            "timestamp" to System.currentTimeMillis()
+        )
+
+        db.push().setValue(screenshotData)
+            .addOnSuccessListener {
+                Log.d("ScreenshotEvent", "📸 Screenshot logged for chat: $chatId")
+                Toast.makeText(this, "Screenshot detected!", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { e ->
+                Log.e("ScreenshotEvent", "❌ Failed to log screenshot: ${e.message}")
+            }
+    }
+
 
     private fun showUserInfo() {
         Toast.makeText(this, "Viewing info for $otherUserName", Toast.LENGTH_SHORT).show()
