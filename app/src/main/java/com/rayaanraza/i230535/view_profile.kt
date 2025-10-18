@@ -32,12 +32,14 @@ class view_profile : AppCompatActivity() {
     private lateinit var followingCountTextView: TextView
     private lateinit var postsRecyclerView: RecyclerView
     private lateinit var followButton: TextView
+    private lateinit var messageButton: TextView
 
     // Posts
     private lateinit var postsAdapter: ProfilePostGridAdapter
     private val postList = mutableListOf<Post>()
 
     private var targetUid: String? = null
+    private var targetUsername: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,6 +70,7 @@ class view_profile : AppCompatActivity() {
         loadUserProfile(targetUid!!)
         loadUserPosts(targetUid!!)
         setupFollowSection(targetUid!!)
+        setupMessageButton(targetUid!!)
         setupBottomNavigationBar()
     }
 
@@ -81,6 +84,7 @@ class view_profile : AppCompatActivity() {
         followingCountTextView = findViewById(R.id.followingCount)
         postsRecyclerView = findViewById(R.id.posts_recycler_view)
         followButton = findViewById(R.id.followingButton)
+        messageButton = findViewById(R.id.messageButton)
     }
 
     private fun loadUserProfile(userId: String) {
@@ -92,6 +96,7 @@ class view_profile : AppCompatActivity() {
                     return
                 }
                 val user = snapshot.getValue(User::class.java) ?: return
+                targetUsername = user.username
                 populateProfileData(user)
             }
             override fun onCancelled(error: DatabaseError) {
@@ -115,7 +120,6 @@ class view_profile : AppCompatActivity() {
         } else {
             profileImageView.setImageResource(R.drawable.default_avatar)
         }
-        // post count is set from loadUserPosts(); follower/following counts are live observers
     }
 
     private fun loadUserPosts(userId: String) {
@@ -144,7 +148,29 @@ class view_profile : AppCompatActivity() {
         postsRecyclerView.adapter = postsAdapter
     }
 
-    // ---------------- FOLLOW / UNFOLLOW USING TOP-LEVEL NODES ----------------
+    // ---------------- MESSAGE BUTTON ----------------
+
+    private fun setupMessageButton(targetUid: String) {
+        val me = meUid
+        if (me == null || me == targetUid) {
+            // Hide message button if not logged in or viewing own profile
+            messageButton.visibility = View.GONE
+            return
+        }
+
+        messageButton.visibility = View.VISIBLE
+
+        messageButton.setOnClickListener {
+            // Open ChatActivity with this user
+            val intent = Intent(this, ChatActivity::class.java).apply {
+                putExtra("userId", targetUid)
+                putExtra("username", targetUsername ?: "User")
+            }
+            startActivity(intent)
+        }
+    }
+
+    // ---------------- FOLLOW / UNFOLLOW ----------------
 
     private fun setupFollowSection(targetUid: String) {
         val me = meUid
