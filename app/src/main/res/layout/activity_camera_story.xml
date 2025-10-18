@@ -5,6 +5,7 @@
     android:layout_height="match_parent"
     xmlns:tools="http://schemas.android.com/tools"
     android:background="#000"
+    android:id="@+id/main"
     tools:context=".camera_story">
 
     <ImageView

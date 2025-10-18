@@ -5,17 +5,19 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
 import com.rayaanraza.i230535.R
 import com.rayaanraza.i230535.StoryBubble
 import com.rayaanraza.i230535.camera_story
+import com.rayaanraza.i230535.loadUserAvatar
 
-class StoryAdapter(private val items: List<StoryBubble>) :
-    RecyclerView.Adapter<StoryAdapter.StoryVH>() {
+class StoryAdapter(
+    private val items: List<StoryBubble>,
+    private val currentUid: String
+) : RecyclerView.Adapter<StoryAdapter.StoryVH>() {
 
     inner class StoryVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val username: TextView = itemView.findViewById(R.id.username)   // from item_story_bubble.xml
-        val pfp: ImageView = itemView.findViewById(R.id.pfp)            // from item_story_bubble.xml
+        val username: TextView = itemView.findViewById(R.id.username)
+        val pfp: ImageView = itemView.findViewById(R.id.pfp)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): StoryVH {
@@ -27,22 +29,21 @@ class StoryAdapter(private val items: List<StoryBubble>) :
     override fun onBindViewHolder(holder: StoryVH, position: Int) {
         val item = items[position]
 
-        holder.username.text = item.username
+        val isSelfBubble = (position == 0) || (item.uid == currentUid)
+        holder.username.text = if (isSelfBubble) "Your Story" else item.username
 
-        val ctx = holder.itemView.context
-        if (!item.profileUrl.isNullOrBlank()) {
-            Glide.with(ctx)
-                .load(item.profileUrl)
-                .placeholder(R.drawable.person1)
-                .error(R.drawable.person1)
-                .into(holder.pfp)
-        } else {
-            holder.pfp.setImageResource(R.drawable.person1)
-        }
+        val targetUid = if (isSelfBubble) currentUid else item.uid
+        // Load avatar for target user; if their DP is missing, fallback to your DP.
+        holder.pfp.loadUserAvatar(
+            uid = targetUid,
+            fallbackUid = currentUid,
+            placeholderRes = R.drawable.person1
+        )
 
         holder.itemView.setOnClickListener {
-            ctx.startActivity(
-                Intent(ctx, camera_story::class.java).putExtra("uid", item.uid)
+            val safeUid = if (item.uid.isNotBlank()) item.uid else currentUid
+            holder.itemView.context.startActivity(
+                Intent(holder.itemView.context, camera_story::class.java).putExtra("uid", safeUid)
             )
         }
     }

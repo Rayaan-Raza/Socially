@@ -55,10 +55,43 @@ class my_profile : AppCompatActivity() {
 
     private var currentUserId: String = ""
 
+    fun loadBottomBarAvatar(navProfile: ImageView) {
+        val uid = FirebaseAuth.getInstance().uid ?: return
+        val ref = FirebaseDatabase.getInstance()
+            .getReference("users")
+            .child(uid)
+            .child("profilePictureUrl")
+
+        ref.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val b64 = snapshot.getValue(String::class.java) ?: return
+
+                val clean = b64.substringAfter(",", b64)  // remove data:image/... prefix
+                val bytes = try {
+                    Base64.decode(clean, Base64.DEFAULT)
+                } catch (_: Exception) { null } ?: return
+
+                Glide.with(navProfile.context)
+                    .asBitmap()
+                    .load(bytes)
+                    .placeholder(R.drawable.oval)
+                    .error(R.drawable.oval)
+                    .circleCrop()
+                    .into(navProfile)
+            }
+
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_my_profile)
+        val navProfile = findViewById<ImageView>(R.id.nav_profile)
+        loadBottomBarAvatar(navProfile)
+
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)

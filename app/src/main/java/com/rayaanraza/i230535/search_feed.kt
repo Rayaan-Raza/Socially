@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.Base64
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.Toast
@@ -13,6 +14,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 
@@ -28,10 +30,42 @@ class search_feed : AppCompatActivity() {
     private val allPosts = mutableListOf<Post>()
     private val filteredPosts = mutableListOf<Post>()
 
+    fun loadBottomBarAvatar(navProfile: ImageView) {
+        val uid = FirebaseAuth.getInstance().uid ?: return
+        val ref = FirebaseDatabase.getInstance()
+            .getReference("users")
+            .child(uid)
+            .child("profilePictureUrl")
+
+        ref.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val b64 = snapshot.getValue(String::class.java) ?: return
+
+                val clean = b64.substringAfter(",", b64)  // remove data:image/... prefix
+                val bytes = try {
+                    Base64.decode(clean, Base64.DEFAULT)
+                } catch (_: Exception) { null } ?: return
+
+                Glide.with(navProfile.context)
+                    .asBitmap()
+                    .load(bytes)
+                    .placeholder(R.drawable.oval)
+                    .error(R.drawable.oval)
+                    .circleCrop()
+                    .into(navProfile)
+            }
+
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_search_feed)
+        val navProfile = findViewById<ImageView>(R.id.profile)
+        loadBottomBarAvatar(navProfile)
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())

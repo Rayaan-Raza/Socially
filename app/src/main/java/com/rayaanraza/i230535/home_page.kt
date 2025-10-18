@@ -79,9 +79,41 @@ class home_page : AppCompatActivity() {
         }
     }
 
+    fun loadBottomBarAvatar(navProfile: ImageView) {
+        val uid = FirebaseAuth.getInstance().uid ?: return
+        val ref = FirebaseDatabase.getInstance()
+            .getReference("users")
+            .child(uid)
+            .child("profilePictureUrl")
+
+        ref.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val b64 = snapshot.getValue(String::class.java) ?: return
+
+                val clean = b64.substringAfter(",", b64)  // remove data:image/... prefix
+                val bytes = try {
+                    Base64.decode(clean, Base64.DEFAULT)
+                } catch (_: Exception) { null } ?: return
+
+                Glide.with(navProfile.context)
+                    .asBitmap()
+                    .load(bytes)
+                    .placeholder(R.drawable.oval)
+                    .error(R.drawable.oval)
+                    .circleCrop()
+                    .into(navProfile)
+            }
+
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_home_page)
+        val navProfile = findViewById<ImageView>(R.id.profile)
+        loadBottomBarAvatar(navProfile)
 
         // --- Apply window insets to the main layout for edge-to-edge support ---
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { v, insets ->
@@ -218,23 +250,7 @@ class home_page : AppCompatActivity() {
             storyAdapter.notifyDataSetChanged()
 
             // Load profile picture in bottom nav
-            if (!myPic.isNullOrEmpty()) {
-                try {
-                    Glide.with(this)
-                        .load(myPic)
-                        .circleCrop()
-                        .placeholder(R.drawable.oval)
-                        .error(R.drawable.oval)
-                        .into(navProfileImage)
-                    android.util.Log.d("home_page", "Loaded profile pic successfully")
-                } catch (e: Exception) {
-                    android.util.Log.e("home_page", "Error loading profile pic: ${e.message}")
-                    navProfileImage.setImageResource(R.drawable.oval)
-                }
-            } else {
-                android.util.Log.d("home_page", "No profile pic URL found")
-                navProfileImage.setImageResource(R.drawable.oval)
-            }
+
         }.addOnFailureListener { e ->
             android.util.Log.e("home_page", "Failed to load user data: ${e.message}")
         }

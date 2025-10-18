@@ -2,6 +2,7 @@ package com.rayaanraza.i230535
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Base64
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
@@ -41,9 +42,41 @@ class view_profile : AppCompatActivity() {
     private var targetUid: String? = null
     private var targetUsername: String? = null
 
+    fun loadBottomBarAvatar(navProfile: ImageView) {
+        val uid = FirebaseAuth.getInstance().uid ?: return
+        val ref = FirebaseDatabase.getInstance()
+            .getReference("users")
+            .child(uid)
+            .child("profilePictureUrl")
+
+        ref.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val b64 = snapshot.getValue(String::class.java) ?: return
+
+                val clean = b64.substringAfter(",", b64)  // remove data:image/... prefix
+                val bytes = try {
+                    Base64.decode(clean, Base64.DEFAULT)
+                } catch (_: Exception) { null } ?: return
+
+                Glide.with(navProfile.context)
+                    .asBitmap()
+                    .load(bytes)
+                    .placeholder(R.drawable.oval)
+                    .error(R.drawable.oval)
+                    .circleCrop()
+                    .into(navProfile)
+            }
+
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_view_profile)
+        val navProfile = findViewById<ImageView>(R.id.navProfile)
+        loadBottomBarAvatar(navProfile)
         enableEdgeToEdge()
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
