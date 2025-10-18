@@ -128,14 +128,18 @@ class home_page : AppCompatActivity() {
         // STORIES
         rvStories = findViewById(R.id.rvStories)
         rvStories.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        storyAdapter = StoryAdapter(storyList)
+        val currentUid = auth.currentUser?.uid ?: return
+        storyAdapter = StoryAdapter(storyList, currentUid)
+        rvStories.adapter = storyAdapter
         rvStories.adapter = storyAdapter
 
         // FEED
         rvFeed = findViewById(R.id.rvFeed)
         rvFeed.layoutManager = LinearLayoutManager(this)
         // --- NEW AMENDMENT: Add onSendClick to the adapter initialization ---
+
         postAdapter = PostAdapter(
+            currentUid = currentUid,                       // ⬅ add this
             onLikeToggle = { post, wantLike -> toggleLike(post, wantLike) },
             onCommentClick = { post -> showAddCommentDialog(post) },
             onSendClick = { post -> sendPostToFriend(post) }
@@ -282,7 +286,7 @@ class home_page : AppCompatActivity() {
 
     // ---------------- Your existing StoryAdapter, no changes made ----------------
     // Update your StoryAdapter's onBindViewHolder method
-    inner class StoryAdapter(private val items: List<StoryBubble>) :
+    inner class StoryAdapter(private val items: List<StoryBubble>, private val currentUid: String) :
         RecyclerView.Adapter<StoryAdapter.StoryVH>() {
 
         inner class StoryVH(val binding: ItemStoryBubbleBinding) :
@@ -302,12 +306,11 @@ class home_page : AppCompatActivity() {
 
             if (!item.profileUrl.isNullOrEmpty()) {
                 try {
-                    Glide.with(this@home_page)
-                        .load(item.profileUrl)
-                        .circleCrop()
-                        .placeholder(R.drawable.person1)
-                        .error(R.drawable.person1)
-                        .into(holder.binding.pfp)
+                    holder.binding.pfp.loadUserAvatar(
+                        uid = item.uid,
+                        fallbackUid = currentUid,
+                        placeholderRes = R.drawable.person1
+                    )
                     android.util.Log.d("StoryAdapter", "Glide load initiated for ${item.username}")
                 } catch (e: Exception) {
                     android.util.Log.e("StoryAdapter", "Error loading image: ${e.message}")
@@ -682,6 +685,7 @@ class home_page : AppCompatActivity() {
     }
     // --- NEW AMENDMENT: Add onSendClick to adapter and btnSend to PostVH ---
     inner class PostAdapter(
+        private val currentUid: String,                          // ⬅ new
         private val onLikeToggle: (post: Post, liked: Boolean) -> Unit,
         private val onCommentClick: (post: Post) -> Unit,
         private val onSendClick: (post: Post) -> Unit
@@ -750,6 +754,13 @@ class home_page : AppCompatActivity() {
             else usernameCache[item.uid] ?: "user"
             h.username.text = shownName
             h.tvCaption.text = "$shownName  ${item.caption}"
+
+            h.avatar.loadUserAvatar(
+                uid = item.uid,
+                fallbackUid = currentUid,
+                placeholderRes = R.drawable.oval
+            )
+
 
             if (item.username.isBlank()) {
                 db.child("users").child(item.uid).child("username")
