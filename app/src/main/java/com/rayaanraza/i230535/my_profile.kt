@@ -156,8 +156,32 @@ class my_profile : AppCompatActivity() {
         findViewById<ImageView>(R.id.dropdown_icon).setOnClickListener {
             Toast.makeText(this, "Account options coming soon", Toast.LENGTH_SHORT).show()
         }
+
+        // ONLY THIS CHANGED - Logout functionality added
         findViewById<ImageView>(R.id.menu_icon).setOnClickListener {
-            Toast.makeText(this, "Menu coming soon", Toast.LENGTH_SHORT).show()
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Logout")
+                .setMessage("Are you sure you want to logout?")
+                .setPositiveButton("Logout") { _, _ ->
+                    auth.signOut()
+
+                    if (currentUserId.isNotEmpty()) {
+                        val updates = hashMapOf<String, Any>(
+                            "isOnline" to false,
+                            "lastSeen" to System.currentTimeMillis()
+                        )
+                        database.getReference("users")
+                            .child(currentUserId)
+                            .updateChildren(updates)
+                    }
+
+                    val intent = Intent(this, login_sign::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    startActivity(intent)
+                    finish()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
         }
     }
 
