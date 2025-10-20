@@ -107,6 +107,10 @@
         <activity
             android:name=".call_page"
             android:exported="false" />
+
+        <activity android:name=".FollowListActivity"
+            android:exported="false"/>
+
         <activity
             android:name=".notification_following"
             android:exported="false" />

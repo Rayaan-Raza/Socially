@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.rayaanraza.i230535"
+    namespace = "com.group.i230535_i230048"
     compileSdk = 36
 
     defaultConfig {
