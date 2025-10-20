@@ -1,8 +1,10 @@
 package com.rayaanraza.i230535
 
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.util.Base64
+import android.view.Gravity
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
@@ -41,6 +43,20 @@ class view_profile : AppCompatActivity() {
 
     private var targetUid: String? = null
     private var targetUsername: String? = null
+    private var targetIsPrivate: Boolean = false
+
+    private enum class FollowState { NOT_FOLLOWING, REQUESTED, FOLLOWING }
+    private var currentFollowState: FollowState = FollowState.NOT_FOLLOWING
+
+    // Live state cache for listeners
+    private var isFollowingLive: Boolean = false
+    private var isRequestedLive: Boolean = false
+
+    // Listener refs to clean up
+    private var followingRef: DatabaseReference? = null
+    private var followReqRef: DatabaseReference? = null
+    private var followingListener: ValueEventListener? = null
+    private var followReqListener: ValueEventListener? = null
 
     fun loadBottomBarAvatar(navProfile: ImageView) {
         val uid = FirebaseAuth.getInstance().uid ?: return
@@ -52,11 +68,8 @@ class view_profile : AppCompatActivity() {
         ref.addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val b64 = snapshot.getValue(String::class.java) ?: return
-
-                val clean = b64.substringAfter(",", b64)  // remove data:image/... prefix
-                val bytes = try {
-                    Base64.decode(clean, Base64.DEFAULT)
-                } catch (_: Exception) { null } ?: return
+                val clean = b64.substringAfter(",", b64)
+                val bytes = try { Base64.decode(clean, Base64.DEFAULT) } catch (_: Exception) { null } ?: return
 
                 Glide.with(navProfile.context)
                     .asBitmap()
@@ -66,11 +79,9 @@ class view_profile : AppCompatActivity() {
                     .circleCrop()
                     .into(navProfile)
             }
-
             override fun onCancelled(error: DatabaseError) {}
         })
     }
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -93,8 +104,7 @@ class view_profile : AppCompatActivity() {
 
         if (targetUid.isNullOrEmpty()) {
             Toast.makeText(this, "User ID is missing.", Toast.LENGTH_LONG).show()
-            finish()
-            return
+            finish(); return
         }
 
         findViewById<ImageView>(R.id.backButton).setOnClickListener { finish() }
@@ -105,6 +115,16 @@ class view_profile : AppCompatActivity() {
         setupFollowSection(targetUid!!)
         setupMessageButton(targetUid!!)
         setupBottomNavigationBar()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        followingListener?.let { l ->
+            followingRef?.removeEventListener(l)
+        }
+        followReqListener?.let { l ->
+            followReqRef?.removeEventListener(l)
+        }
     }
 
     private fun initializeViews() {
@@ -130,6 +150,7 @@ class view_profile : AppCompatActivity() {
                 }
                 val user = snapshot.getValue(User::class.java) ?: return
                 targetUsername = user.username
+                targetIsPrivate = snapshot.child("isPrivate").getValue(Boolean::class.java) == true
                 populateProfileData(user)
             }
             override fun onCancelled(error: DatabaseError) {
@@ -186,15 +207,12 @@ class view_profile : AppCompatActivity() {
     private fun setupMessageButton(targetUid: String) {
         val me = meUid
         if (me == null || me == targetUid) {
-            // Hide message button if not logged in or viewing own profile
             messageButton.visibility = View.GONE
             return
         }
 
         messageButton.visibility = View.VISIBLE
-
         messageButton.setOnClickListener {
-            // Open ChatActivity with this user
             val intent = Intent(this, ChatActivity::class.java).apply {
                 putExtra("userId", targetUid)
                 putExtra("username", targetUsername ?: "User")
@@ -203,57 +221,126 @@ class view_profile : AppCompatActivity() {
         }
     }
 
-    // ---------------- FOLLOW / UNFOLLOW ----------------
+    // ---------------- FOLLOW / REQUEST / FOLLOWING ----------------
 
     private fun setupFollowSection(targetUid: String) {
         val me = meUid
         if (me == null || me == targetUid) {
-            // hide when not logged in or viewing own profile
             followButton.visibility = View.GONE
             return
         }
-
         followButton.visibility = View.VISIBLE
 
-        // Reflect current state live: /following/<me>/<target>
-        rtdb.child("following").child(me).child(targetUid)
-            .addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(s: DataSnapshot) {
-                    val isFollowing = s.getValue(Boolean::class.java) == true
-                    applyFollowStyle(isFollowing)
-                }
-                override fun onCancelled(error: DatabaseError) {}
-            })
+        // attach independent LIVE listeners → combine to decide state
+        attachStateListeners(me, targetUid)
 
-        // Live counts from top-level trees
+        // counts
         observeCounts(targetUid)
 
         followButton.setOnClickListener {
-            // Flip state by reading once
-            rtdb.child("following").child(me).child(targetUid)
-                .addListenerForSingleValueEvent(object : ValueEventListener {
-                    override fun onDataChange(s: DataSnapshot) {
-                        val currentlyFollowing = s.getValue(Boolean::class.java) == true
-                        if (currentlyFollowing) {
-                            unfollow(me, targetUid)
-                        } else {
-                            follow(me, targetUid)
-                        }
-                    }
-                    override fun onCancelled(error: DatabaseError) {}
-                })
+            when (currentFollowState) {
+                FollowState.FOLLOWING -> unfollow(me, targetUid)
+                FollowState.REQUESTED  -> cancelRequest(me, targetUid)
+                FollowState.NOT_FOLLOWING -> sendFollowRequest(me, targetUid) // <-- only request
+            }
         }
+
+
+    }
+
+    private fun attachStateListeners(me: String, target: String) {
+        // Following listener
+        followingRef = rtdb.child("following").child(me).child(target)
+        followingListener = object : ValueEventListener {
+            override fun onDataChange(s: DataSnapshot) {
+                isFollowingLive = s.getValue(Boolean::class.java) == true
+                applyCombinedState()
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }.also { followingRef?.addValueEventListener(it) }
+
+        // Request listener
+        followReqRef = rtdb.child("follow_requests").child(target).child(me)
+        followReqListener = object : ValueEventListener {
+            override fun onDataChange(s: DataSnapshot) {
+                isRequestedLive = s.getValue(Boolean::class.java) == true
+                applyCombinedState()
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }.also { followReqRef?.addValueEventListener(it) }
+    }
+
+    private fun applyCombinedState() {
+        when {
+            isFollowingLive -> setFollowState(FollowState.FOLLOWING)
+            isRequestedLive -> setFollowState(FollowState.REQUESTED)
+            else -> setFollowState(FollowState.NOT_FOLLOWING)
+        }
+    }
+
+    private fun setFollowState(state: FollowState) {
+        currentFollowState = state
+
+        // comfort & center
+        followButton.gravity = Gravity.CENTER
+        followButton.setPadding(24, 12, 24, 12)
+
+        when (state) {
+            FollowState.NOT_FOLLOWING -> {
+                followButton.text = "Follow"
+                followButton.setBackgroundResource(R.drawable.message_bttn)
+                ViewCompat.setBackgroundTintList(
+                    followButton,
+                    ColorStateList.valueOf(getColor(R.color.smd_theme))
+                )
+                followButton.setTextColor(getColor(android.R.color.white))
+            }
+            FollowState.REQUESTED -> {
+                followButton.text = "Requested"
+                followButton.setBackgroundResource(R.drawable.requested_button)
+                ViewCompat.setBackgroundTintList(followButton, null)
+                followButton.setTextColor(getColor(R.color.gray))
+            }
+            FollowState.FOLLOWING -> {
+                followButton.text = "Following"
+                followButton.setBackgroundResource(R.drawable.follow_button)
+                ViewCompat.setBackgroundTintList(followButton, null)
+                followButton.setTextColor(getColor(R.color.black))
+            }
+        }
+    }
+
+    private fun sendFollowRequest(me: String, target: String) {
+        val updates = hashMapOf<String, Any?>(
+            "/follow_requests/$target/$me" to true,
+            "/following/$me/$target" to null,   // guard: no following until accepted
+            "/followers/$target/$me" to null    // guard: no follower until accepted
+        )
+        rtdb.updateChildren(updates)
+    }
+
+
+    private fun cancelRequest(me: String, target: String) {
+        val updates = hashMapOf<String, Any?>(
+            "/follow_requests/$target/$me" to null
+        )
+        rtdb.updateChildren(updates)
+            .addOnFailureListener {
+                Toast.makeText(this, "Cancel failed: ${it.message}", Toast.LENGTH_SHORT).show()
+            }
     }
 
     private fun follow(me: String, target: String) {
         if (me == target) return
         val updates = hashMapOf<String, Any?>(
             "/following/$me/$target" to true,
-            "/followers/$target/$me" to true
+            "/followers/$target/$me" to true,
+            "/follow_requests/$target/$me" to null // clear pending request if any
         )
-        rtdb.updateChildren(updates).addOnFailureListener {
-            Toast.makeText(this, "Follow failed: ${it.message}", Toast.LENGTH_SHORT).show()
-        }
+        rtdb.updateChildren(updates)
+            .addOnFailureListener {
+                Toast.makeText(this, "Follow failed: ${it.message}", Toast.LENGTH_SHORT).show()
+            }
     }
 
     private fun unfollow(me: String, target: String) {
@@ -262,13 +349,13 @@ class view_profile : AppCompatActivity() {
             "/following/$me/$target" to null,
             "/followers/$target/$me" to null
         )
-        rtdb.updateChildren(updates).addOnFailureListener {
-            Toast.makeText(this, "Unfollow failed: ${it.message}", Toast.LENGTH_SHORT).show()
-        }
+        rtdb.updateChildren(updates)
+            .addOnFailureListener {
+                Toast.makeText(this, "Unfollow failed: ${it.message}", Toast.LENGTH_SHORT).show()
+            }
     }
 
     private fun observeCounts(targetUid: String) {
-        // Followers count = children under /followers/<target>
         rtdb.child("followers").child(targetUid)
             .addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(s: DataSnapshot) {
@@ -277,7 +364,6 @@ class view_profile : AppCompatActivity() {
                 override fun onCancelled(error: DatabaseError) {}
             })
 
-        // Following count = children under /following/<target>
         rtdb.child("following").child(targetUid)
             .addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(s: DataSnapshot) {
@@ -285,18 +371,6 @@ class view_profile : AppCompatActivity() {
                 }
                 override fun onCancelled(error: DatabaseError) {}
             })
-    }
-
-    private fun applyFollowStyle(isFollowing: Boolean) {
-        if (isFollowing) {
-            followButton.text = "Following"
-            followButton.setBackgroundResource(R.drawable.follow_button) // white/outlined
-            followButton.setTextColor(getColor(R.color.black))
-        } else {
-            followButton.text = "Follow"
-            followButton.setBackgroundResource(R.drawable.message_bttn)  // blue filled
-            followButton.setTextColor(getColor(R.color.white))
-        }
     }
 
     // ---------------- NAV ----------------
