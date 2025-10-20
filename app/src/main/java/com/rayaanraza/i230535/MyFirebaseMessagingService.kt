@@ -51,9 +51,9 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
         when (type) {
             "message" -> handleMessageNotification(data)
-            "like" -> handleLikeNotification(data)
-            "comment" -> handleCommentNotification(data)
-            "follow" -> handleFollowNotification(data)
+            "screenshot" -> handleScreenshotNotification(data)
+            "follow_request" -> handleFollowRequestNotification(data)
+            "follow_accepted" -> handleFollowAcceptedNotification(data)
         }
     }
 
@@ -63,8 +63,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         val senderId = data["senderId"] ?: ""
 
         // Extract user IDs from chatId
-        val userIds = chatId.split("-")
-        val otherUserId = if (userIds[0] == senderId) userIds[0] else userIds.getOrNull(1) ?: senderId
+        val userIds = chatId.split("_")
+        val otherUserId = if (userIds.getOrNull(0) == senderId) userIds[0] else userIds.getOrNull(1) ?: senderId
 
         val intent = Intent(this, ChatActivity::class.java).apply {
             putExtra("userId", otherUserId)
@@ -81,49 +81,59 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         )
     }
 
-    private fun handleLikeNotification(data: Map<String, String>) {
-        val postId = data["postId"] ?: ""
-        val userId = data["userId"] ?: ""
+    private fun handleScreenshotNotification(data: Map<String, String>) {
+        val takerId = data["takerId"] ?: ""
+        val chatId = data["chatId"] ?: ""
 
-        val intent = Intent(this, home_page::class.java).apply {
+        val intent = Intent(this, ChatActivity::class.java).apply {
+            // Extract user IDs from chatId to open the correct chat
+            val userIds = chatId.split("_")
+            val otherUserId = userIds.firstOrNull { it != com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid } ?: takerId
+            putExtra("userId", otherUserId)
+            putExtra("username", "User")
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
 
         showNotification(
-            title = "New Like",
-            message = "Someone liked your post",
+            title = "📸 Screenshot Alert!",
+            message = "Someone took a screenshot in your chat",
             intent = intent,
-            channelId = "social",
-            notificationId = postId.hashCode()
+            channelId = "security",
+            notificationId = chatId.hashCode()
         )
     }
 
-    private fun handleCommentNotification(data: Map<String, String>) {
-        val postId = data["postId"] ?: ""
+    private fun handleFollowRequestNotification(data: Map<String, String>) {
+        val requesterId = data["requesterId"] ?: ""
+        val requesterName = data["requesterName"] ?: "Someone"
 
-        val intent = Intent(this, home_page::class.java).apply {
+        // Open the you_page (follow requests page)
+        val intent = Intent(this, you_page::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
 
         showNotification(
-            title = "New Comment",
-            message = "Someone commented on your post",
+            title = "New Follow Request",
+            message = "$requesterName wants to follow you",
             intent = intent,
             channelId = "social",
-            notificationId = postId.hashCode()
+            notificationId = requesterId.hashCode()
         )
     }
 
-    private fun handleFollowNotification(data: Map<String, String>) {
+    private fun handleFollowAcceptedNotification(data: Map<String, String>) {
         val userId = data["userId"] ?: ""
+        val userName = data["userName"] ?: "Someone"
 
-        val intent = Intent(this, home_page::class.java).apply {
+        // Open their profile
+        val intent = Intent(this, view_profile::class.java).apply {
+            putExtra("userId", userId)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
 
         showNotification(
-            title = "New Follower",
-            message = "Someone started following you",
+            title = "Follow Request Accepted",
+            message = "$userName accepted your follow request",
             intent = intent,
             channelId = "social",
             notificationId = userId.hashCode()
@@ -163,7 +173,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channelName = when (channelId) {
                 "messages" -> "Messages"
-                "calls" -> "Calls"
+                "security" -> "Security Alerts"
                 "social" -> "Social"
                 else -> "Notifications"
             }

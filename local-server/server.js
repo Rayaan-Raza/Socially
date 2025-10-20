@@ -11,16 +11,20 @@ const serviceAccount = JSON.parse(fs.readFileSync("./serviceAccountKey.json", "u
 // Initialize Firebase Admin SDK
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://socially-5a61a-default-rtdb.firebaseio.com",
-
+  databaseURL: "your-socially-firebase-database-link",
 });
 
 const db = admin.database();
 const usersRef = db.ref("users");
 const messagesRef = db.ref("messages");
+const followRequestsRef = db.ref("follow_requests");
+const followersRef = db.ref("followers");
+const screenshotsRef = db.ref("screenshots");
 
-// ✅ Keep track of already processed message IDs to avoid duplicate notifications
+// ✅ Keep track of already processed IDs to avoid duplicate notifications
 const sentMessages = new Set();
+const sentFollowRequests = new Set();
+const sentFollowAccepts = new Set();
 
 // 🔔 Listen for NEW messages
 messagesRef.on("child_added", (chatSnap) => {
@@ -72,9 +76,115 @@ messagesRef.on("child_added", (chatSnap) => {
     }
   });
 });
-// ✅ Listen for new screenshot events
-const screenshotsRef = db.ref("screenshots");
 
+// 🔔 Listen for NEW follow requests
+followRequestsRef.on("child_added", (userSnap) => {
+  const receiverId = userSnap.key; // The person receiving follow requests
+  console.log(`👥 Now monitoring follow requests for: ${receiverId}`);
+
+  // Listen for each requester
+  userSnap.ref.on("child_added", async (reqSnap) => {
+    const requesterId = reqSnap.key;
+    const isActive = reqSnap.val();
+    
+    if (!isActive) return; // Skip if request is not active
+    
+    const notificationId = `${receiverId}_${requesterId}`;
+    if (sentFollowRequests.has(notificationId)) return;
+    sentFollowRequests.add(notificationId);
+
+    try {
+      // Get receiver's FCM token
+      const tokenSnap = await usersRef.child(receiverId).child("fcmToken").once("value");
+      const token = tokenSnap.val();
+      if (!token) return console.log(`⚠️ No FCM token for receiver: ${receiverId}`);
+
+      // Get requester's username
+      const requesterSnap = await usersRef.child(requesterId).child("username").once("value");
+      const requesterName = requesterSnap.val() || "Someone";
+
+      // Create FCM payload
+      const payload = {
+        notification: {
+          title: "New Follow Request",
+          body: `${requesterName} wants to follow you`,
+        },
+        data: {
+          type: "follow_request",
+          requesterId,
+          requesterName,
+        },
+        token,
+      };
+
+      // Send the push notification
+      await admin.messaging().send(payload);
+      console.log(`✅ Follow request notification sent to ${receiverId} from ${requesterName}`);
+    } catch (err) {
+      console.error("❌ Error sending follow request notification:", err);
+    }
+  });
+
+  // Listen for when requests are removed (accepted or declined)
+  userSnap.ref.on("child_removed", async (reqSnap) => {
+    const requesterId = reqSnap.key;
+    const notificationId = `${receiverId}_${requesterId}`;
+    
+    // Remove from tracking when request is removed
+    sentFollowRequests.delete(notificationId);
+    console.log(`🗑️  Follow request removed: ${requesterId} -> ${receiverId}`);
+  });
+});
+
+// 🔔 Listen for NEW followers (when follow request is accepted)
+followersRef.on("child_added", (userSnap) => {
+  const userId = userSnap.key; // The person who gained a follower
+  console.log(`👤 Now monitoring followers for: ${userId}`);
+
+  userSnap.ref.on("child_added", async (followerSnap) => {
+    const followerId = followerSnap.key;
+    const isFollowing = followerSnap.val();
+    
+    if (!isFollowing) return;
+    
+    const notificationId = `accept_${followerId}_${userId}`;
+    if (sentFollowAccepts.has(notificationId)) return;
+    sentFollowAccepts.add(notificationId);
+
+    try {
+      // Get follower's FCM token (person who sent the original request)
+      const tokenSnap = await usersRef.child(followerId).child("fcmToken").once("value");
+      const token = tokenSnap.val();
+      if (!token) return console.log(`⚠️ No FCM token for follower: ${followerId}`);
+
+      // Get the person's username who accepted
+      const userSnap = await usersRef.child(userId).child("username").once("value");
+      const userName = userSnap.val() || "Someone";
+
+      // Create FCM payload
+      const payload = {
+        notification: {
+          title: "Follow Request Accepted",
+          body: `${userName} accepted your follow request`,
+        },
+        data: {
+          type: "follow_accepted",
+          userId,
+          userName,
+        },
+        token,
+      };
+
+      // Send the push notification
+      await admin.messaging().send(payload);
+      console.log(`✅ Follow accepted notification sent to ${followerId} about ${userName}`);
+    } catch (err) {
+      console.error("❌ Error sending follow accepted notification:", err);
+    }
+  });
+});
+
+// ✅ Listen for new screenshot events
 screenshotsRef.on("child_added", async (snap) => {
   const event = snap.val();
   if (!event) return;
@@ -109,4 +219,12 @@ screenshotsRef.on("child_added", async (snap) => {
   }
 });
 
-app.listen(PORT, () => console.log(`🚀 Local FCM Server running on port ${PORT}`));
+// 🚀 Start the server
+app.listen(PORT, () => {
+  console.log(`🚀 Local FCM Server running on port ${PORT}`);
+  console.log(`📡 Monitoring:`);
+  console.log(`   - Messages (messages/)`);
+  console.log(`   - Follow Requests (follow_requests/)`);
+  console.log(`   - New Followers (followers/)`);
+  console.log(`   - Screenshots (screenshots/)`);
+});

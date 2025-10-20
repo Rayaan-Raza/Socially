@@ -334,23 +334,57 @@ class home_page : AppCompatActivity() {
 
     // ---------------- ALL CODE BELOW THIS LINE IS YOUR EXISTING, UNCHANGED LOGIC ----------------
 
+
     private fun loadFeed() {
         val myUid = auth.currentUser?.uid ?: return
 
+        // Clear existing posts and adapter
         currentPosts.clear()
         postAdapter.submitList(emptyList())
 
-        db.child("users").child(myUid).child("following")
+        // Read from following/{currentUserId}/
+        db.child("following").child(myUid)
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     val uids = mutableListOf<String>()
-                    uids.add(myUid)
-                    for (c in snapshot.children) c.key?.let { uids.add(it) }
 
+                    // Add current user's UID first (to show own posts)
+                    uids.add(myUid)
+
+                    // Add all following UIDs
+                    // Structure is: following/{myUid}/{followedUserId}: true
+                    for (c in snapshot.children) {
+                        val followedUid = c.key
+                        val isFollowing = c.getValue(Boolean::class.java) ?: false
+
+                        if (isFollowing && followedUid != null) {
+                            uids.add(followedUid)
+                            android.util.Log.d("home_page", "Following: $followedUid")
+                        }
+                    }
+
+                    android.util.Log.d("home_page", "Total users to load posts from: ${uids.size}")
+                    android.util.Log.d("home_page", "UIDs: $uids")
+
+                    // Only proceed if we have at least the current user
+                    if (uids.isEmpty()) {
+                        android.util.Log.w("home_page", "No users to load posts from")
+                        currentPosts.clear()
+                        postAdapter.submitList(emptyList())
+                        return
+                    }
+
+                    // Load posts from these users only
                     readPostsFor(uids)
                     attachRealtimeFeed(uids)
                 }
-                override fun onCancelled(error: DatabaseError) {}
+
+                override fun onCancelled(error: DatabaseError) {
+                    android.util.Log.e("home_page", "Failed to load following list: ${error.message}")
+                    // Still show own posts if following list fails to load
+                    readPostsFor(listOf(myUid))
+                    attachRealtimeFeed(listOf(myUid))
+                }
             })
     }
 
