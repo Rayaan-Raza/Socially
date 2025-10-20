@@ -167,9 +167,14 @@ class my_profile : AppCompatActivity() {
         findViewById<FrameLayout>(R.id.friendsHighlightContainer).setOnClickListener {
             startActivity(Intent(this, story::class.java))
         }
+
+        // --- MODIFICATION: Updated to open camera_story with current user's ID ---
         findViewById<FrameLayout>(R.id.profileImage).setOnClickListener {
-            startActivity(Intent(this, my_story_view::class.java))
+            val intent = Intent(this, camera_story::class.java)
+            intent.putExtra("uid", currentUserId)
+            startActivity(intent)
         }
+        // --- END MODIFICATION ---
 
         findViewById<ImageView>(R.id.dropdown_icon).setOnClickListener {
             Toast.makeText(this, "Account options coming soon", Toast.LENGTH_SHORT).show()

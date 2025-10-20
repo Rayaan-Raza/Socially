@@ -98,6 +98,18 @@ class view_profile : AppCompatActivity() {
         database = FirebaseDatabase.getInstance()
         initializeViews()
 
+        // --- MODIFICATION: Add click listener to profile image to view stories ---
+        profileImageView.setOnClickListener {
+            if (targetUid.isNullOrEmpty()) {
+                Toast.makeText(this, "Cannot load stories, user ID is missing.", Toast.LENGTH_SHORT).show()
+            } else {
+                val intent = Intent(this, camera_story::class.java)
+                intent.putExtra("uid", targetUid)
+                startActivity(intent)
+            }
+        }
+        // --- END MODIFICATION ---
+
         targetUid = intent.getStringExtra("userId")
             ?: intent.getStringExtra("USER_ID")
                     ?: intent.getStringExtra("uid")
@@ -313,8 +325,8 @@ class view_profile : AppCompatActivity() {
     private fun sendFollowRequest(me: String, target: String) {
         val updates = hashMapOf<String, Any?>(
             "/follow_requests/$target/$me" to true,
-            "/following/$me/$target" to null,   // guard: no following until accepted
-            "/followers/$target/$me" to null    // guard: no follower until accepted
+            "/following/$me/$target" to null,    // guard: no following until accepted
+            "/followers/$target/$me" to null     // guard: no follower until accepted
         )
         rtdb.updateChildren(updates)
     }
