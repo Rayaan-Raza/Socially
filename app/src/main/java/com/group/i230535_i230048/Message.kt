@@ -46,7 +46,7 @@ data class Chat(
 }
 
 data class User(
-    val uid: String = "",
+    var uid: String = "",
     val username: String = "",
     val firstName: String = "",
     val lastName: String = "",

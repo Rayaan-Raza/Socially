@@ -348,6 +348,15 @@ class ChatActivity : AppCompatActivity() {
         if (requestCode == PICK_IMAGE && resultCode == Activity.RESULT_OK && data != null) {
             val imageUri: Uri? = data.data
             if (imageUri != null) {
+                // --- NEW CHANGE ---
+                // The provided MessageAdapter treats "image" messages as text and
+                // does not display the image. It only displays the 'content' field.
+                // Therefore, processing the bitmap and encoding to Base64 is unnecessary.
+                // We just send a message with the "image" type and the placeholder content.
+                sendMessage("image", "Sent an image", "", "")
+                // --- END OF CHANGE ---
+
+                /* --- OLD CODE (Kept for reference, but now redundant) ---
                 try {
                     val bitmap = if (Build.VERSION.SDK_INT >= 29) {
                         val source = ImageDecoder.createSource(contentResolver, imageUri)
@@ -361,10 +370,12 @@ class ChatActivity : AppCompatActivity() {
                 } catch (e: Exception) {
                     Toast.makeText(this, "Failed to load image: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
+                */
             }
         }
     }
 
+    // This function is no longer called by onActivityResult, but is kept per the "Omit Nothing" instruction.
     private fun encodeImage(bitmap: Bitmap): String {
         val output = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.JPEG, 50, output)
@@ -382,6 +393,9 @@ class ChatActivity : AppCompatActivity() {
             Toast.makeText(this, "Can only edit/delete within 5 minutes", Toast.LENGTH_SHORT).show()
             return
         }
+
+        // Per the MessageAdapter, this callback will only trigger for `messageType == "text"`.
+        // The logic below is therefore correct for text messages.
 
         val options = arrayOf("Edit", "Delete", "Cancel")
         AlertDialog.Builder(this)

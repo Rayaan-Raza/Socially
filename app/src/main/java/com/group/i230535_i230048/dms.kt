@@ -1,5 +1,6 @@
 package com.group.i230535_i230048
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
@@ -24,6 +25,11 @@ class dms : AppCompatActivity() {
     private lateinit var noChatsMessage: TextView
 
     private val chatList = mutableListOf<ChatSession>()
+    private var currentUserId: String = ""
+
+    // --- NEW ---
+    // Variables to check if we are sharing
+    private var isShareMode = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,76 +47,115 @@ class dms : AppCompatActivity() {
 
         val currentUser = auth.currentUser
         if (currentUser == null) {
-            Toast.makeText(this, "You must be logged in to view messages.", Toast.LENGTH_LONG).show()
-            startActivity(Intent(this, login_sign::class.java))
+            Toast.makeText(this, "You must be logged in.", Toast.LENGTH_LONG).show()
             finish()
             return
         }
+        currentUserId = currentUser.uid
 
-        setupRecyclerView(currentUser.uid)
-        loadChats(currentUser.uid)
+        // --- NEW ---
+        // Check if we were started in "share mode"
+        if (intent.getStringExtra("ACTION_MODE") == "SHARE") {
+            isShareMode = true
+            findViewById<TextView>(R.id.title)?.text = "Share to..." // Optional: Change title
+        }
+        // --- END NEW ---
+
+        setupRecyclerView()
+        loadChats()
 
         findViewById<ImageView>(R.id.back)?.setOnClickListener { finish() }
     }
 
-    private fun setupRecyclerView(currentUserId: String) {
+    // --- MODIFIED ---
+    private fun setupRecyclerView() {
         recyclerView = findViewById(R.id.chatsRecyclerView)
         noChatsMessage = findViewById(R.id.no_chats_message)
         recyclerView.layoutManager = LinearLayoutManager(this)
 
-        chatAdapter = ChatAdapter(chatList, currentUserId)
+        // Pass the new click handler to the adapter
+        chatAdapter = ChatAdapter(chatList, currentUserId) { clickedChat ->
+            // This 'clickedChat' is the ChatSession object
+            if (isShareMode) {
+                // If sharing, send the result back
+                handleShareClick(clickedChat)
+            } else {
+                // If not sharing, open the chat
+                handleNormalClick(clickedChat)
+            }
+        }
         recyclerView.adapter = chatAdapter
     }
 
-    private fun loadChats(currentUserId: String) {
+    // --- NEW ---
+    // This is the new logic for "share mode"
+    private fun handleShareClick(chat: ChatSession) {
+        val otherUserId = chat.participants.keys.firstOrNull { it != currentUserId }
+        if (otherUserId == null) {
+            Toast.makeText(this, "Error selecting chat.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Create a result intent and put the recipient's ID in it
+        val resultIntent = Intent()
+        resultIntent.putExtra("SELECTED_USER_ID", otherUserId)
+        setResult(Activity.RESULT_OK, resultIntent)
+
+        // Close this activity and return to GotoPostActivity
+        finish()
+    }
+
+    // --- NEW ---
+    // This is the original logic for opening a chat
+    private fun handleNormalClick(chat: ChatSession) {
+        val otherUserId = chat.participants.keys.firstOrNull { it != currentUserId }
+        if (otherUserId == null) {
+            Toast.makeText(this, "Error opening chat.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // We need the other user's name to pass to ChatActivity
+        database.getReference("users").child(otherUserId).child("username")
+            .addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val username = snapshot.getValue(String::class.java) ?: "User"
+                    val intent = Intent(this@dms, ChatActivity::class.java)
+                    intent.putExtra("userId", otherUserId)
+                    intent.putExtra("username", username)
+                    startActivity(intent)
+                }
+                override fun onCancelled(error: DatabaseError) {
+                    Toast.makeText(this@dms, "Could not load user data.", Toast.LENGTH_SHORT).show()
+                }
+            })
+    }
+
+    // --- MODIFIED ---
+    // Removed currentUserId param since it's a class variable now
+    private fun loadChats() {
         val chatsRef = database.getReference("chats")
 
         chatsRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 chatList.clear()
-
                 android.util.Log.d("DMS_DEBUG", "=== Starting to load chats ===")
-                android.util.Log.d("DMS_DEBUG", "Current User ID: '$currentUserId'")
-                android.util.Log.d("DMS_DEBUG", "Current User ID length: ${currentUserId.length}")
 
-                var totalChatsFound = 0
                 var chatsAdded = 0
-
-                // Loop through ALL chats in Firebase
                 for (chatSnapshot in snapshot.children) {
-                    totalChatsFound++
-
                     try {
-                        // Read the chat ID (this is the key name)
-                        val chatId = chatSnapshot.key ?: chatSnapshot.child("chatId").getValue(String::class.java) ?: ""
-
+                        val chatId = chatSnapshot.key ?: ""
                         val lastMessage = chatSnapshot.child("lastMessage").getValue(String::class.java) ?: ""
                         val lastMessageTimestamp = chatSnapshot.child("lastMessageTimestamp").getValue(Long::class.java) ?: 0L
                         val lastMessageSenderId = chatSnapshot.child("lastMessageSenderId").getValue(String::class.java) ?: ""
 
-                        // Read participants array (0 and 1 indices)
                         val participantsSnapshot = chatSnapshot.child("participants")
                         val participant0 = participantsSnapshot.child("0").getValue(String::class.java)?.trim() ?: ""
                         val participant1 = participantsSnapshot.child("1").getValue(String::class.java)?.trim() ?: ""
 
-                        android.util.Log.d("DMS_DEBUG", "--- Chat #$totalChatsFound ---")
-                        android.util.Log.d("DMS_DEBUG", "Chat ID: '$chatId'")
-                        android.util.Log.d("DMS_DEBUG", "Participant[0]: '$participant0' (length: ${participant0.length})")
-                        android.util.Log.d("DMS_DEBUG", "Participant[1]: '$participant1' (length: ${participant1.length})")
-                        android.util.Log.d("DMS_DEBUG", "Match with [0]: ${participant0 == currentUserId}")
-                        android.util.Log.d("DMS_DEBUG", "Match with [1]: ${participant1 == currentUserId}")
-
-                        // Check if both participants exist and current user is one of them
                         if (participant0.isNotEmpty() && participant1.isNotEmpty() &&
                             (participant0 == currentUserId || participant1 == currentUserId)) {
 
-                            // Create participants map
-                            val participantsMap = hashMapOf(
-                                participant0 to true,
-                                participant1 to true
-                            )
-
-                            // Create ChatSession object
+                            val participantsMap = hashMapOf(participant0 to true, participant1 to true)
                             val chat = ChatSession(
                                 chatId = chatId,
                                 participants = participantsMap,
@@ -118,51 +163,24 @@ class dms : AppCompatActivity() {
                                 lastMessageTimestamp = lastMessageTimestamp,
                                 lastMessageSenderId = lastMessageSenderId
                             )
-
                             chatList.add(chat)
                             chatsAdded++
-
-                            val otherUserId = if (participant0 == currentUserId) participant1 else participant0
-                            android.util.Log.d("DMS_DEBUG", "✅ ADDED chat with other user: $otherUserId")
-                        } else {
-                            android.util.Log.d("DMS_DEBUG", "❌ SKIPPED - Not your chat or missing participants")
                         }
                     } catch (e: Exception) {
                         android.util.Log.e("DMS_ERROR", "Error processing chat: ${e.message}", e)
                     }
                 }
 
-                android.util.Log.d("DMS_DEBUG", "=== Summary ===")
-                android.util.Log.d("DMS_DEBUG", "Total chats in Firebase: $totalChatsFound")
                 android.util.Log.d("DMS_DEBUG", "Chats added for this user: $chatsAdded")
-
-                // Sort by newest first
                 chatList.sortByDescending { it.lastMessageTimestamp }
-
-                // Update UI
                 chatAdapter.notifyDataSetChanged()
-
-                // DEBUG: Check RecyclerView state
-                android.util.Log.d("DMS_DEBUG", "RecyclerView childCount: ${recyclerView.childCount}")
-                android.util.Log.d("DMS_DEBUG", "RecyclerView width: ${recyclerView.width}, height: ${recyclerView.height}")
-                android.util.Log.d("DMS_DEBUG", "RecyclerView visibility: ${recyclerView.visibility} (0=VISIBLE, 4=INVISIBLE, 8=GONE)")
-                android.util.Log.d("DMS_DEBUG", "Adapter item count: ${chatAdapter.itemCount}")
-                android.util.Log.d("DMS_DEBUG", "ChatList size: ${chatList.size}")
 
                 if (chatList.isEmpty()) {
                     recyclerView.visibility = View.GONE
                     noChatsMessage.visibility = View.VISIBLE
-                    android.util.Log.d("DMS_DEBUG", "❌ No chats to display")
                 } else {
                     recyclerView.visibility = View.VISIBLE
                     noChatsMessage.visibility = View.GONE
-                    Toast.makeText(this@dms, "Loaded ${chatList.size} chat(s)", Toast.LENGTH_SHORT).show()
-                    android.util.Log.d("DMS_DEBUG", "✅ Displaying ${chatList.size} chat(s)")
-
-                    // Force RecyclerView to measure and layout
-                    recyclerView.post {
-                        android.util.Log.d("DMS_DEBUG", "After post - RecyclerView childCount: ${recyclerView.childCount}")
-                    }
                 }
             }
 

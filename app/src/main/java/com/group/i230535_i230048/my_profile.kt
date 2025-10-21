@@ -29,7 +29,6 @@ class my_profile : AppCompatActivity() {
     private lateinit var userRef: DatabaseReference
     private var postsRef: DatabaseReference? = null
 
-    // NEW: top-level refs for live follower/following counts
     private var followersRef: DatabaseReference? = null
     private var followingRef: DatabaseReference? = null
 
@@ -48,7 +47,6 @@ class my_profile : AppCompatActivity() {
     private lateinit var profileImageView: ImageView
     private lateinit var editProfileBtn: TextView
 
-    // RecyclerView for posts grid
     private lateinit var postsRecyclerView: RecyclerView
     private lateinit var postsAdapter: ProfilePostGridAdapter
     private val postList = mutableListOf<Post>()
@@ -65,21 +63,11 @@ class my_profile : AppCompatActivity() {
         ref.addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val b64 = snapshot.getValue(String::class.java) ?: return
+                val clean = b64.substringAfter(",", b64)
+                val bytes = try { Base64.decode(clean, Base64.DEFAULT) } catch (_: Exception) { null } ?: return
 
-                val clean = b64.substringAfter(",", b64)  // remove data:image/... prefix
-                val bytes = try {
-                    Base64.decode(clean, Base64.DEFAULT)
-                } catch (_: Exception) { null } ?: return
-
-                Glide.with(navProfile.context)
-                    .asBitmap()
-                    .load(bytes)
-                    .placeholder(R.drawable.oval)
-                    .error(R.drawable.oval)
-                    .circleCrop()
-                    .into(navProfile)
+                Glide.with(navProfile.context).asBitmap().load(bytes).placeholder(R.drawable.oval).error(R.drawable.oval).circleCrop().into(navProfile)
             }
-
             override fun onCancelled(error: DatabaseError) {}
         })
     }
@@ -112,7 +100,6 @@ class my_profile : AppCompatActivity() {
         initViews()
         setupClickListeners()
         setupPostsGrid()
-        // listeners attached in onStart()
     }
 
     private fun initViews() {
@@ -133,7 +120,6 @@ class my_profile : AppCompatActivity() {
             startActivity(Intent(this, edit_profile::class.java))
         }
 
-        // inside setupClickListeners() in my_profile.kt, after other listeners:
         findViewById<android.widget.LinearLayout>(R.id.followersStats).setOnClickListener {
             startActivity(
                 Intent(this, FollowListActivity::class.java)
@@ -149,7 +135,6 @@ class my_profile : AppCompatActivity() {
                     .putExtra("uid", currentUserId)
             )
         }
-
 
         findViewById<ImageView>(R.id.nav_home).setOnClickListener {
             startActivity(Intent(this, home_page::class.java)); finish()
@@ -168,36 +153,29 @@ class my_profile : AppCompatActivity() {
             startActivity(Intent(this, story::class.java))
         }
 
-        // --- MODIFICATION: Updated to open camera_story with current user's ID ---
         findViewById<FrameLayout>(R.id.profileImage).setOnClickListener {
             val intent = Intent(this, camera_story::class.java)
             intent.putExtra("uid", currentUserId)
             startActivity(intent)
         }
-        // --- END MODIFICATION ---
 
         findViewById<ImageView>(R.id.dropdown_icon).setOnClickListener {
             Toast.makeText(this, "Account options coming soon", Toast.LENGTH_SHORT).show()
         }
 
-        // ONLY THIS CHANGED - Logout functionality added
         findViewById<ImageView>(R.id.menu_icon).setOnClickListener {
             androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Logout")
                 .setMessage("Are you sure you want to logout?")
                 .setPositiveButton("Logout") { _, _ ->
                     auth.signOut()
-
                     if (currentUserId.isNotEmpty()) {
                         val updates = hashMapOf<String, Any>(
                             "isOnline" to false,
                             "lastSeen" to System.currentTimeMillis()
                         )
-                        database.getReference("users")
-                            .child(currentUserId)
-                            .updateChildren(updates)
+                        database.getReference("users").child(currentUserId).updateChildren(updates)
                     }
-
                     val intent = Intent(this, login_sign::class.java)
                     intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                     startActivity(intent)
@@ -208,20 +186,31 @@ class my_profile : AppCompatActivity() {
         }
     }
 
-    // 3-column Instagram-like grid with tight spacing
+    // --- MODIFICATION: Updated to launch GotoPostActivity ---
+    private fun openPostDetail(post: Post) {
+        val intent = Intent(this, GotoPostActivity::class.java).apply {
+            putExtra("POST_ID", post.postId)
+            putExtra("USER_ID", post.uid)
+        }
+        startActivity(intent)
+    }
+    // --- END MODIFICATION ---
+
     private fun setupPostsGrid() {
         val spanCount = 3
         postsRecyclerView.layoutManager = GridLayoutManager(this, spanCount)
         postsRecyclerView.setHasFixedSize(true)
         postsRecyclerView.addItemDecoration(GridSpacingDecoration(spanCount, dp(1), includeEdge = false))
 
+        // --- MODIFICATION: Updated click listener ---
         postsAdapter = ProfilePostGridAdapter(postList) { clickedPost ->
-            Toast.makeText(this, "Post: ${clickedPost.caption}", Toast.LENGTH_SHORT).show()
+            openPostDetail(clickedPost)
         }
+        // --- END MODIFICATION ---
+
         postsRecyclerView.adapter = postsAdapter
     }
 
-    // Listen to user's own posts under posts/<uid>
     private fun attachPostsListener() {
         postsRef = database.getReference("posts").child(currentUserId)
         val listener = object : ValueEventListener {
@@ -242,15 +231,11 @@ class my_profile : AppCompatActivity() {
         postListener = listener
     }
 
-    // Listen to user profile data (name, bio, photo, username)
     private fun attachUserListener() {
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (!snapshot.exists()) return
-
                 usernameText.text = snapshot.child("username").getValue(String::class.java) ?: ""
-
-                // Display name: prefer fullName, else first+last
                 val fullName = snapshot.child("fullName").getValue(String::class.java)
                 val first = snapshot.child("firstName").getValue(String::class.java)
                 val last  = snapshot.child("lastName").getValue(String::class.java)
@@ -259,20 +244,14 @@ class my_profile : AppCompatActivity() {
                     !first.isNullOrBlank() || !last.isNullOrBlank() -> listOfNotNull(first, last).joinToString(" ")
                     else -> ""
                 }
-
                 val bio = snapshot.child("bio").getValue(String::class.java) ?: ""
                 if (bio.isNotEmpty()) {
                     val bioLines = bio.split("\n", limit = 2)
                     bioLine1.text = bioLines.getOrNull(0) ?: ""
                     bioLine2.text = bioLines.getOrNull(1) ?: ""
                 } else {
-                    bioLine1.text = ""
-                    bioLine2.text = ""
+                    bioLine1.text = ""; bioLine2.text = ""
                 }
-
-                // NOTE: follower/following counts now come from top-level nodes (see attachCountsListeners)
-
-                // Profile picture: prefer URL; else Base64 (supports data URL prefix)
                 val pic = listOf(
                     snapshot.child("profilePictureUrl").getValue(String::class.java),
                     snapshot.child("profileImageUrl").getValue(String::class.java),
@@ -284,11 +263,7 @@ class my_profile : AppCompatActivity() {
                 ).firstOrNull { !it.isNullOrBlank() }
 
                 if (!pic.isNullOrEmpty() && pic.startsWith("http", true)) {
-                    Glide.with(this@my_profile)
-                        .load(pic)
-                        .placeholder(R.drawable.oval)
-                        .error(R.drawable.default_avatar)
-                        .into(profileImageView)
+                    Glide.with(this@my_profile).load(pic).placeholder(R.drawable.oval).error(R.drawable.default_avatar).into(profileImageView)
                 } else if (!pic.isNullOrEmpty()) {
                     lifecycleScope.launch {
                         val bmp = withContext(Dispatchers.IO) {
@@ -298,20 +273,11 @@ class my_profile : AppCompatActivity() {
                                 BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                             } catch (_: Exception) { null }
                         }
-                        if (bmp != null) {
-                            profileImageView.setImageBitmap(bmp)
-                        } else {
-                            Glide.with(this@my_profile)
-                                .load(R.drawable.default_avatar)
-                                .placeholder(R.drawable.oval)
-                                .into(profileImageView)
-                        }
+                        if (bmp != null) profileImageView.setImageBitmap(bmp)
+                        else Glide.with(this@my_profile).load(R.drawable.default_avatar).placeholder(R.drawable.oval).into(profileImageView)
                     }
                 } else {
-                    Glide.with(this@my_profile)
-                        .load(R.drawable.default_avatar)
-                        .placeholder(R.drawable.oval)
-                        .into(profileImageView)
+                    Glide.with(this@my_profile).load(R.drawable.default_avatar).placeholder(R.drawable.oval).into(profileImageView)
                 }
             }
             override fun onCancelled(error: DatabaseError) {
@@ -322,24 +288,18 @@ class my_profile : AppCompatActivity() {
         userListener = listener
     }
 
-    // NEW: attach live listeners for top-level followers/following
     private fun attachCountsListeners() {
         followersRef = database.getReference("followers").child(currentUserId)
         followingRef = database.getReference("following").child(currentUserId)
 
         val folL = object : ValueEventListener {
-            override fun onDataChange(s: DataSnapshot) {
-                followersCountText.text = s.childrenCount.toString()
-            }
+            override fun onDataChange(s: DataSnapshot) { followersCountText.text = s.childrenCount.toString() }
             override fun onCancelled(error: DatabaseError) {}
         }
         val fingL = object : ValueEventListener {
-            override fun onDataChange(s: DataSnapshot) {
-                followingCountText.text = s.childrenCount.toString()
-            }
+            override fun onDataChange(s: DataSnapshot) { followingCountText.text = s.childrenCount.toString() }
             override fun onCancelled(error: DatabaseError) {}
         }
-
         followersRef?.addValueEventListener(folL)
         followingRef?.addValueEventListener(fingL)
         followersCountListener = folL
@@ -355,7 +315,7 @@ class my_profile : AppCompatActivity() {
         super.onStart()
         attachUserListener()
         attachPostsListener()
-        attachCountsListeners() // NEW: keep counts live from top-level trees
+        attachCountsListeners()
     }
 
     override fun onStop() {
@@ -379,20 +339,13 @@ class my_profile : AppCompatActivity() {
         followingCountListener = null
     }
 
-    // ---- Utilities ----
-
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
     class GridSpacingDecoration(
-        private val spanCount: Int,
-        private val spacingPx: Int,
-        private val includeEdge: Boolean
+        private val spanCount: Int, private val spacingPx: Int, private val includeEdge: Boolean
     ) : RecyclerView.ItemDecoration() {
         override fun getItemOffsets(
-            outRect: android.graphics.Rect,
-            view: android.view.View,
-            parent: RecyclerView,
-            state: RecyclerView.State
+            outRect: android.graphics.Rect, view: android.view.View, parent: RecyclerView, state: RecyclerView.State
         ) {
             val position = parent.getChildAdapterPosition(view)
             val column = position % spanCount

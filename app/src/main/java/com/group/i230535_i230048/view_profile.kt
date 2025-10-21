@@ -48,11 +48,11 @@ class view_profile : AppCompatActivity() {
     private enum class FollowState { NOT_FOLLOWING, REQUESTED, FOLLOWING }
     private var currentFollowState: FollowState = FollowState.NOT_FOLLOWING
 
-    // Live state cache for listeners
+    // Live state cache
     private var isFollowingLive: Boolean = false
     private var isRequestedLive: Boolean = false
 
-    // Listener refs to clean up
+    // Listener refs
     private var followingRef: DatabaseReference? = null
     private var followReqRef: DatabaseReference? = null
     private var followingListener: ValueEventListener? = null
@@ -71,13 +71,7 @@ class view_profile : AppCompatActivity() {
                 val clean = b64.substringAfter(",", b64)
                 val bytes = try { Base64.decode(clean, Base64.DEFAULT) } catch (_: Exception) { null } ?: return
 
-                Glide.with(navProfile.context)
-                    .asBitmap()
-                    .load(bytes)
-                    .placeholder(R.drawable.oval)
-                    .error(R.drawable.oval)
-                    .circleCrop()
-                    .into(navProfile)
+                Glide.with(navProfile.context).asBitmap().load(bytes).placeholder(R.drawable.oval).error(R.drawable.oval).circleCrop().into(navProfile)
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -98,7 +92,6 @@ class view_profile : AppCompatActivity() {
         database = FirebaseDatabase.getInstance()
         initializeViews()
 
-        // --- MODIFICATION: Add click listener to profile image to view stories ---
         profileImageView.setOnClickListener {
             if (targetUid.isNullOrEmpty()) {
                 Toast.makeText(this, "Cannot load stories, user ID is missing.", Toast.LENGTH_SHORT).show()
@@ -108,7 +101,6 @@ class view_profile : AppCompatActivity() {
                 startActivity(intent)
             }
         }
-        // --- END MODIFICATION ---
 
         targetUid = intent.getStringExtra("userId")
             ?: intent.getStringExtra("USER_ID")
@@ -131,12 +123,8 @@ class view_profile : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        followingListener?.let { l ->
-            followingRef?.removeEventListener(l)
-        }
-        followReqListener?.let { l ->
-            followReqRef?.removeEventListener(l)
-        }
+        followingListener?.let { l -> followingRef?.removeEventListener(l) }
+        followReqListener?.let { l -> followReqRef?.removeEventListener(l) }
     }
 
     private fun initializeViews() {
@@ -177,12 +165,7 @@ class view_profile : AppCompatActivity() {
         bioTextView.text = user.bio.takeIf { !it.isNullOrBlank() } ?: "No bio available."
 
         if (!user.profilePictureUrl.isNullOrEmpty()) {
-            Glide.with(this)
-                .load(user.profilePictureUrl)
-                .placeholder(R.drawable.default_avatar)
-                .error(R.drawable.default_avatar)
-                .circleCrop()
-                .into(profileImageView)
+            Glide.with(this).load(user.profilePictureUrl).placeholder(R.drawable.default_avatar).error(R.drawable.default_avatar).circleCrop().into(profileImageView)
         } else {
             profileImageView.setImageResource(R.drawable.default_avatar)
         }
@@ -206,23 +189,33 @@ class view_profile : AppCompatActivity() {
         })
     }
 
+    // --- MODIFICATION: Updated to launch GotoPostActivity ---
+    private fun openPostDetail(post: Post) {
+        val intent = Intent(this, GotoPostActivity::class.java).apply {
+            putExtra("POST_ID", post.postId)
+            putExtra("USER_ID", post.uid)
+        }
+        startActivity(intent)
+    }
+    // --- END MODIFICATION ---
+
     private fun setupPostsGrid() {
         postsRecyclerView.layoutManager = GridLayoutManager(this, 3)
+
+        // --- MODIFICATION: Updated click listener ---
         postsAdapter = ProfilePostGridAdapter(postList) { clickedPost ->
-            Toast.makeText(this, "Clicked on post: ${clickedPost.caption}", Toast.LENGTH_SHORT).show()
+            openPostDetail(clickedPost)
         }
+        // --- END MODIFICATION ---
+
         postsRecyclerView.adapter = postsAdapter
     }
-
-    // ---------------- MESSAGE BUTTON ----------------
 
     private fun setupMessageButton(targetUid: String) {
         val me = meUid
         if (me == null || me == targetUid) {
-            messageButton.visibility = View.GONE
-            return
+            messageButton.visibility = View.GONE; return
         }
-
         messageButton.visibility = View.VISIBLE
         messageButton.setOnClickListener {
             val intent = Intent(this, ChatActivity::class.java).apply {
@@ -233,35 +226,24 @@ class view_profile : AppCompatActivity() {
         }
     }
 
-    // ---------------- FOLLOW / REQUEST / FOLLOWING ----------------
-
     private fun setupFollowSection(targetUid: String) {
         val me = meUid
         if (me == null || me == targetUid) {
-            followButton.visibility = View.GONE
-            return
+            followButton.visibility = View.GONE; return
         }
         followButton.visibility = View.VISIBLE
-
-        // attach independent LIVE listeners → combine to decide state
         attachStateListeners(me, targetUid)
-
-        // counts
         observeCounts(targetUid)
-
         followButton.setOnClickListener {
             when (currentFollowState) {
                 FollowState.FOLLOWING -> unfollow(me, targetUid)
                 FollowState.REQUESTED  -> cancelRequest(me, targetUid)
-                FollowState.NOT_FOLLOWING -> sendFollowRequest(me, targetUid) // <-- only request
+                FollowState.NOT_FOLLOWING -> sendFollowRequest(me, targetUid)
             }
         }
-
-
     }
 
     private fun attachStateListeners(me: String, target: String) {
-        // Following listener
         followingRef = rtdb.child("following").child(me).child(target)
         followingListener = object : ValueEventListener {
             override fun onDataChange(s: DataSnapshot) {
@@ -271,7 +253,6 @@ class view_profile : AppCompatActivity() {
             override fun onCancelled(error: DatabaseError) {}
         }.also { followingRef?.addValueEventListener(it) }
 
-        // Request listener
         followReqRef = rtdb.child("follow_requests").child(target).child(me)
         followReqListener = object : ValueEventListener {
             override fun onDataChange(s: DataSnapshot) {
@@ -292,19 +273,13 @@ class view_profile : AppCompatActivity() {
 
     private fun setFollowState(state: FollowState) {
         currentFollowState = state
-
-        // comfort & center
         followButton.gravity = Gravity.CENTER
         followButton.setPadding(24, 12, 24, 12)
-
         when (state) {
             FollowState.NOT_FOLLOWING -> {
                 followButton.text = "Follow"
                 followButton.setBackgroundResource(R.drawable.message_bttn)
-                ViewCompat.setBackgroundTintList(
-                    followButton,
-                    ColorStateList.valueOf(getColor(R.color.smd_theme))
-                )
+                ViewCompat.setBackgroundTintList(followButton, ColorStateList.valueOf(getColor(R.color.smd_theme)))
                 followButton.setTextColor(getColor(android.R.color.white))
             }
             FollowState.REQUESTED -> {
@@ -325,21 +300,17 @@ class view_profile : AppCompatActivity() {
     private fun sendFollowRequest(me: String, target: String) {
         val updates = hashMapOf<String, Any?>(
             "/follow_requests/$target/$me" to true,
-            "/following/$me/$target" to null,    // guard: no following until accepted
-            "/followers/$target/$me" to null     // guard: no follower until accepted
+            "/following/$me/$target" to null,
+            "/followers/$target/$me" to null
         )
         rtdb.updateChildren(updates)
     }
 
-
     private fun cancelRequest(me: String, target: String) {
-        val updates = hashMapOf<String, Any?>(
-            "/follow_requests/$target/$me" to null
-        )
-        rtdb.updateChildren(updates)
-            .addOnFailureListener {
-                Toast.makeText(this, "Cancel failed: ${it.message}", Toast.LENGTH_SHORT).show()
-            }
+        val updates = hashMapOf<String, Any?>("/follow_requests/$target/$me" to null)
+        rtdb.updateChildren(updates).addOnFailureListener {
+            Toast.makeText(this, "Cancel failed: ${it.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun follow(me: String, target: String) {
@@ -347,12 +318,11 @@ class view_profile : AppCompatActivity() {
         val updates = hashMapOf<String, Any?>(
             "/following/$me/$target" to true,
             "/followers/$target/$me" to true,
-            "/follow_requests/$target/$me" to null // clear pending request if any
+            "/follow_requests/$target/$me" to null
         )
-        rtdb.updateChildren(updates)
-            .addOnFailureListener {
-                Toast.makeText(this, "Follow failed: ${it.message}", Toast.LENGTH_SHORT).show()
-            }
+        rtdb.updateChildren(updates).addOnFailureListener {
+            Toast.makeText(this, "Follow failed: ${it.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun unfollow(me: String, target: String) {
@@ -361,31 +331,21 @@ class view_profile : AppCompatActivity() {
             "/following/$me/$target" to null,
             "/followers/$target/$me" to null
         )
-        rtdb.updateChildren(updates)
-            .addOnFailureListener {
-                Toast.makeText(this, "Unfollow failed: ${it.message}", Toast.LENGTH_SHORT).show()
-            }
+        rtdb.updateChildren(updates).addOnFailureListener {
+            Toast.makeText(this, "Unfollow failed: ${it.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun observeCounts(targetUid: String) {
-        rtdb.child("followers").child(targetUid)
-            .addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(s: DataSnapshot) {
-                    followersCountTextView.text = s.childrenCount.toString()
-                }
-                override fun onCancelled(error: DatabaseError) {}
-            })
-
-        rtdb.child("following").child(targetUid)
-            .addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(s: DataSnapshot) {
-                    followingCountTextView.text = s.childrenCount.toString()
-                }
-                override fun onCancelled(error: DatabaseError) {}
-            })
+        rtdb.child("followers").child(targetUid).addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(s: DataSnapshot) { followersCountTextView.text = s.childrenCount.toString() }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+        rtdb.child("following").child(targetUid).addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(s: DataSnapshot) { followingCountTextView.text = s.childrenCount.toString() }
+            override fun onCancelled(error: DatabaseError) {}
+        })
     }
-
-    // ---------------- NAV ----------------
 
     private fun setupBottomNavigationBar() {
         findViewById<ImageView>(R.id.navHome).setOnClickListener { startActivity(Intent(this, home_page::class.java)) }

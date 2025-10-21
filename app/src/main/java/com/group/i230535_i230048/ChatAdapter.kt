@@ -15,9 +15,11 @@ import com.google.firebase.database.ValueEventListener
 import java.text.SimpleDateFormat
 import java.util.*
 
+// --- 1. ADD onChatClick LAMBDA TO CONSTRUCTOR ---
 class ChatAdapter(
     private val chatList: List<ChatSession>,
-    private val currentUserId: String
+    private val currentUserId: String,
+    private val onChatClick: (ChatSession) -> Unit // <-- ADDED
 ) : RecyclerView.Adapter<ChatAdapter.ChatViewHolder>() {
 
     inner class ChatViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -43,8 +45,8 @@ class ChatAdapter(
                     return
                 }
 
-                // Load other user's details from Firebase
-                loadUserDetails(otherUserId)
+                // --- 2. PASS 'chat' OBJECT TO loadUserDetails ---
+                loadUserDetails(otherUserId, chat) // <-- MODIFIED
 
                 // Display last message
                 if (chat.lastMessage.isNotEmpty()) {
@@ -63,7 +65,8 @@ class ChatAdapter(
             }
         }
 
-        private fun loadUserDetails(userId: String) {
+        // --- 3. ADD 'chat' PARAMETER TO FUNCTION SIGNATURE ---
+        private fun loadUserDetails(userId: String, chat: ChatSession) { // <-- MODIFIED
             val userRef = FirebaseDatabase.getInstance().getReference("users").child(userId)
 
             android.util.Log.d("ChatAdapter", "Loading user details for: $userId")
@@ -100,14 +103,11 @@ class ChatAdapter(
                         profileImage.setImageResource(R.drawable.circular_background)
                     }
 
+                    // --- 4. REPLACE CLICK LISTENER LOGIC ---
                     // IMPORTANT: Set click listener here after we have the username
                     itemView.setOnClickListener {
-                        val context = itemView.context
-                        val intent = Intent(context, ChatActivity::class.java).apply {
-                            putExtra("userId", userId)
-                            putExtra("username", username)
-                        }
-                        context.startActivity(intent)
+                        // Call the lambda instead of starting ChatActivity
+                        onChatClick(chat) // <-- MODIFIED
                     }
                 }
 

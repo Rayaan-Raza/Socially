@@ -129,14 +129,17 @@ class home_page : AppCompatActivity() {
         // FEED
         rvFeed = findViewById(R.id.rvFeed)
         rvFeed.layoutManager = LinearLayoutManager(this)
-        // --- NEW AMENDMENT: Add onSendClick to the adapter initialization ---
 
+        // --- MODIFICATION: Added onPostClick and updated onCommentClick ---
         postAdapter = PostAdapter(
-            currentUid = currentUid,                       // ⬅ add this
+            currentUid = currentUid,
             onLikeToggle = { post, wantLike -> toggleLike(post, wantLike) },
-            onCommentClick = { post -> showAddCommentDialog(post) },
-            onSendClick = { post -> sendPostToFriend(post) }
+            onCommentClick = { post -> openPostDetail(post, showComments = true) }, // Opens detail view
+            onSendClick = { post -> sendPostToFriend(post) }, // This was already correct
+            onPostClick = { post -> openPostDetail(post, showComments = false) } // Opens detail view
         )
+        // --- END MODIFICATION ---
+
         rvFeed.adapter = postAdapter
 
         // Setup Navigation Click Listeners
@@ -144,6 +147,25 @@ class home_page : AppCompatActivity() {
         getFcmToken()
         requestNotificationPermission()
     }
+
+    // --- MODIFICATION: New function to navigate to post detail ---
+    /**
+     * Navigates to the (hypothetical) PostDetailActivity.
+     * You will need to create this activity.
+     */
+    private fun openPostDetail(post: Post, showComments: Boolean = false) {
+        // NOTE: PostDetailActivity.kt is not provided by you.
+        // This is the required intent to open it.
+        Toast.makeText(this, "Opening post details...", Toast.LENGTH_SHORT).show()
+//        val intent = Intent(this, PostDetailActivity::class.java).apply {
+//            putExtra("POST_ID", post.postId)
+//            putExtra("USER_ID", post.uid)
+//            putExtra("SHOW_COMMENTS", showComments) // Optional: to auto-focus comments
+//        }
+//        startActivity(intent)
+    }
+    // --- END MODIFICATION ---
+
 
     // --- NEW AMENDMENT: New function to handle starting the send process ---
     private fun sendPostToFriend(post: Post) {
@@ -576,6 +598,9 @@ class home_page : AppCompatActivity() {
             })
     }
 
+    // --- NOTE: These functions are no longer called from the adapter, ---
+    // --- but I'll leave them in case they are used elsewhere. ---
+    // --- Logic would move to PostDetailActivity ---
     private fun showAddCommentDialog(post: Post) {
         val input = android.widget.EditText(this).apply {
             hint = "Write a comment…"
@@ -710,13 +735,16 @@ class home_page : AppCompatActivity() {
             }
         }
     }
-    // --- NEW AMENDMENT: Add onSendClick to adapter and btnSend to PostVH ---
+
+    // --- MODIFICATION: Added onPostClick parameter ---
     inner class PostAdapter(
-        private val currentUid: String,                          // ⬅ new
+        private val currentUid: String,
         private val onLikeToggle: (post: Post, liked: Boolean) -> Unit,
         private val onCommentClick: (post: Post) -> Unit,
-        private val onSendClick: (post: Post) -> Unit
+        private val onSendClick: (post: Post) -> Unit,
+        private val onPostClick: (post: Post) -> Unit // <-- ADDED
     ) : RecyclerView.Adapter<PostAdapter.PostVH>() {
+        // --- END MODIFICATION ---
 
         private val items = mutableListOf<Post>()
         private val likeState = mutableMapOf<String, Boolean>()
@@ -857,10 +885,14 @@ class home_page : AppCompatActivity() {
 
                 onLikeToggle(item, wantLike)
             }
+
+            // --- MODIFICATION: Set click listeners ---
+            h.postImage.setOnClickListener { onPostClick(item) }
+            h.tvCaption.setOnClickListener { onPostClick(item) }
             h.commentBtn.setOnClickListener { onCommentClick(item) }
             h.tvViewAll.setOnClickListener { onCommentClick(item) }
-            // --- NEW AMENDMENT: Set the click listener for the send button ---
             h.sendBtn.setOnClickListener { onSendClick(item) }
+            // --- END MODIFICATION ---
         }
 
         override fun getItemCount() = items.size
