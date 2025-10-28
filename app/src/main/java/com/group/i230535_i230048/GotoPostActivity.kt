@@ -48,19 +48,13 @@ class GotoPostActivity : AppCompatActivity() {
     private lateinit var commentAdapter: CommentAdapter
     private val commentList = mutableListOf<Comment>()
 
-    // Listeners
     private var likeListener: ValueEventListener? = null
     private var commentsListener: ValueEventListener? = null
     private var postListener: ValueEventListener? = null
-
-    // --- MODIFIED ---
-    // This launcher now waits for a result from dms.kt
-    private val selectFriendLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+   private val selectFriendLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
-            // This 'SELECTED_USER_ID' will be sent back from your dms activity
             val selectedUserId = result.data?.getStringExtra("SELECTED_USER_ID")
             if (selectedUserId != null && currentPost != null) {
-                // This function is now correct and will send the post
                 sendMessageWithPost(selectedUserId, currentPost!!)
             }
         }

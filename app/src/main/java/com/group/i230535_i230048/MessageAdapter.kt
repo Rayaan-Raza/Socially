@@ -18,7 +18,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// Message Adapter for RecyclerView
 class MessageAdapter(
     private val messages: List<Message>,
     private val currentUserId: String,
@@ -29,9 +28,12 @@ class MessageAdapter(
     companion object {
         private const val VIEW_TYPE_TEXT_SENT = 1
         private const val VIEW_TYPE_TEXT_RECEIVED = 2
-        // Removed IMAGE types
-        private const val VIEW_TYPE_POST_SENT = 5        // Kept Post type
-        private const val VIEW_TYPE_POST_RECEIVED = 6     // Kept Post type
+        // --- MODIFIED: Re-add IMAGE types ---
+        private const val VIEW_TYPE_IMAGE_SENT = 3
+        private const val VIEW_TYPE_IMAGE_RECEIVED = 4
+        // ---
+        private const val VIEW_TYPE_POST_SENT = 5
+        private const val VIEW_TYPE_POST_RECEIVED = 6
     }
 
     // --- Determine View Type ---
@@ -39,39 +41,39 @@ class MessageAdapter(
         val message = messages[position]
         val isSent = message.senderId == currentUserId
 
-        // Handle deleted messages primarily as text
         if (message.isDeleted) {
             return if (isSent) VIEW_TYPE_TEXT_SENT else VIEW_TYPE_TEXT_RECEIVED
         }
 
-        // Map based on type
+        // --- MODIFIED: Route "image" to new types ---
         return when (message.messageType) {
             "text" -> if (isSent) VIEW_TYPE_TEXT_SENT else VIEW_TYPE_TEXT_RECEIVED
-            "image" -> if (isSent) VIEW_TYPE_TEXT_SENT else VIEW_TYPE_TEXT_RECEIVED // Treat images as text for display
+            "image" -> if (isSent) VIEW_TYPE_IMAGE_SENT else VIEW_TYPE_IMAGE_RECEIVED // <-- CHANGED
             "post" -> if (isSent) VIEW_TYPE_POST_SENT else VIEW_TYPE_POST_RECEIVED
-            else -> if (isSent) VIEW_TYPE_TEXT_SENT else VIEW_TYPE_TEXT_RECEIVED // Fallback
+            else -> if (isSent) VIEW_TYPE_TEXT_SENT else VIEW_TYPE_TEXT_RECEIVED
         }
     }
 
     // --- Inflate Layout Based on View Type ---
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MessageViewHolder {
         val layoutInflater = LayoutInflater.from(parent.context)
-        // Determine the layout resource ID based on the view type
+        // --- MODIFIED: Add cases for new image layouts ---
         val layoutId = when (viewType) {
             VIEW_TYPE_TEXT_SENT -> R.layout.item_message_sent
             VIEW_TYPE_TEXT_RECEIVED -> R.layout.item_message_received
-            VIEW_TYPE_POST_SENT -> R.layout.item_post_sent // Use NEW post layout
-            VIEW_TYPE_POST_RECEIVED -> R.layout.item_post_received // Use NEW post layout
+            VIEW_TYPE_IMAGE_SENT -> R.layout.item_image_sent // <-- ADDED
+            VIEW_TYPE_IMAGE_RECEIVED -> R.layout.item_image_received // <-- ADDED
+            VIEW_TYPE_POST_SENT -> R.layout.item_post_sent
+            VIEW_TYPE_POST_RECEIVED -> R.layout.item_post_received
             else -> R.layout.item_message_sent // Fallback
         }
         val view = layoutInflater.inflate(layoutId, parent, false)
-        // Pass the viewType to the ViewHolder
         return MessageViewHolder(view, viewType, onMessageLongClick)
     }
 
     // --- Bind Data to ViewHolder ---
     override fun onBindViewHolder(holder: MessageViewHolder, position: Int) {
-        holder.bind(messages[position]) // Delegate binding logic to ViewHolder
+        holder.bind(messages[position])
     }
 
     override fun getItemCount() = messages.size
@@ -79,46 +81,58 @@ class MessageAdapter(
     // --- ViewHolder Class ---
     class MessageViewHolder(
         itemView: View,
-        private val viewType: Int, // Store viewType to know which views to access
+        private val viewType: Int,
         private val onItemLongClick: (Message) -> Unit
     ) : RecyclerView.ViewHolder(itemView) {
 
         // Find views - use nullable types '?'
         private val messageText: TextView? = itemView.findViewById(R.id.messageText)
-        private val timeText: TextView? = itemView.findViewById(R.id.messageTime) // Assume exists in all
-        
-        // Views specific to post layouts
+        private val timeText: TextView? = itemView.findViewById(R.id.messageTime)
+
+        // messageImage is now used for BOTH posts and images
         private val messageImage: ImageView? = itemView.findViewById(R.id.messageImage)
         private val postIndicator: TextView? = itemView.findViewById(R.id.postIndicator)
 
-        // Bind data based on message and viewType
         fun bind(message: Message) {
-            // --- Handle common elements ---
-            setTimeText(message) // Set formatted time and edited status
+            // Handle common elements
+            setTimeText(message)
 
-            // --- Handle specific view types ---
+            // Handle specific view types
             when (viewType) {
                 VIEW_TYPE_TEXT_SENT, VIEW_TYPE_TEXT_RECEIVED -> {
-                    // Display text content (handles deleted, image placeholders)
                     messageText?.text = message.getDisplayContent()
-                    messageImage?.visibility = View.GONE // Ensure image view is hidden
+                    messageImage?.visibility = View.GONE
                     postIndicator?.visibility = View.GONE
-
-                    // Set long click listener only for non-deleted messages
                     setupLongClickListener(message)
                 }
 
-                VIEW_TYPE_POST_SENT, VIEW_TYPE_POST_RECEIVED -> {
-                    messageText?.visibility = View.GONE // Hide text view if it exists in this layout
-                    postIndicator?.visibility = View.VISIBLE // Show "Shared Post" indicator
-                    messageImage?.visibility = View.VISIBLE // Show image view
-                    messageImage?.let { imgView ->
-                        loadPostImage(message.imageUrl, imgView) // Load post image (URL or Base64)
+                // --- MODIFIED: Add block for image types ---
+                VIEW_TYPE_IMAGE_SENT, VIEW_TYPE_IMAGE_RECEIVED -> {
+                    messageText?.visibility = View.GONE // Hide text
+                    postIndicator?.visibility = View.GONE // Hide post indicator
+                    messageImage?.visibility = View.VISIBLE // Show image
 
-                        // Make post image clickable -> opens GotoPostActivity
+                    messageImage?.let { imgView ->
+                        // Use your existing helper to load the Base64 image
+                        // (This assumes your ChatActivity sends Base64 in message.imageUrl)
+                        decodeAndLoadBase64(message.imageUrl, imgView)
+                    }
+
+                    // Allow long-clicking on images to delete them
+                    setupLongClickListener(message)
+                }
+                // ---
+
+                VIEW_TYPE_POST_SENT, VIEW_TYPE_POST_RECEIVED -> {
+                    messageText?.visibility = View.GONE
+                    postIndicator?.visibility = View.VISIBLE
+                    messageImage?.visibility = View.VISIBLE
+                    messageImage?.let { imgView ->
+                        loadPostImage(message.imageUrl, imgView)
+
                         imgView.setOnClickListener {
-                            // Use postId and senderId (post owner)
                             if (message.postId.isNotEmpty() && message.senderId.isNotEmpty()) {
+                                // --- FIX: Use message.senderId (the post owner), not message.receiverId ---
                                 openPostDetails(itemView.context, message.postId, message.senderId)
                             } else {
                                 Log.w("MessageAdapter", "Missing postId or senderId for shared post message.")
@@ -126,7 +140,6 @@ class MessageAdapter(
                             }
                         }
                     }
-                    // Disable long click for posts
                     itemView.setOnLongClickListener(null)
                 }
             }
@@ -146,34 +159,36 @@ class MessageAdapter(
         }
 
         private fun setupLongClickListener(message: Message) {
-            if (!message.isDeleted && message.messageType == "text") { // Only allow long click on deletable/editable TEXT
+            // --- MODIFIED: Allow long click on "text" OR "image" ---
+            if (!message.isDeleted && (message.messageType == "text" || message.messageType == "image")) {
                 itemView.setOnLongClickListener {
                     onItemLongClick(message)
-                    true // Consume the long click event
+                    true
                 }
             } else {
-                itemView.setOnLongClickListener(null) // Remove listener otherwise
+                itemView.setOnLongClickListener(null)
             }
         }
 
         // Decode Base64 String and load into ImageView
         private fun decodeAndLoadBase64(base64String: String, imageView: ImageView) {
             if (base64String.isBlank()) {
-                imageView.setImageResource(R.drawable.city)
+                imageView.setImageResource(R.drawable.city) // Your placeholder
                 return
             }
             try {
+                // Clean the Base64 string (remove prefix if it exists)
                 val cleanBase64 = base64String.substringAfter("base64,", base64String)
                 val imageBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
                 val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
                 if (bitmap != null) {
                     imageView.setImageBitmap(bitmap)
                 } else {
-                    imageView.setImageResource(R.drawable.city)
+                    imageView.setImageResource(R.drawable.city) // Your placeholder
                 }
             } catch (e: Exception) {
                 Log.e("MessageAdapter", "Error decoding Base64", e)
-                imageView.setImageResource(R.drawable.city)
+                imageView.setImageResource(R.drawable.city) // Your placeholder
             }
         }
 
@@ -198,9 +213,19 @@ class MessageAdapter(
         private fun openPostDetails(context: Context, postId: String, postOwnerId: String) {
             val intent = Intent(context, GotoPostActivity::class.java).apply {
                 putExtra("POST_ID", postId)
-                putExtra("USER_ID", postOwnerId) // Pass the owner's ID
+                putExtra("USER_ID", postOwnerId)
             }
             context.startActivity(intent)
+        }
+    }
+
+    // --- Add this helper function inside MessageAdapter, outside the ViewHolder ---
+    // This provides the text for text-based views (handling deleted, images, etc.)
+    private fun Message.getDisplayContent(): String {
+        return when {
+            isDeleted -> "This message was deleted"
+            messageType == "image" -> "📷 Photo" // Fallback text if it's routed to text
+            else -> content
         }
     }
 }

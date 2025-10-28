@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:paddingVertical="4dp"
+    android:paddingStart="60dp"
+    android:paddingEnd="8dp"
+    android:clipToPadding="false">
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cardView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="#E0E0E0">
+
+        <ImageView
+            android:id="@+id/messageImage"
+            android:layout_width="240dp"
+            android:layout_height="wrap_content"
+            android:minHeight="240dp"
+            android:adjustViewBounds="true"
+            android:scaleType="centerCrop"
+            android:src="@drawable/city" /> </androidx.cardview.widget.CardView>
+
+    <TextView
+        android:id="@+id/messageTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/cardView"
+        android:layout_alignEnd="@id/cardView"
+        android:layout_marginTop="2dp"
+        android:text="10:00 AM"
+        android:textColor="#8A000000"
+        android:textSize="10sp" />
+
+</RelativeLayout>

@@ -83,7 +83,7 @@ class search_feed : AppCompatActivity() {
         })
     }
 
-    // --- MODIFICATION: Updated to launch GotoPostActivity ---
+
     private fun openPostDetail(post: Post) {
         val intent = Intent(this, GotoPostActivity::class.java).apply {
             putExtra("POST_ID", post.postId)
@@ -91,17 +91,14 @@ class search_feed : AppCompatActivity() {
         }
         startActivity(intent)
     }
-    // --- END MODIFICATION ---
 
     private fun setupRecyclerView() {
         recyclerView = findViewById(R.id.postsRecyclerView)
         recyclerView.layoutManager = GridLayoutManager(this, 3)
 
-        // --- MODIFICATION: Updated click listener ---
-        adapter = ProfilePostGridAdapter(filteredPosts) { clickedPost ->
+         adapter = ProfilePostGridAdapter(filteredPosts) { clickedPost ->
             openPostDetail(clickedPost)
         }
-        // --- END MODIFICATION ---
 
         recyclerView.adapter = adapter
     }

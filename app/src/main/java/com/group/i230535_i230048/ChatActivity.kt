@@ -348,16 +348,11 @@ class ChatActivity : AppCompatActivity() {
         if (requestCode == PICK_IMAGE && resultCode == Activity.RESULT_OK && data != null) {
             val imageUri: Uri? = data.data
             if (imageUri != null) {
-                // --- NEW CHANGE ---
-                // The provided MessageAdapter treats "image" messages as text and
-                // does not display the image. It only displays the 'content' field.
-                // Therefore, processing the bitmap and encoding to Base64 is unnecessary.
-                // We just send a message with the "image" type and the placeholder content.
-                sendMessage("image", "Sent an image", "", "")
-                // --- END OF CHANGE ---
 
-                /* --- OLD CODE (Kept for reference, but now redundant) ---
+                // --- THIS IS THE FIX ---
+                // Re-enable the code to process the image
                 try {
+                    // 1. Get Bitmap from Uri
                     val bitmap = if (Build.VERSION.SDK_INT >= 29) {
                         val source = ImageDecoder.createSource(contentResolver, imageUri)
                         ImageDecoder.decodeBitmap(source)
@@ -365,12 +360,18 @@ class ChatActivity : AppCompatActivity() {
                         @Suppress("DEPRECATION")
                         MediaStore.Images.Media.getBitmap(contentResolver, imageUri)
                     }
+
+                    // 2. Encode the bitmap to Base64
                     val base64Image = encodeImage(bitmap)
-                    sendMessage("image", "Sent an image", base64Image, "")
+
+                    // 3. Send the message with the REAL Base64 data
+                    // We send "📷 Photo" as content for the chat list preview
+                    sendMessage("image", "📷 Photo", base64Image, "")
+
                 } catch (e: Exception) {
                     Toast.makeText(this, "Failed to load image: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
-                */
+                // --- END OF FIX ---
             }
         }
     }

@@ -36,43 +36,37 @@ import androidx.core.content.ContextCompat
 
 class home_page : AppCompatActivity() {
 
-    // --- Caches & State ---
     private val usernameCache = mutableMapOf<String, String>()
 
-    // --- Views ---
-    private lateinit var navProfileImage: ImageView // For bottom nav profile pic
+    private lateinit var navProfileImage: ImageView
 
-    // Stories
     private lateinit var rvStories: RecyclerView
     private lateinit var storyAdapter: StoryAdapter
     private val storyList = mutableListOf<StoryBubble>()
 
-    // Feed
     private lateinit var rvFeed: RecyclerView
     private lateinit var postAdapter: PostAdapter
     private val db = FirebaseDatabase.getInstance().reference
     private val auth = FirebaseAuth.getInstance()
     private val currentPosts = mutableListOf<Post>()
 
-    // --- Realtime listener bookkeeping (avoid leaks/duplicates) ---
-    private val postChildListeners = mutableMapOf<String, ChildEventListener>()      // uid -> listener
-    private val likeListeners = mutableMapOf<String, ValueEventListener>()           // postId -> listener
-    private val commentPreviewListeners = mutableMapOf<String, ValueEventListener>() // postId -> listener
+    private val postChildListeners = mutableMapOf<String, ChildEventListener>()
+    private val likeListeners = mutableMapOf<String, ValueEventListener>()
+    private val commentPreviewListeners = mutableMapOf<String, ValueEventListener>()
     private var watchingUids: List<String> = emptyList()
 
-    // --- NEW AMENDMENT: Launcher for SelectFriendActivity ---
     private var postToSend: Post? = null
     private val selectFriendLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val selectedUserId = result.data?.getStringExtra("SELECTED_USER_ID")
             if (selectedUserId != null && postToSend != null) {
-                // Now actually send the message with post details
                 sendMessageWithPost(selectedUserId, postToSend!!)
             }
         }
     }
 
     fun loadBottomBarAvatar(navProfile: ImageView) {
+        // load pic for bottom
         val uid = FirebaseAuth.getInstance().uid ?: return
         val ref = FirebaseDatabase.getInstance()
             .getReference("users")
@@ -83,7 +77,7 @@ class home_page : AppCompatActivity() {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val b64 = snapshot.getValue(String::class.java) ?: return
 
-                val clean = b64.substringAfter(",", b64)  // remove data:image/... prefix
+                val clean = b64.substringAfter(",", b64)
                 val bytes = try {
                     Base64.decode(clean, Base64.DEFAULT)
                 } catch (_: Exception) { null } ?: return
@@ -103,22 +97,20 @@ class home_page : AppCompatActivity() {
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // when page start
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_home_page)
         val navProfile = findViewById<ImageView>(R.id.profile)
         loadBottomBarAvatar(navProfile)
 
-        // --- Apply window insets to the main layout for edge-to-edge support ---
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
 
-        // --- Initialize Views ---
         navProfileImage = findViewById(R.id.profile)
 
-        // STORIES
         rvStories = findViewById(R.id.rvStories)
         rvStories.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         val currentUid = auth.currentUser?.uid ?: return
@@ -126,80 +118,102 @@ class home_page : AppCompatActivity() {
         rvStories.adapter = storyAdapter
         rvStories.adapter = storyAdapter
 
-        // FEED
         rvFeed = findViewById(R.id.rvFeed)
         rvFeed.layoutManager = LinearLayoutManager(this)
 
-        // --- MODIFICATION: Added onPostClick and updated onCommentClick ---
         postAdapter = PostAdapter(
             currentUid = currentUid,
             onLikeToggle = { post, wantLike -> toggleLike(post, wantLike) },
-            onCommentClick = { post -> openPostDetail(post, showComments = true) }, // Opens detail view
-            onSendClick = { post -> sendPostToFriend(post) }, // This was already correct
-            onPostClick = { post -> openPostDetail(post, showComments = false) } // Opens detail view
+            onCommentClick = { post -> openPostDetail(post, showComments = true) },
+            onSendClick = { post -> sendPostToFriend(post) },
+            onPostClick = { post -> openPostDetail(post, showComments = false) }
         )
-        // --- END MODIFICATION ---
 
         rvFeed.adapter = postAdapter
 
-        // Setup Navigation Click Listeners
         setupClickListeners()
         getFcmToken()
         requestNotificationPermission()
     }
 
-    // --- MODIFICATION: New function to navigate to post detail ---
-    /**
-     * Navigates to the (hypothetical) PostDetailActivity.
-     * You will need to create this activity.
-     */
+
     private fun openPostDetail(post: Post, showComments: Boolean = false) {
-        // NOTE: PostDetailActivity.kt is not provided by you.
-        // This is the required intent to open it.
-        Toast.makeText(this, "Opening post details...", Toast.LENGTH_SHORT).show()
-//        val intent = Intent(this, PostDetailActivity::class.java).apply {
-//            putExtra("POST_ID", post.postId)
-//            putExtra("USER_ID", post.uid)
-//            putExtra("SHOW_COMMENTS", showComments) // Optional: to auto-focus comments
-//        }
-//        startActivity(intent)
+        // go to post page
+        val intent = Intent(this, GotoPostActivity::class.java).apply {
+            putExtra("POST_ID", post.postId)
+            putExtra("USER_ID", post.uid)
+
+            putExtra("SHOW_COMMENTS", showComments)
+        }
+        startActivity(intent)
     }
-    // --- END MODIFICATION ---
 
-
-    // --- NEW AMENDMENT: New function to handle starting the send process ---
     private fun sendPostToFriend(post: Post) {
-        postToSend = post // Store the post that the user wants to send
-        val intent = Intent(this, SelectFriendActivity::class.java)
-        // We pass the post ID in case the SelectFriendActivity needs it, though not strictly required by its current logic
-        intent.putExtra("POST_ID", post.postId)
+        // send this post
+        postToSend = post
+
+        val intent = Intent(this, dms::class.java)
+
+        intent.putExtra("ACTION_MODE", "SHARE")
+
         selectFriendLauncher.launch(intent)
     }
 
-    // --- NEW AMENDMENT: New function to create and send the special chat message ---
-    private fun sendMessageWithPost(recipientId: String, post: Post) {
+    private fun updateLastMessage(chatId: String, content: String, timestamp: Long) {
+        // update chat last
         val myUid = auth.currentUser?.uid ?: return
-        // Determine a consistent chat room ID between the two users
-        val chatRoomId = if (myUid > recipientId) "$myUid-$recipientId" else "$recipientId-$myUid"
-        val messageRef = db.child("chats").child(chatRoomId).push()
+        val chatsRef = db.child("chats").child(chatId)
+
+        val chatData = mapOf(
+            "lastMessage" to content,
+            "lastMessageTimestamp" to timestamp,
+            "lastMessageSenderId" to myUid
+        )
+        chatsRef.updateChildren(chatData)
+    }
+
+    private fun sendMessageWithPost(recipientId: String, post: Post) {
+        // send message new
+        val myUid = auth.currentUser?.uid ?: return
+
+        val chatId = if (myUid < recipientId) {
+            "${myUid}_${recipientId}"
+        } else {
+            "${recipientId}_${myUid}"
+        }
+
+        val messageRef = db.child("messages").child(chatId).push()
+        val messageId = messageRef.key ?: return
+        val timestamp = System.currentTimeMillis()
 
         val message = Message(
-            messageId = messageRef.key!!,
+            messageId = messageId,
             senderId = myUid,
-            //text = "Check out this post!", // Default text for a shared post
-            timestamp = System.currentTimeMillis(),
-            messageType = "post", // Special type to identify this message
-            //sharedPostId = post.postId,
-            imageUrl = post.imageUrl // Include image URL for a quick preview in chat
+            receiverId = recipientId,
+            messageType = "post",
+            content = "Shared a post",
+            imageUrl = post.imageUrl.ifEmpty { post.imageBase64 },
+            postId = post.postId,
+            timestamp = timestamp,
+            isEdited = false,
+            isDeleted = false,
+            editableUntil = 0
         )
 
         messageRef.setValue(message).addOnSuccessListener {
             Toast.makeText(this, "Post sent!", Toast.LENGTH_SHORT).show()
+
+            updateLastMessage(chatId, "📝 Shared a post", timestamp)
+
+        }.addOnFailureListener { e ->
+            android.util.Log.e("home_page", "Failed to send message: ${e.message}")
+            Toast.makeText(this, "Failed to send: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
 
     private fun setupClickListeners() {
+        // make buttons work
         findViewById<ImageView>(R.id.heart).setOnClickListener {
             startActivity(Intent(this, following_page::class.java))
         }
@@ -221,44 +235,41 @@ class home_page : AppCompatActivity() {
     }
 
     override fun onStart() {
+        // when resume page
         super.onStart()
-        // Refresh stories and feed whenever we (re)enter this screen.
         loadStories()
         loadFeed()
         setupCallListener()
     }
 
     override fun onStop() {
+        // when page stop
         super.onStop()
-        // Detach post listeners per UID
         postChildListeners.forEach { (uid, listener) ->
             db.child("posts").child(uid).removeEventListener(listener)
         }
         postChildListeners.clear()
 
-        // Detach per-post likes listeners
         likeListeners.forEach { (postId, listener) ->
             db.child("postLikes").child(postId).removeEventListener(listener)
         }
         likeListeners.clear()
 
-        // Detach per-post comment preview listeners
         commentPreviewListeners.forEach { (postId, listener) ->
             db.child("postComments").child(postId).removeEventListener(listener)
         }
         commentPreviewListeners.clear()
     }
 
-    // ---------------- STORIES (No changes to this function) ----------------
+
     private fun loadStories() {
+        // get stories from db
         val uid = auth.currentUser?.uid ?: return
         storyList.clear()
 
-        // Load current user's profile first
         db.child("users").child(uid).get().addOnSuccessListener { snapshot ->
             val myName = snapshot.child("username").getValue(String::class.java) ?: "You"
 
-            // Try multiple field names for profile picture
             val myPic = snapshot.child("profilePictureUrl").getValue(String::class.java)
                 ?: snapshot.child("profileImage").getValue(String::class.java)
                 ?: snapshot.child("profileImageUrl").getValue(String::class.java)
@@ -268,13 +279,11 @@ class home_page : AppCompatActivity() {
             storyList.add(0, StoryBubble(uid, myName, myPic))
             storyAdapter.notifyDataSetChanged()
 
-            // Load profile picture in bottom nav
 
         }.addOnFailureListener { e ->
             android.util.Log.e("home_page", "Failed to load user data: ${e.message}")
         }
 
-        // Load following users' stories
         db.child("users").child(uid).child("following")
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
@@ -283,7 +292,6 @@ class home_page : AppCompatActivity() {
                         db.child("users").child(friendUid).get().addOnSuccessListener { userSnap ->
                             val uname = userSnap.child("username").getValue(String::class.java) ?: "User"
 
-                            // Try multiple field names for profile picture
                             val pfp = userSnap.child("profilePictureUrl").getValue(String::class.java)
                                 ?: userSnap.child("profileImage").getValue(String::class.java)
                                 ?: userSnap.child("profileImageUrl").getValue(String::class.java)
@@ -299,8 +307,7 @@ class home_page : AppCompatActivity() {
             })
     }
 
-    // ---------------- Your existing StoryAdapter, no changes made ----------------
-    // Update your StoryAdapter's onBindViewHolder method
+
     inner class StoryAdapter(private val items: List<StoryBubble>, private val currentUid: String) :
         RecyclerView.Adapter<StoryAdapter.StoryVH>() {
 
@@ -308,12 +315,14 @@ class home_page : AppCompatActivity() {
             RecyclerView.ViewHolder(binding.root)
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): StoryVH {
+            // make story view
             val inflater = layoutInflater
             val binding = ItemStoryBubbleBinding.inflate(inflater, parent, false)
             return StoryVH(binding)
         }
 
         override fun onBindViewHolder(holder: StoryVH, position: Int) {
+            // put data in story view
             val item = items[position]
             holder.binding.username.text = item.username
 
@@ -343,31 +352,26 @@ class home_page : AppCompatActivity() {
             }
         }
 
-        override fun getItemCount() = items.size
+        override fun getItemCount(): Int {
+            // how many story
+            return items.size
+        }
     }
 
-
-    // ---------------- ALL CODE BELOW THIS LINE IS YOUR EXISTING, UNCHANGED LOGIC ----------------
-
-
     private fun loadFeed() {
+        // get feed posts
         val myUid = auth.currentUser?.uid ?: return
 
-        // Clear existing posts and adapter
         currentPosts.clear()
         postAdapter.submitList(emptyList())
 
-        // Read from following/{currentUserId}/
         db.child("following").child(myUid)
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     val uids = mutableListOf<String>()
 
-                    // Add current user's UID first (to show own posts)
                     uids.add(myUid)
 
-                    // Add all following UIDs
-                    // Structure is: following/{myUid}/{followedUserId}: true
                     for (c in snapshot.children) {
                         val followedUid = c.key
                         val isFollowing = c.getValue(Boolean::class.java) ?: false
@@ -381,7 +385,6 @@ class home_page : AppCompatActivity() {
                     android.util.Log.d("home_page", "Total users to load posts from: ${uids.size}")
                     android.util.Log.d("home_page", "UIDs: $uids")
 
-                    // Only proceed if we have at least the current user
                     if (uids.isEmpty()) {
                         android.util.Log.w("home_page", "No users to load posts from")
                         currentPosts.clear()
@@ -389,14 +392,12 @@ class home_page : AppCompatActivity() {
                         return
                     }
 
-                    // Load posts from these users only
                     readPostsFor(uids)
                     attachRealtimeFeed(uids)
                 }
 
                 override fun onCancelled(error: DatabaseError) {
                     android.util.Log.e("home_page", "Failed to load following list: ${error.message}")
-                    // Still show own posts if following list fails to load
                     readPostsFor(listOf(myUid))
                     attachRealtimeFeed(listOf(myUid))
                 }
@@ -404,6 +405,7 @@ class home_page : AppCompatActivity() {
     }
 
     private fun readPostsFor(uids: List<String>) {
+        // read post for user
         val collected = mutableListOf<Post>()
         val remaining = uids.toMutableSet()
         if (uids.isEmpty()) {
@@ -430,6 +432,7 @@ class home_page : AppCompatActivity() {
     }
 
     private fun fetchInitialCommentsAndShow(posts: MutableList<Post>) {
+        // get comment and show
         if (posts.isEmpty()) {
             currentPosts.clear()
             postAdapter.submitList(emptyList())
@@ -483,6 +486,7 @@ class home_page : AppCompatActivity() {
     }
 
     private fun attachRealtimeFeed(uids: List<String>) {
+        // listen for new post
         watchingUids = uids
 
         for (u in uids) {
@@ -517,6 +521,7 @@ class home_page : AppCompatActivity() {
     }
 
     private fun upsertPost(p: Post) {
+        // add or change post
         val idx = currentPosts.indexOfFirst { it.postId == p.postId }
         if (idx >= 0) currentPosts[idx] = p else currentPosts.add(p)
         currentPosts.sortByDescending { it.createdAt }
@@ -524,6 +529,7 @@ class home_page : AppCompatActivity() {
     }
 
     private fun attachRealtimeFor(p: Post) {
+        // listen for like comment
         val myUid = auth.currentUser?.uid ?: return
 
         if (!likeListeners.containsKey(p.postId)) {
@@ -563,6 +569,7 @@ class home_page : AppCompatActivity() {
     }
 
     private fun detachRealtimeFor(postId: String) {
+        // stop listen
         likeListeners.remove(postId)?.let {
             db.child("postLikes").child(postId).removeEventListener(it)
         }
@@ -572,6 +579,7 @@ class home_page : AppCompatActivity() {
     }
 
     private fun toggleLike(post: Post, wantLike: Boolean) {
+        // like or unlike
         val myUid = auth.currentUser?.uid ?: return
         val likeRef = db.child("postLikes").child(post.postId).child(myUid)
 
@@ -598,10 +606,9 @@ class home_page : AppCompatActivity() {
             })
     }
 
-    // --- NOTE: These functions are no longer called from the adapter, ---
-    // --- but I'll leave them in case they are used elsewhere. ---
-    // --- Logic would move to PostDetailActivity ---
+
     private fun showAddCommentDialog(post: Post) {
+        // show box for comment
         val input = android.widget.EditText(this).apply {
             hint = "Write a comment…"
             setPadding(24, 24, 24, 24)
@@ -619,6 +626,7 @@ class home_page : AppCompatActivity() {
     }
 
     private fun addComment(post: Post, text: String) {
+        // put comment in db
         val myUid = auth.currentUser?.uid ?: return
         db.child("users").child(myUid).child("username")
             .addListenerForSingleValueEvent(object : ValueEventListener {
@@ -661,6 +669,7 @@ class home_page : AppCompatActivity() {
     }
 
     private fun decodeBase64ToBitmap(raw: String?): Bitmap? {
+        // string to image
         if (raw.isNullOrBlank()) return null
         val clean = raw.substringAfter("base64,", raw)
         return try {
@@ -672,6 +681,7 @@ class home_page : AppCompatActivity() {
     }
 
     private fun setupCallListener() {
+        // listen for call
         val currentUser = FirebaseAuth.getInstance().currentUser
         if (currentUser == null) {
             android.util.Log.e("home_page", "No current user for call listener")
@@ -686,22 +696,21 @@ class home_page : AppCompatActivity() {
         }
     }
 
-    /**
-     * Show incoming call screen
-     */
+
     private fun showIncomingCall(callId: String, callerName: String, isVideoCall: Boolean) {
+        // show call screen
         val intent = Intent(this, IncomingCallActivity::class.java).apply {
             putExtra("CALL_ID", callId)
             putExtra("CALLER_NAME", callerName)
             putExtra("IS_VIDEO_CALL", isVideoCall)
-            // These flags ensure the incoming call appears on top
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         startActivity(intent)
     }
-    //notifs
+
 
     private fun getFcmToken() {
+        // get notif token
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
                 Log.e("FCM", "Failed to get token", task.exception)
@@ -721,6 +730,7 @@ class home_page : AppCompatActivity() {
 
 
     private fun requestNotificationPermission() {
+        // ask for notif
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     this,
@@ -736,15 +746,15 @@ class home_page : AppCompatActivity() {
         }
     }
 
-    // --- MODIFICATION: Added onPostClick parameter ---
+
     inner class PostAdapter(
         private val currentUid: String,
         private val onLikeToggle: (post: Post, liked: Boolean) -> Unit,
         private val onCommentClick: (post: Post) -> Unit,
         private val onSendClick: (post: Post) -> Unit,
-        private val onPostClick: (post: Post) -> Unit // <-- ADDED
+        private val onPostClick: (post: Post) -> Unit
     ) : RecyclerView.Adapter<PostAdapter.PostVH>() {
-        // --- END MODIFICATION ---
+
 
         private val items = mutableListOf<Post>()
         private val likeState = mutableMapOf<String, Boolean>()
@@ -753,30 +763,35 @@ class home_page : AppCompatActivity() {
         private val commentTotals = mutableMapOf<String, Int>()
 
         fun submitList(list: List<Post>) {
+            // new list for adapter
             items.clear()
             items.addAll(list)
             notifyDataSetChanged()
         }
 
         fun setLikeCount(postId: String, count: Int) {
+            // set like number
             likeCounts[postId] = count
             val idx = items.indexOfFirst { it.postId == postId }
             if (idx >= 0) notifyItemChanged(idx)
         }
 
         fun setLiked(postId: String, liked: Boolean) {
+            // set if liked
             likeState[postId] = liked
             val idx = items.indexOfFirst { it.postId == postId }
             if (idx >= 0) notifyItemChanged(idx)
         }
 
         fun setCommentPreview(postId: String, comments: List<Comment>) {
+            // show comment preview
             commentPreviews[postId] = comments
             val idx = items.indexOfFirst { it.postId == postId }
             if (idx >= 0) notifyItemChanged(idx)
         }
 
         fun setCommentTotal(postId: String, total: Int) {
+            // set total comment
             commentTotals[postId] = total
             val idx = items.indexOfFirst { it.postId == postId }
             if (idx >= 0) notifyItemChanged(idx)
@@ -793,16 +808,18 @@ class home_page : AppCompatActivity() {
             val tvC2: TextView = v.findViewById(R.id.tvComment2)
             val tvViewAll: TextView = v.findViewById(R.id.tvViewAll)
             val commentBtn: ImageView = v.findViewById(R.id.btnComment)
-            val sendBtn: ImageView = v.findViewById(R.id.btnShare) // Added send button
+            val sendBtn: ImageView = v.findViewById(R.id.btnShare)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PostVH {
+            // make post view
             val v = LayoutInflater.from(parent.context).inflate(R.layout.item_post, parent, false)
             return PostVH(v)
         }
 
         @SuppressLint("RecyclerView", "SetTextI18n")
         override fun onBindViewHolder(h: PostVH, position: Int) {
+            // put data in post view
             val item = items[position]
 
             val shownName = if (item.username.isNotBlank()) item.username
@@ -886,15 +903,18 @@ class home_page : AppCompatActivity() {
                 onLikeToggle(item, wantLike)
             }
 
-            // --- MODIFICATION: Set click listeners ---
+
             h.postImage.setOnClickListener { onPostClick(item) }
             h.tvCaption.setOnClickListener { onPostClick(item) }
             h.commentBtn.setOnClickListener { onCommentClick(item) }
             h.tvViewAll.setOnClickListener { onCommentClick(item) }
             h.sendBtn.setOnClickListener { onSendClick(item) }
-            // --- END MODIFICATION ---
+
         }
 
-        override fun getItemCount() = items.size
+        override fun getItemCount(): Int {
+            // how many post
+            return items.size
+        }
     }
 }
