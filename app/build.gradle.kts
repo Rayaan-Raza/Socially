@@ -44,7 +44,8 @@ android {
 }
 
 dependencies {
-
+    // For Kotlin + Coroutines
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
     implementation("com.android.volley:volley:1.2.1")
     implementation("androidx.gridlayout:gridlayout:1.0.0")
     implementation("io.agora.rtc:full-sdk:4.2.6") // Or the latest 3.x version for stability

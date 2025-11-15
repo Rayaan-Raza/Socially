@@ -14,18 +14,7 @@ import androidx.core.view.WindowInsetsCompat
 // REMOVED: import com.google.firebase.auth.FirebaseAuth
 
 // CHANGED: Central place for your SharedPreferences keys
-object AppGlobals {
-    const val PREFS_NAME = "SociallyPrefs"
-    const val KEY_USER_UID = "user_uid"
-    const val KEY_USERNAME = "username"
-    const val KEY_PROFILE_COMPLETE = "profile_complete" // ADDED THIS
 
-    // TODO: Replace with your actual server URL from Dev A
-    const val BASE_URL = "https://YOUR_SUBDOMAIN.infinityfreeapp.com/"
-
-    // SET THIS TO TRUE TO TEST WITHOUT A REAL BACKEND
-    const val IS_TESTING_MODE = true
-}
 
 class login_sign : AppCompatActivity() {
 
