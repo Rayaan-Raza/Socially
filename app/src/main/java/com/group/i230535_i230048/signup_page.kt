@@ -2,6 +2,7 @@ package com.group.i230535_i230048
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Context // CHANGED: Added for SharedPreferences
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
@@ -16,13 +17,19 @@ import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
+// CHANGED: Added Volley and JSON imports
+import com.android.volley.Request
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
+import org.json.JSONObject
+// REMOVED: Firebase imports
+// import com.google.firebase.auth.FirebaseAuth
+// import com.google.firebase.database.FirebaseDatabase
 import java.io.ByteArrayOutputStream
 
 class signup_page : AppCompatActivity() {
 
-    private lateinit var auth: FirebaseAuth
+    // REMOVED: private lateinit var auth: FirebaseAuth
     private lateinit var profileCircle: FrameLayout
     private lateinit var profileImage: ImageView
     private var selectedImageBase64: String? = null
@@ -34,7 +41,7 @@ class signup_page : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_signup_page)
 
-        auth = FirebaseAuth.getInstance()
+        // REMOVED: auth = FirebaseAuth.getInstance()
 
         findViewById<ImageView>(R.id.left_arrow).setOnClickListener {
             startActivity(Intent(this, login_sign::class.java))
@@ -44,7 +51,6 @@ class signup_page : AppCompatActivity() {
         profileCircle = findViewById(R.id.Profile_circle)
         profileImage = findViewById(R.id.profile_image)
 
-        // Click profile circle to pick image
         profileCircle.setOnClickListener {
             val intent = Intent(Intent.ACTION_PICK)
             intent.type = "image/*"
@@ -72,86 +78,78 @@ class signup_page : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            auth.createUserWithEmailAndPassword(email, pass)
-                .addOnSuccessListener { result ->
-                    val uid = result.user?.uid
-                    if (uid == null) {
-                        Toast.makeText(this, "Signup failed: UID missing.", Toast.LENGTH_LONG).show()
-                        return@addOnSuccessListener
-                    }
+            // --- CHANGED: Replaced entire Firebase block with Volley ---
 
-                    val profile = HashMap<String, Any>()
-                    profile["uid"] = uid
-                    profile["username"] = username
-                    profile["firstName"] = first
-                    profile["lastName"] = last
-                    profile["fullName"] = "$first $last"
-                    profile["dob"] = dob
-                    profile["email"] = email
-                    profile["bio"] = "Hey there! I'm using Socially"
-                    profile["website"] = ""
-                    profile["phoneNumber"] = ""
-                    profile["gender"] = ""
-                    profile["createdAt"] = System.currentTimeMillis()
-                    profile["profileCompleted"] = true
+            val queue = Volley.newRequestQueue(this)
+            val url = AppGlobals.BASE_URL + "signup.php" // [cite: 151-154]
 
-                    // Online/Offline Status
-                    profile["isOnline"] = true
-                    profile["lastSeen"] = System.currentTimeMillis()
+            val stringRequest = object : StringRequest(
+                Request.Method.POST,
+                url,
+                { response ->
+                    // Success listener
+                    try {
+                        val jsonResponse = JSONObject(response)
+                        val success = jsonResponse.getBoolean("success") // [cite: 111, 116]
 
-                    // FCM Token - will be updated later when you add FCM
-                    profile["fcmToken"] = ""
-
-                    // Follow System Counters
-                    profile["followersCount"] = 0
-                    profile["followingCount"] = 0
-                    profile["postsCount"] = 0
-
-                    // Privacy Settings
-                    profile["accountPrivate"] = false
-
-                    // Profile Picture
-                    if (selectedImageBase64 != null) {
-                        profile["profilePictureUrl"] = selectedImageBase64!!
-                        profile["photo"] = selectedImageBase64!!
-                    } else {
-                        profile["profilePictureUrl"] = ""
-                        profile["photo"] = ""
-                    }
-
-                    FirebaseDatabase.getInstance().getReference("users")
-                        .child(uid)
-                        .setValue(profile)
-                        .addOnSuccessListener {
-                            // Set user as online
-                            setUserOnlineStatus(uid, true)
-
+                        if (success) {
                             Toast.makeText(this, "Account created!", Toast.LENGTH_SHORT).show()
+
+                            // Parse the user data from response
+                            val userObject = jsonResponse.getJSONObject("data") // [cite: 113, 177]
+                            val uid = userObject.getString("uid") // [cite: 123]
+                            val newUsername = userObject.getString("username") // [cite: 126]
+
+                            // Save session to log the user in
+                            val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
+                            prefs.edit().putString(AppGlobals.KEY_USER_UID, uid).apply()
+                            prefs.edit().putString(AppGlobals.KEY_USERNAME, newUsername).apply()
+
+                            // Go to home page
                             startActivity(Intent(this, home_page::class.java))
                             finish()
+
+                        } else {
+                            // API returned an error (e.g., "Email or username already in use")
+                            val message = jsonResponse.getString("message") // [cite: 112, 186, 191]
+                            Toast.makeText(this, "Signup failed: $message", Toast.LENGTH_LONG).show()
                         }
-                        .addOnFailureListener { e ->
-                            Toast.makeText(this, "Failed to save profile: ${e.message}", Toast.LENGTH_LONG).show()
-                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(this, "Error parsing response: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                },
+                { error ->
+                    // Network error listener
+                    Toast.makeText(this, "Network error: ${error.message}", Toast.LENGTH_LONG).show()
+                }) {
+
+                // Override getParams to send data as x-www-form-urlencoded
+                override fun getParams(): MutableMap<String, String> {
+                    val params = HashMap<String, String>()
+                    params["email"] = email       // [cite: 159]
+                    params["password"] = pass     // [cite: 160]
+                    params["username"] = username // [cite: 161]
+                    params["firstName"] = first   // [cite: 162]
+                    params["lastName"] = last     // [cite: 163]
+                    params["dob"] = dob           // [cite: 164]
+
+                    // Add optional profile picture if user selected one
+                    selectedImageBase64?.let {
+                        params["profilePictureBase64"] = it // [cite: 171]
+                    }
+                    return params
                 }
-                .addOnFailureListener { e ->
-                    Toast.makeText(this, "Signup failed: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+            }
+            // Add the request to the queue
+            queue.add(stringRequest)
+            // --- END OF CHANGED BLOCK ---
         }
     }
 
-    // Set user online status
-    private fun setUserOnlineStatus(uid: String, isOnline: Boolean) {
-        val statusMap = HashMap<String, Any>()
-        statusMap["isOnline"] = isOnline
-        statusMap["lastSeen"] = System.currentTimeMillis()
+    // REMOVED: setUserOnlineStatus function (backend handles this)
 
-        FirebaseDatabase.getInstance().getReference("users")
-            .child(uid)
-            .updateChildren(statusMap)
-    }
-
-    // Image picker result
+    // This image picker logic is perfect, no changes needed.
+    // It already provides the Base64 string that the API needs.
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
 
@@ -170,9 +168,9 @@ class signup_page : AppCompatActivity() {
         }
     }
 
-    // Convert bitmap → Base64 string
     private fun encodeImage(bitmap: Bitmap): String {
         val output = ByteArrayOutputStream()
+        // Reduced quality to 50 to avoid request payload being too large
         bitmap.compress(Bitmap.CompressFormat.JPEG, 50, output)
         val imageBytes = output.toByteArray()
         return Base64.encodeToString(imageBytes, Base64.DEFAULT)

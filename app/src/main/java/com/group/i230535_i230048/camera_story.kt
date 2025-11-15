@@ -1,18 +1,28 @@
 package com.group.i230535_i230048
 
+import android.content.Context
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.util.Base64
+import android.util.Log
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
+import com.android.volley.Request
+import com.android.volley.RequestQueue
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
+import com.bumptech.glide.Glide
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import org.json.JSONObject
 
 class camera_story : AppCompatActivity() {
+
+    private lateinit var queue: RequestQueue
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,64 +34,78 @@ class camera_story : AppCompatActivity() {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+
+        queue = Volley.newRequestQueue(this)
+
         val img = findViewById<ImageView>(R.id.storyImage)
         val close = findViewById<ImageView>(R.id.closeBtn)
         close.setOnClickListener { finish() }
 
-        // If you want to open someone else’s story, pass "uid" in the intent.
-        val targetUid = intent.getStringExtra("uid")
-            ?: FirebaseAuth.getInstance().currentUser?.uid
-            ?: run {
-                Toast.makeText(this, "Not logged in.", Toast.LENGTH_SHORT).show()
-                finish(); return
-            }
+        val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
+        val myUid = prefs.getString(AppGlobals.KEY_USER_UID, "") ?: ""
 
-        val ref = FirebaseDatabase.getInstance()
-            .getReference("stories")
-            .child(targetUid)
+        val targetUid = intent.getStringExtra("uid") ?: myUid
 
-        ref.get()
-            .addOnSuccessListener { snapshot ->
-                val now = System.currentTimeMillis()
+        if (targetUid.isEmpty()) {
+            Toast.makeText(this, "Not logged in.", Toast.LENGTH_SHORT).show()
+            finish(); return
+        }
 
-                // Find the latest (max createdAt) story that hasn't expired.
-                var bestBase64: String? = null
-                var bestCreatedAt = Long.MIN_VALUE
+        val url = AppGlobals.BASE_URL + "get_stories.php?user_id=$targetUid"
 
-                for (storySnap in snapshot.children) {
-                    val expiresAt = storySnap.child("expiresAt").getValue(Long::class.java) ?: 0L
-                    val createdAt = storySnap.child("createdAt").getValue(Long::class.java) ?: 0L
-                    val base64 = storySnap.child("imageBase64").getValue(String::class.java)
-
-                    if (expiresAt > now && !base64.isNullOrEmpty() && createdAt > bestCreatedAt) {
-                        bestCreatedAt = createdAt
-                        bestBase64 = base64
-                    }
-                }
-
-                if (bestBase64 == null) {
-                    Toast.makeText(this, "No active stories!", Toast.LENGTH_SHORT).show()
-                    finish()
-                    return@addOnSuccessListener
-                }
-
+        val stringRequest = StringRequest(Request.Method.GET, url,
+            { response ->
                 try {
-                    // We encoded with NO_WRAP; decode the same way.
-                    val bytes = Base64.decode(bestBase64, Base64.NO_WRAP)
-                    val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    if (bmp != null) {
-                        img.setImageBitmap(bmp)
+                    val json = JSONObject(response)
+                    if (json.getBoolean("success")) {
+                        val dataArray = json.getJSONArray("data")
+
+                        // --- CORRECTED: Use your Story_data class ---
+                        val listType = object : TypeToken<List<Story_data>>() {}.type
+                        val stories: List<Story_data> = Gson().fromJson(dataArray.toString(), listType)
+                        // ---
+
+                        // Replicate original logic: Find latest, unexpired story
+                        val now = System.currentTimeMillis()
+
+                        // --- CORRECTED: Use properties from Story_data ---
+                        val latestStory = stories
+                            .filter { it.expiresAt > now }
+                            .maxByOrNull { it.createdAt }
+                        // ---
+
+                        if (latestStory == null) {
+                            Toast.makeText(this, "No active stories!", Toast.LENGTH_SHORT).show()
+                            finish()
+                            return@StringRequest
+                        }
+
+                        // --- CORRECTED: Only use mediaUrl ---
+                        if (latestStory.mediaUrl.isNotEmpty()) {
+                            // Your Story_data model only has mediaUrl, so we use Glide
+                            Glide.with(this).load(latestStory.mediaUrl).into(img)
+                        } else {
+                            // The model does not have Base64, so this is an error
+                            throw Exception("Story media is empty")
+                        }
+                        // ---
+
                     } else {
-                        Toast.makeText(this, "Corrupt image data.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "No active stories!", Toast.LENGTH_SHORT).show()
                         finish()
                     }
                 } catch (e: Exception) {
-                    Toast.makeText(this, "Error decoding image.", Toast.LENGTH_SHORT).show()
+                    Log.e("camera_story", "Error parsing stories: ${e.message}")
+                    Toast.makeText(this, "Error loading story.", Toast.LENGTH_SHORT).show()
                     finish()
                 }
+            },
+            { error ->
+                Log.e("camera_story", "Volley error: ${error.message}")
+                Toast.makeText(this, "Failed to load story.", Toast.LENGTH_LONG).show()
+                finish()
             }
-            .addOnFailureListener { e ->
-                Toast.makeText(this, "Failed to load story: ${e.message}", Toast.LENGTH_LONG).show()
-            }
+        )
+        queue.add(stringRequest)
     }
 }

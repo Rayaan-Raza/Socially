@@ -1,11 +1,18 @@
 package com.group.i230535_i230048
 
 import android.annotation.SuppressLint
+import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
+import android.database.sqlite.SQLiteDatabase
 import android.graphics.BitmapFactory
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Build
 import android.os.Bundle
 import android.text.format.DateUtils
 import android.util.Base64
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,20 +20,29 @@ import android.widget.*
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.android.volley.Request
+import com.android.volley.RequestQueue
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
 import com.bumptech.glide.Glide
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.*
+import com.group.i230535_i230048.AppDbHelper
+import com.group.i230535_i230048.DB
+import org.json.JSONObject
 import java.util.UUID
 
 class GotoPostActivity : AppCompatActivity() {
 
-    private val db = FirebaseDatabase.getInstance().reference
-    private val auth = FirebaseAuth.getInstance()
-    private val myUid = auth.currentUser?.uid ?: ""
+    // --- Local DB, Volley, and Session ---
+    private lateinit var dbHelper: AppDbHelper
+    private lateinit var queue: RequestQueue
+    private var myUid: String = ""
+    private var myUsername: String = ""
+    // ---
 
     private var postId: String? = null
     private var postUserId: String? = null
@@ -48,10 +64,7 @@ class GotoPostActivity : AppCompatActivity() {
     private lateinit var commentAdapter: CommentAdapter
     private val commentList = mutableListOf<Comment>()
 
-    private var likeListener: ValueEventListener? = null
-    private var commentsListener: ValueEventListener? = null
-    private var postListener: ValueEventListener? = null
-   private val selectFriendLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+    private val selectFriendLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
             val selectedUserId = result.data?.getStringExtra("SELECTED_USER_ID")
             if (selectedUserId != null && currentPost != null) {
@@ -66,11 +79,19 @@ class GotoPostActivity : AppCompatActivity() {
         setContentView(R.layout.activity_goto_post)
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, 0) // No bottom padding
-            // Adjust input bar for keyboard
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, 0)
             findViewById<View>(R.id.comment_input_bar).setPadding(0, 0, 0, systemBars.bottom)
             insets
         }
+
+        // --- Setup DB, Volley, and Session ---
+        dbHelper = AppDbHelper(this)
+        queue = Volley.newRequestQueue(this)
+
+        val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
+        myUid = prefs.getString(AppGlobals.KEY_USER_UID, "") ?: ""
+        myUsername = prefs.getString(AppGlobals.KEY_USERNAME, "user") ?: "user"
+        // ---
 
         postId = intent.getStringExtra("POST_ID")
         postUserId = intent.getStringExtra("USER_ID")
@@ -85,8 +106,9 @@ class GotoPostActivity : AppCompatActivity() {
         setupRecyclerView()
         setupClickListeners()
 
-        loadPostData()
-        attachRealtimeListeners()
+        // --- New loading flow ---
+        loadPostDataFromDb() // Load from local DB first
+        fetchPostDetailsFromApi() // Then refresh from network
     }
 
     private fun initializeViews() {
@@ -116,235 +138,372 @@ class GotoPostActivity : AppCompatActivity() {
         btnPostComment.setOnClickListener { postComment() }
     }
 
-    private fun loadPostData() {
-        postListener = db.child("posts").child(postUserId!!).child(postId!!)
-            .addValueEventListener(object : ValueEventListener {
-                @SuppressLint("SetTextI18n")
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val post = snapshot.getValue(Post::class.java)
-                    if (post == null) {
-                        Toast.makeText(this@GotoPostActivity, "This post may have been deleted.", Toast.LENGTH_SHORT).show()
-                        finish()
-                        return
-                    }
-                    currentPost = post // Save for sharing
+    // --- Load data from local SQLite DB ---
+    private fun loadPostDataFromDb() {
+        val db = dbHelper.readableDatabase
+        val cursor = db.query(
+            DB.Post.TABLE_NAME, null,
+            "${DB.Post.COLUMN_POST_ID} = ?", arrayOf(postId),
+            null, null, null
+        )
 
-                    // --- Populate Views ---
-                    tvUsername.text = post.username
-                    tvCaption.text = "${post.username}  ${post.caption}"
-                    imgAvatar.loadUserAvatar(post.uid, myUid, R.drawable.oval)
+        if (cursor.moveToFirst()) {
+            val post = Post(
+                postId = cursor.getString(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_POST_ID)),
+                uid = cursor.getString(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_UID)),
+                username = cursor.getString(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_USERNAME)),
+                caption = cursor.getString(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_CAPTION)),
+                imageUrl = cursor.getString(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_IMAGE_URL)),
+                imageBase64 = cursor.getString(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_IMAGE_BASE64)),
+                createdAt = cursor.getLong(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_CREATED_AT)),
+                likeCount = cursor.getLong(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_LIKE_COUNT)),
+                commentCount = cursor.getLong(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_COMMENT_COUNT))
+            )
+            currentPost = post // Save for sharing
+            populatePostViews(post) // Update UI
+        }
+        cursor.close()
 
-                    if (post.imageUrl.isNotEmpty()) {
-                        Glide.with(this@GotoPostActivity).load(post.imageUrl).placeholder(R.drawable.person1).into(imgPost)
-                    } else if (post.imageBase64.isNotEmpty()) {
-                        decodeBase64ToBitmap(post.imageBase64)?.let { imgPost.setImageBitmap(it) }
-                    } else {
-                        imgPost.setImageResource(R.drawable.person1)
-                    }
-                }
-                override fun onCancelled(error: DatabaseError) {}
-            })
+        // Also load comments from DB
+        loadCommentsFromDb()
     }
 
-    private fun attachRealtimeListeners() {
-        // (Your existing listeners are fine)
-        // 1. Like Listener
-        val likeRef = db.child("postLikes").child(postId!!)
-        likeListener = object : ValueEventListener {
-            @SuppressLint("SetTextI18n")
-            override fun onDataChange(s: DataSnapshot) {
-                val count = s.childrenCount.toInt()
-                val iLike = s.child(myUid).getValue(Boolean::class.java) == true
-                tvLikes.text = if (count == 1) "1 like" else "$count likes"
-                btnLike.setImageResource(if (iLike) R.drawable.liked else R.drawable.like)
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        }
-        likeRef.addValueEventListener(likeListener!!)
+    // --- Populate UI with Post object ---
+    @SuppressLint("SetTextI18n")
+    private fun populatePostViews(post: Post) {
+        tvUsername.text = post.username
+        tvCaption.text = "${post.username}  ${post.caption}"
 
-        // 2. Comments Listener
-        val commentsRef = db.child("postComments").child(postId!!).orderByChild("createdAt")
-        commentsListener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                commentList.clear()
-                for (child in snapshot.children) {
-                    child.getValue(Comment::class.java)?.let { commentList.add(it) }
-                }
-                commentAdapter.notifyDataSetChanged()
-                // Scroll to bottom if we're at the bottom
-                rvComments.post {
-                    rvComments.smoothScrollToPosition(commentAdapter.itemCount - 1)
-                }
-            }
-            override fun onCancelled(error: DatabaseError) {}
+        // This now uses the migrated loadUserAvatar function
+        imgAvatar.loadUserAvatar(post.uid, myUid, R.drawable.oval)
+
+        if (post.imageUrl.isNotEmpty()) {
+            Glide.with(this@GotoPostActivity).load(post.imageUrl).placeholder(R.drawable.person1).into(imgPost)
+        } else if (post.imageBase64.isNotEmpty()) {
+            decodeBase64ToBitmap(post.imageBase64)?.let { imgPost.setImageBitmap(it) }
+        } else {
+            imgPost.setImageResource(R.drawable.person1)
         }
-        commentsRef.addValueEventListener(commentsListener!!)
     }
 
+    // --- Fetch fresh data from API ---
+    private fun fetchPostDetailsFromApi() {
+        if (!isNetworkAvailable(this)) {
+            Log.d("GotoPost", "Offline, skipping API refresh.")
+            return
+        }
+
+        // 1. Fetch Post
+        val postUrl = AppGlobals.BASE_URL + "get_post.php?post_id=$postId&user_id=$myUid"
+        val postRequest = StringRequest(Request.Method.GET, postUrl,
+            { response ->
+                try {
+                    val json = JSONObject(response)
+                    if (json.getBoolean("success")) {
+                        val postObj = json.getJSONObject("data")
+                        val cv = ContentValues()
+                        cv.put(DB.Post.COLUMN_POST_ID, postObj.getString("postId"))
+                        cv.put(DB.Post.COLUMN_UID, postObj.getString("uid"))
+                        cv.put(DB.Post.COLUMN_USERNAME, postObj.getString("username"))
+                        cv.put(DB.Post.COLUMN_CAPTION, postObj.getString("caption"))
+                        cv.put(DB.Post.COLUMN_IMAGE_URL, postObj.getString("imageUrl"))
+                        cv.put(DB.Post.COLUMN_CREATED_AT, postObj.getLong("createdAt"))
+                        cv.put(DB.Post.COLUMN_LIKE_COUNT, postObj.getLong("likeCount"))
+                        cv.put(DB.Post.COLUMN_COMMENT_COUNT, postObj.getLong("commentCount"))
+                        dbHelper.writableDatabase.insertWithOnConflict(DB.Post.TABLE_NAME, null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+
+                        loadPostDataFromDb() // Reload from DB to update UI
+
+                        val isLiked = postObj.optBoolean("isLikedByCurrentUser", false)
+                        btnLike.setImageResource(if (isLiked) R.drawable.liked else R.drawable.like)
+                        tvLikes.text = "${postObj.getLong("likeCount")} likes"
+                    }
+                } catch (e: Exception) { Log.e("GotoPost", "Error parsing post: ${e.message}") }
+            },
+            { error -> Log.e("GotoPost", "Volley error fetching post: ${error.message}") }
+        )
+        queue.add(postRequest)
+
+        // 2. Fetch Comments
+        fetchCommentsFromApi()
+    }
+
+    private fun fetchCommentsFromApi() {
+        val commentsUrl = AppGlobals.BASE_URL + "get_comments.php?post_id=$postId"
+        val commentsRequest = StringRequest(Request.Method.GET, commentsUrl,
+            { response ->
+                try {
+                    val json = JSONObject(response)
+                    if (json.getBoolean("success")) {
+                        val dataArray = json.getJSONArray("data")
+                        val db = dbHelper.writableDatabase
+
+                        db.delete(DB.Comment.TABLE_NAME, "${DB.Comment.COLUMN_POST_ID} = ?", arrayOf(postId))
+
+                        db.beginTransaction()
+                        try {
+                            for (i in 0 until dataArray.length()) {
+                                val commentObj = dataArray.getJSONObject(i)
+                                val cv = ContentValues()
+                                cv.put(DB.Comment.COLUMN_COMMENT_ID, commentObj.getString("commentId"))
+                                cv.put(DB.Comment.COLUMN_POST_ID, commentObj.getString("postId"))
+                                cv.put(DB.Comment.COLUMN_UID, commentObj.getString("uid"))
+                                cv.put(DB.Comment.COLUMN_USERNAME, commentObj.getString("username"))
+                                cv.put(DB.Comment.COLUMN_TEXT, commentObj.getString("text"))
+                                cv.put(DB.Comment.COLUMN_CREATED_AT, commentObj.getLong("createdAt"))
+                                db.insert(DB.Comment.TABLE_NAME, null, cv)
+                            }
+                            db.setTransactionSuccessful()
+                        } finally {
+                            db.endTransaction()
+                        }
+                        loadCommentsFromDb()
+                    }
+                } catch (e: Exception) { Log.e("GotoPost", "Error parsing comments: ${e.message}") }
+            },
+            { error -> Log.e("GotoPost", "Volley error fetching comments: ${error.message}") }
+        )
+        queue.add(commentsRequest)
+    }
+
+    private fun loadCommentsFromDb() {
+        val db = dbHelper.readableDatabase
+        commentList.clear()
+        val cursor = db.query(
+            DB.Comment.TABLE_NAME, null,
+            "${DB.Comment.COLUMN_POST_ID} = ?", arrayOf(postId),
+            null, null, DB.Comment.COLUMN_CREATED_AT + " ASC"
+        )
+        while (cursor.moveToNext()) {
+            commentList.add(
+                Comment(
+                    commentId = cursor.getString(cursor.getColumnIndexOrThrow(DB.Comment.COLUMN_COMMENT_ID)),
+                    postId = cursor.getString(cursor.getColumnIndexOrThrow(DB.Comment.COLUMN_POST_ID)),
+                    uid = cursor.getString(cursor.getColumnIndexOrThrow(DB.Comment.COLUMN_UID)),
+                    username = cursor.getString(cursor.getColumnIndexOrThrow(DB.Comment.COLUMN_USERNAME)),
+                    text = cursor.getString(cursor.getColumnIndexOrThrow(DB.Comment.COLUMN_TEXT)),
+                    createdAt = cursor.getLong(cursor.getColumnIndexOrThrow(DB.Comment.COLUMN_CREATED_AT))
+                )
+            )
+        }
+        cursor.close()
+        commentAdapter.notifyDataSetChanged()
+        rvComments.post {
+            rvComments.smoothScrollToPosition(commentAdapter.itemCount - 1)
+        }
+    }
+
+    // --- CORRECTED: Migrated to Volley + Offline Queue ---
     private fun toggleLike() {
+        // Create a local, non-nullable variable *before* the StringRequest
+        val localPostId = postId
+        if (localPostId == null) {
+            Toast.makeText(this, "Error: Post ID is missing", Toast.LENGTH_SHORT).show()
+            return
+        }
         if (currentPost == null) return
-        val likeRef = db.child("postLikes").child(postId!!).child(myUid)
 
-        // Run transaction to get current state
-        likeRef.addListenerForSingleValueEvent(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val wantLike = snapshot.getValue(Boolean::class.java) != true
+        // Optimistic UI update
+        val currentLikeRes = btnLike.drawable.constantState
+        val wantLike = currentLikeRes != ContextCompat.getDrawable(this, R.drawable.liked)?.constantState
+        btnLike.setImageResource(if (wantLike) R.drawable.liked else R.drawable.like)
 
-                // Update like status
-                if (wantLike) likeRef.setValue(true) else likeRef.removeValue()
+        val action = if (wantLike) "like" else "unlike"
 
-                // Update like count on post
-                val likeCountRef = db.child("posts").child(postUserId!!).child(postId!!).child("likeCount")
-                likeCountRef.runTransaction(object : Transaction.Handler {
-                    override fun doTransaction(cur: MutableData): Transaction.Result {
-                        val c = (cur.getValue(Long::class.java) ?: 0L)
-                        cur.value = (c + if (wantLike) 1L else -1L).coerceAtLeast(0L)
-                        return Transaction.success(cur)
-                    }
-                    override fun onComplete(e: DatabaseError?, committed: Boolean, snap: DataSnapshot?) {}
-                })
+        val payload = JSONObject()
+        payload.put("post_id", localPostId)
+        payload.put("user_id", myUid)
+        payload.put("action", action)
+
+        if (isNetworkAvailable(this)) {
+            val url = AppGlobals.BASE_URL + "like_post.php"
+            val stringRequest = object : StringRequest(Request.Method.POST, url,
+                { response ->
+                    Log.d("GotoPost", "Like action successful")
+                    fetchPostDetailsFromApi() // Refresh to get new count
+                },
+                { error ->
+                    Log.e("GotoPost", "Volley error liking: ${error.message}")
+                    saveToSyncQueue("like_post.php", payload)
+                }) {
+                override fun getParams(): MutableMap<String, String> {
+                    val params = HashMap<String, String>()
+                    params["post_id"] = localPostId // Use local var
+                    params["user_id"] = myUid
+                    params["action"] = action
+                    return params
+                }
             }
-            override fun onCancelled(error: DatabaseError) {}
-        })
+            queue.add(stringRequest)
+        } else {
+            saveToSyncQueue("like_post.php", payload)
+        }
     }
 
-    // --- MODIFIED ---
     private fun sharePost() {
         if (currentPost == null) {
             Toast.makeText(this, "Cannot share post, data not loaded.", Toast.LENGTH_SHORT).show()
             return
         }
-
-        // Launch dms.kt INSTEAD of SelectFriendActivity
         val intent = Intent(this, dms::class.java)
-
-        // Add extras to tell dms.kt it's in "share mode"
         intent.putExtra("ACTION_MODE", "SHARE")
-        // No need to pass post data, we already have it in this activity.
-        // We just need the selected user ID back.
-
-        // Use the launcher
         selectFriendLauncher.launch(intent)
     }
 
-    // --- THIS IS THE FIXED FUNCTION FROM OUR PREVIOUS CONVERSATION ---
+    // --- CORRECTED: Migrated to Volley + Offline Queue ---
     private fun sendMessageWithPost(recipientId: String, post: Post) {
-        // Use the correct Chat ID format (with underscore)
-        val chatId = if (myUid < recipientId) {
-            "${myUid}_${recipientId}"
-        } else {
-            "${recipientId}_${myUid}"
+        // Create a local, non-nullable variable
+        val localPostId = postId
+        if (localPostId == null) {
+            Toast.makeText(this, "Error: Post ID is missing", Toast.LENGTH_SHORT).show()
+            return
         }
 
-        // Write to the "messages" node
-        val messageRef = db.child("messages").child(chatId).push()
-        val messageId = messageRef.key ?: return // Safe check
         val timestamp = System.currentTimeMillis()
+        val payload = JSONObject()
+        payload.put("sender_id", myUid)
+        payload.put("receiver_id", recipientId)
+        payload.put("message_type", "post")
+        payload.put("content", "Shared a post")
+        payload.put("post_id", localPostId) // Use local var
+        payload.put("timestamp", timestamp)
 
-        // --- THIS IS THE FIX ---
-        // We must use 'this.postId!!' (the class variable) instead of 'post.postId'
-        // 'this.postId' is guaranteed to be non-null from the check in onCreate.
-        val message = Message(
-            messageId = messageId,
-            senderId = myUid,
-            receiverId = recipientId,
-            messageType = "post",
-            content = "Shared a post",
-            imageUrl = post.imageUrl.ifEmpty { post.imageBase64 },
-            postId = this.postId!!,  // <-- THE FIX
-            timestamp = timestamp,
-            isEdited = false,
-            isDeleted = false,
-            editableUntil = 0
-        )
-        // --- END OF FIX ---
-
-        messageRef.setValue(message).addOnSuccessListener {
-            Toast.makeText(this, "Post sent!", Toast.LENGTH_SHORT).show()
-
-            // Also update the "lastMessage" in the "chats" node
-            updateLastMessage(chatId, "📝 Shared a post", timestamp)
-
-        }.addOnFailureListener { e ->
-            // If it still fails, this will tell you why
-            android.util.Log.e("GotoPostActivity", "Failed to send message: ${e.message}")
-            Toast.makeText(this, "Failed to send: ${e.message}", Toast.LENGTH_SHORT).show()
+        if (isNetworkAvailable(this)) {
+            val url = AppGlobals.BASE_URL + "send_message.php"
+            val stringRequest = object : StringRequest(Request.Method.POST, url,
+                { response ->
+                    try {
+                        val json = JSONObject(response)
+                        if (json.getBoolean("success")) {
+                            Toast.makeText(this, "Post sent!", Toast.LENGTH_SHORT).show()
+                            // TODO: Save sent message to local DB
+                        } else {
+                            Toast.makeText(this, "Failed to send: ${json.getString("message")}", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) { Log.e("GotoPost", "Error parsing send_message: ${e.message}") }
+                },
+                { error ->
+                    Log.e("GotoPost", "Volley error send_message: ${error.message}")
+                    saveToSyncQueue("send_message.php", payload)
+                }) {
+                override fun getParams(): MutableMap<String, String> {
+                    val params = HashMap<String, String>()
+                    params["sender_id"] = myUid
+                    params["receiver_id"] = recipientId
+                    params["message_type"] = "post"
+                    params["content"] = "Shared a post"
+                    params["post_id"] = localPostId // Use local var
+                    return params
+                }
+            }
+            queue.add(stringRequest)
+        } else {
+            saveToSyncQueue("send_message.php", payload)
         }
     }
 
-    // --- HELPER FUNCTION FOR sendMessageWithPost ---
-    private fun updateLastMessage(chatId: String, content: String, timestamp: Long) {
-        val chatsRef = db.child("chats").child(chatId)
-
-        // This ensures the chat exists in the chat list
-        val chatData = mapOf(
-            "lastMessage" to content,
-            "lastMessageTimestamp" to timestamp,
-            "lastMessageSenderId" to myUid
-        )
-        chatsRef.updateChildren(chatData)
-    }
-
-
+    // --- CORRECTED: Migrated to Volley + Offline Queue ---
     private fun postComment() {
+        // Create a local, non-nullable variable
+        val localPostId = postId
+        if (localPostId == null) {
+            Toast.makeText(this, "Error: Post ID is missing", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         val text = etCommentInput.text.toString().trim()
-        if (text.isEmpty()) {
-            return
-        }
-        if (currentPost == null) {
-            Toast.makeText(this, "Cannot comment, post not loaded.", Toast.LENGTH_SHORT).show()
-            return
-        }
+        if (text.isEmpty()) return
+        if (currentPost == null) return
 
         btnPostComment.isEnabled = false
         etCommentInput.isEnabled = false
 
-        db.child("users").child(myUid).child("username")
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(s: DataSnapshot) {
-                    val uname = (s.getValue(String::class.java) ?: "user").ifBlank { "user" }
-                    val commentId = UUID.randomUUID().toString()
-                    val comment = Comment(
-                        commentId = commentId,
-                        postId = postId!!,
-                        uid = myUid,
-                        username = uname,
-                        text = text,
-                        createdAt = System.currentTimeMillis()
-                    )
+        val commentId = UUID.randomUUID().toString()
+        val timestamp = System.currentTimeMillis()
 
-                    db.child("postComments").child(postId!!).child(commentId).setValue(comment)
-                        .addOnSuccessListener {
-                            // Clear input
+        val payload = JSONObject()
+        payload.put("post_id", localPostId)
+        payload.put("user_id", myUid)
+        payload.put("text", text)
+        payload.put("commentId", commentId) // Send local ID for tracking
+        payload.put("username", myUsername)
+        payload.put("createdAt", timestamp)
+
+        if (isNetworkAvailable(this)) {
+            val url = AppGlobals.BASE_URL + "add_comment.php"
+            val stringRequest = object : StringRequest(Request.Method.POST, url,
+                { response ->
+                    try {
+                        val json = JSONObject(response)
+                        if (json.getBoolean("success")) {
+                            val commentObj = json.getJSONObject("data")
+                            saveCommentToDb(
+                                commentObj.getString("commentId"),
+                                commentObj.getString("postId"),
+                                commentObj.getString("uid"),
+                                commentObj.getString("username"),
+                                commentObj.getString("text"),
+                                commentObj.getLong("createdAt")
+                            )
                             etCommentInput.text.clear()
-                            etCommentInput.isEnabled = true
-                            btnPostComment.isEnabled = true
-                            // Update comment count
-                            updateCommentCount()
+                            loadCommentsFromDb()
+                        } else {
+                            Toast.makeText(this@GotoPostActivity, "Failed to post comment: ${json.getString("message")}", Toast.LENGTH_SHORT).show()
                         }
-                        .addOnFailureListener {
-                            Toast.makeText(this@GotoPostActivity, "Failed to post comment.", Toast.LENGTH_SHORT).show()
-                            etCommentInput.isEnabled = true
-                            btnPostComment.isEnabled = true
-                        }
-                }
-                override fun onCancelled(error: DatabaseError) {
-                    Toast.makeText(this@GotoPostActivity, "Failed to get user data.", Toast.LENGTH_SHORT).show()
+                    } catch (e: Exception) {
+                        Log.e("GotoPost", "Error parsing add_comment: ${e.message}")
+                    } finally {
+                        etCommentInput.isEnabled = true
+                        btnPostComment.isEnabled = true
+                    }
+                },
+                { error ->
+                    Log.e("GotoPost", "Volley error add_comment: ${error.message}")
+                    saveToSyncQueue("add_comment.php", payload)
+                    // Optimistic update for offline error
+                    saveCommentToDb(commentId, localPostId, myUid, myUsername, text, timestamp)
+                    etCommentInput.text.clear()
+                    loadCommentsFromDb()
                     etCommentInput.isEnabled = true
                     btnPostComment.isEnabled = true
+                }) {
+                override fun getParams(): MutableMap<String, String> {
+                    val params = HashMap<String, String>()
+                    params["post_id"] = localPostId // Use local var
+                    params["user_id"] = myUid
+                    params["text"] = text
+                    return params
                 }
-            })
+            }
+            queue.add(stringRequest)
+        } else {
+            // Offline - Save to queue
+            saveToSyncQueue("add_comment.php", payload)
+
+            // Optimistic UI: Add to local DB immediately
+            saveCommentToDb(commentId, localPostId, myUid, myUsername, text, timestamp)
+            etCommentInput.text.clear()
+            loadCommentsFromDb()
+
+            etCommentInput.isEnabled = true
+            btnPostComment.isEnabled = true
+        }
     }
 
-    private fun updateCommentCount() {
-        val ref = db.child("posts").child(postUserId!!).child(postId!!).child("commentCount")
-        ref.runTransaction(object : Transaction.Handler {
-            override fun doTransaction(cur: MutableData): Transaction.Result {
-                cur.value = ((cur.getValue(Long::class.java) ?: 0L) + 1L)
-                return Transaction.success(cur)
-            }
-            override fun onComplete(e: DatabaseError?, committed: Boolean, s: DataSnapshot?) {}
-        })
+    // --- NEW: Helper to save comment to DB ---
+    private fun saveCommentToDb(id: String, postId: String, uid: String, username: String, text: String, timestamp: Long) {
+        try {
+            val cv = ContentValues()
+            cv.put(DB.Comment.COLUMN_COMMENT_ID, id)
+            cv.put(DB.Comment.COLUMN_POST_ID, postId)
+            cv.put(DB.Comment.COLUMN_UID, uid)
+            cv.put(DB.Comment.COLUMN_USERNAME, username)
+            cv.put(DB.Comment.COLUMN_TEXT, text)
+            cv.put(DB.Comment.COLUMN_CREATED_AT, timestamp)
+            dbHelper.writableDatabase.insertWithOnConflict(DB.Comment.TABLE_NAME, null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+        } catch (e: Exception) {
+            Log.e("GotoPost", "Error saving comment to DB: ${e.message}")
+        }
     }
 
     private fun decodeBase64ToBitmap(raw: String?): android.graphics.Bitmap? {
@@ -358,10 +517,48 @@ class GotoPostActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Detach listeners to prevent memory leaks
-        postListener?.let { db.child("posts").child(postUserId!!).child(postId!!).removeEventListener(it) }
-        likeListener?.let { db.child("postLikes").child(postId!!).removeEventListener(it) }
-        commentsListener?.let { db.child("postComments").child(postId!!).removeEventListener(it) }
+        // No listeners to detach
+    }
+
+    // --- HELPER FUNCTIONS FOR OFFLINE QUEUE & NETWORK ---
+
+    private fun saveToSyncQueue(endpoint: String, payload: JSONObject) {
+        Log.d("GotoPost", "Saving to sync queue. Endpoint: $endpoint")
+        try {
+            val db = dbHelper.writableDatabase
+            val cv = ContentValues()
+            cv.put(DB.SyncQueue.COLUMN_ENDPOINT, endpoint)
+            cv.put(DB.SyncQueue.COLUMN_PAYLOAD, payload.toString())
+            cv.put(DB.SyncQueue.COLUMN_STATUS, "PENDING")
+            db.insert(DB.SyncQueue.TABLE_NAME, null, cv)
+
+            runOnUiThread {
+                Toast.makeText(this, "Offline. Action will sync later.", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Log.e("GotoPost", "Failed to save to sync queue: ${e.message}")
+        }
+    }
+
+    private fun isNetworkAvailable(context: Context): Boolean {
+        val connectivityManager =
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val network = connectivityManager.activeNetwork ?: return false
+            val activeNetwork =
+                connectivityManager.getNetworkCapabilities(network) ?: return false
+            return when {
+                activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> true
+                activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> true
+                activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> true
+                else -> false
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            val networkInfo = connectivityManager.activeNetworkInfo ?: return false
+            @Suppress("DEPRECATION")
+            return networkInfo.isConnected
+        }
     }
 
     // --- Inner Adapter for Comments ---
@@ -382,11 +579,7 @@ class GotoPostActivity : AppCompatActivity() {
         @SuppressLint("SetTextI18n")
         override fun onBindViewHolder(h: CommentVH, position: Int) {
             val comment = comments[position]
-
-            // Set text with username
             h.text.text = "${comment.username}  ${comment.text}"
-
-            // Set relative timestamp
             val timeAgo = DateUtils.getRelativeTimeSpanString(
                 comment.createdAt,
                 System.currentTimeMillis(),
@@ -394,7 +587,7 @@ class GotoPostActivity : AppCompatActivity() {
             )
             h.timestamp.text = timeAgo
 
-            // Load avatar
+            // This now uses the migrated loadUserAvatar function
             h.avatar.loadUserAvatar(comment.uid, myUid, R.drawable.oval)
         }
 

@@ -1,8 +1,12 @@
 package com.group.i230535_i230048
 
 import android.app.Activity
+import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
+import android.database.sqlite.SQLiteDatabase
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
@@ -13,22 +17,30 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.*
+import com.android.volley.Request
+import com.android.volley.RequestQueue
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
+// REMOVED: All Firebase imports
+import com.google.gson.Gson // CHANGED: Added Gson to parse the API response
+import com.google.gson.reflect.TypeToken // CHANGED: Added for Gson list parsing
+import com.group.i230535_i230048.AppDbHelper
+import com.group.i230535_i230048.DB
+import org.json.JSONObject
 
 class dms : AppCompatActivity() {
 
-    private lateinit var auth: FirebaseAuth
-    private lateinit var database: FirebaseDatabase
+    // --- CHANGED: Removed Firebase, added Volley, DB, and session ---
+    private lateinit var dbHelper: AppDbHelper
+    private lateinit var queue: RequestQueue
+    private var currentUserId: String = ""
+    // ---
+
     private lateinit var recyclerView: RecyclerView
     private lateinit var chatAdapter: ChatAdapter
     private lateinit var noChatsMessage: TextView
 
     private val chatList = mutableListOf<ChatSession>()
-    private var currentUserId: String = ""
-
-    // --- NEW ---
-    // Variables to check if we are sharing
     private var isShareMode = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,152 +54,187 @@ class dms : AppCompatActivity() {
             insets
         }
 
-        auth = FirebaseAuth.getInstance()
-        database = FirebaseDatabase.getInstance()
+        // --- CHANGED: Setup DB, Volley, and Session ---
+        dbHelper = AppDbHelper(this)
+        queue = Volley.newRequestQueue(this)
 
-        val currentUser = auth.currentUser
-        if (currentUser == null) {
+        val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
+        currentUserId = prefs.getString(AppGlobals.KEY_USER_UID, "") ?: ""
+
+        if (currentUserId.isEmpty()) {
             Toast.makeText(this, "You must be logged in.", Toast.LENGTH_LONG).show()
             finish()
             return
         }
-        currentUserId = currentUser.uid
+        // ---
 
-        // --- NEW ---
-        // Check if we were started in "share mode"
         if (intent.getStringExtra("ACTION_MODE") == "SHARE") {
             isShareMode = true
-            findViewById<TextView>(R.id.title)?.text = "Share to..." // Optional: Change title
+            findViewById<TextView>(R.id.title)?.text = "Share to..."
         }
-        // --- END NEW ---
 
         setupRecyclerView()
-        loadChats()
-
         findViewById<ImageView>(R.id.back)?.setOnClickListener { finish() }
     }
 
-    // --- MODIFIED ---
+    override fun onStart() {
+        super.onStart()
+        // --- CHANGED: Offline-first loading ---
+        loadChatsFromDb()
+        fetchChatsFromApi()
+    }
+
     private fun setupRecyclerView() {
         recyclerView = findViewById(R.id.chatsRecyclerView)
         noChatsMessage = findViewById(R.id.no_chats_message)
         recyclerView.layoutManager = LinearLayoutManager(this)
 
-        // Pass the new click handler to the adapter
         chatAdapter = ChatAdapter(chatList, currentUserId) { clickedChat ->
-            // This 'clickedChat' is the ChatSession object
             if (isShareMode) {
-                // If sharing, send the result back
                 handleShareClick(clickedChat)
             } else {
-                // If not sharing, open the chat
                 handleNormalClick(clickedChat)
             }
         }
         recyclerView.adapter = chatAdapter
     }
 
-    // --- NEW ---
-    // This is the new logic for "share mode"
     private fun handleShareClick(chat: ChatSession) {
-        val otherUserId = chat.participants.keys.firstOrNull { it != currentUserId }
-        if (otherUserId == null) {
+        // CHANGED: Logic is simpler, 'otherUser' is now directly on the chat object
+        val otherUser = chat.getOtherUser(currentUserId)
+        if (otherUser == null) {
             Toast.makeText(this, "Error selecting chat.", Toast.LENGTH_SHORT).show()
             return
         }
 
-        // Create a result intent and put the recipient's ID in it
         val resultIntent = Intent()
-        resultIntent.putExtra("SELECTED_USER_ID", otherUserId)
+        resultIntent.putExtra("SELECTED_USER_ID", otherUser.uid)
         setResult(Activity.RESULT_OK, resultIntent)
-
-        // Close this activity and return to GotoPostActivity
         finish()
     }
 
-    // --- NEW ---
-    // This is the original logic for opening a chat
     private fun handleNormalClick(chat: ChatSession) {
-        val otherUserId = chat.participants.keys.firstOrNull { it != currentUserId }
-        if (otherUserId == null) {
+        // CHANGED: Logic is simpler, 'otherUser' is now directly on the chat object
+        val otherUser = chat.getOtherUser(currentUserId)
+        if (otherUser == null) {
             Toast.makeText(this, "Error opening chat.", Toast.LENGTH_SHORT).show()
             return
         }
 
-        // We need the other user's name to pass to ChatActivity
-        database.getReference("users").child(otherUserId).child("username")
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val username = snapshot.getValue(String::class.java) ?: "User"
-                    val intent = Intent(this@dms, ChatActivity::class.java)
-                    intent.putExtra("userId", otherUserId)
-                    intent.putExtra("username", username)
-                    startActivity(intent)
-                }
-                override fun onCancelled(error: DatabaseError) {
-                    Toast.makeText(this@dms, "Could not load user data.", Toast.LENGTH_SHORT).show()
-                }
-            })
+        // We already have the username, no need to fetch it.
+        val intent = Intent(this@dms, ChatActivity::class.java)
+        intent.putExtra("userId", otherUser.uid)
+        intent.putExtra("username", otherUser.username)
+        startActivity(intent)
     }
 
-    // --- MODIFIED ---
-    // Removed currentUserId param since it's a class variable now
-    private fun loadChats() {
-        val chatsRef = database.getReference("chats")
+    // --- NEW: Load chat list from local SQLite DB ---
+    private fun loadChatsFromDb() {
+        Log.d("DMS", "Loading chats from local DB...")
+        chatList.clear()
+        val db = dbHelper.readableDatabase
+        val cursor = db.query(
+            DB.ChatSessionInfo.TABLE_NAME, null, null, null, null, null,
+            DB.ChatSessionInfo.COLUMN_LAST_MESSAGE_TIMESTAMP + " DESC"
+        )
 
-        chatsRef.addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                chatList.clear()
-                android.util.Log.d("DMS_DEBUG", "=== Starting to load chats ===")
+        while (cursor.moveToNext()) {
+            // Re-construct the ChatSession object from our denormalized table
+            val otherUserId = cursor.getString(cursor.getColumnIndexOrThrow(DB.ChatSessionInfo.COLUMN_OTHER_USER_ID))
+            val otherUser = User(
+                uid = otherUserId,
+                username = cursor.getString(cursor.getColumnIndexOrThrow(DB.ChatSessionInfo.COLUMN_OTHER_USERNAME)),
+                profilePictureUrl = cursor.getString(cursor.getColumnIndexOrThrow(DB.ChatSessionInfo.COLUMN_OTHER_PIC_URL))
+            )
 
-                var chatsAdded = 0
-                for (chatSnapshot in snapshot.children) {
-                    try {
-                        val chatId = chatSnapshot.key ?: ""
-                        val lastMessage = chatSnapshot.child("lastMessage").getValue(String::class.java) ?: ""
-                        val lastMessageTimestamp = chatSnapshot.child("lastMessageTimestamp").getValue(Long::class.java) ?: 0L
-                        val lastMessageSenderId = chatSnapshot.child("lastMessageSenderId").getValue(String::class.java) ?: ""
+            chatList.add(
+                ChatSession(
+                    chatId = cursor.getString(cursor.getColumnIndexOrThrow(DB.ChatSessionInfo.COLUMN_CHAT_ID)),
+                    participants = listOf(currentUserId, otherUserId),
+                    participantDetails = listOf(otherUser), // Only need the other user
+                    lastMessage = cursor.getString(cursor.getColumnIndexOrThrow(DB.ChatSessionInfo.COLUMN_LAST_MESSAGE)),
+                    lastMessageTimestamp = cursor.getLong(cursor.getColumnIndexOrThrow(DB.ChatSessionInfo.COLUMN_LAST_MESSAGE_TIMESTAMP)),
+                    lastMessageSenderId = cursor.getString(cursor.getColumnIndexOrThrow(DB.ChatSessionInfo.COLUMN_LAST_MESSAGE_SENDER_ID))
+                )
+            )
+        }
+        cursor.close()
+        chatAdapter.notifyDataSetChanged()
 
-                        val participantsSnapshot = chatSnapshot.child("participants")
-                        val participant0 = participantsSnapshot.child("0").getValue(String::class.java)?.trim() ?: ""
-                        val participant1 = participantsSnapshot.child("1").getValue(String::class.java)?.trim() ?: ""
+        updateNoChatsMessage()
+    }
 
-                        if (participant0.isNotEmpty() && participant1.isNotEmpty() &&
-                            (participant0 == currentUserId || participant1 == currentUserId)) {
+    // --- NEW: Fetch chat list from API ---
+    private fun fetchChatsFromApi() {
+        Log.d("DMS", "Fetching chats from API...")
+        val url = AppGlobals.BASE_URL + "get_chats.php?user_id=$currentUserId" // (from ApiService.kt)
 
-                            val participantsMap = hashMapOf(participant0 to true, participant1 to true)
-                            val chat = ChatSession(
-                                chatId = chatId,
-                                participants = participantsMap,
-                                lastMessage = lastMessage,
-                                lastMessageTimestamp = lastMessageTimestamp,
-                                lastMessageSenderId = lastMessageSenderId
-                            )
-                            chatList.add(chat)
-                            chatsAdded++
-                        }
-                    } catch (e: Exception) {
-                        android.util.Log.e("DMS_ERROR", "Error processing chat: ${e.message}", e)
+        val stringRequest = StringRequest(Request.Method.GET, url,
+            { response ->
+                try {
+                    val json = JSONObject(response)
+                    if (json.getBoolean("success")) {
+                        val dataArray = json.getJSONArray("data")
+
+                        // Use Gson to parse the JSON array into a List<ChatSession>
+                        val listType = object : TypeToken<List<ChatSession>>() {}.type
+                        val sessions: List<ChatSession> = Gson().fromJson(dataArray.toString(), listType)
+
+                        saveChatsToDb(sessions) // Save to SQLite
+                        loadChatsFromDb() // Reload from DB to refresh UI
+
+                    } else {
+                        Log.w("DMS", "API error fetching chats: ${json.getString("message")}")
                     }
+                } catch (e: Exception) {
+                    Log.e("DMS", "Error parsing chat list: ${e.message}")
                 }
-
-                android.util.Log.d("DMS_DEBUG", "Chats added for this user: $chatsAdded")
-                chatList.sortByDescending { it.lastMessageTimestamp }
-                chatAdapter.notifyDataSetChanged()
-
-                if (chatList.isEmpty()) {
-                    recyclerView.visibility = View.GONE
-                    noChatsMessage.visibility = View.VISIBLE
-                } else {
-                    recyclerView.visibility = View.VISIBLE
-                    noChatsMessage.visibility = View.GONE
-                }
+            },
+            { error ->
+                Log.e("DMS", "Volley error fetching chats: ${error.message}")
             }
+        )
+        queue.add(stringRequest)
+    }
 
-            override fun onCancelled(error: DatabaseError) {
-                Toast.makeText(this@dms, "Failed to load chats: ${error.message}", Toast.LENGTH_LONG).show()
-                android.util.Log.e("DMS_ERROR", "Database error: ${error.message}")
+    // --- NEW: Helper to save API response to DB ---
+    private fun saveChatsToDb(sessions: List<ChatSession>) {
+        val db = dbHelper.writableDatabase
+        db.beginTransaction()
+        try {
+            // Clear old chat list
+            db.delete(DB.ChatSessionInfo.TABLE_NAME, null, null)
+
+            for (session in sessions) {
+                val otherUser = session.getOtherUser(currentUserId) ?: continue // Skip if no other user
+
+                val cv = ContentValues()
+                cv.put(DB.ChatSessionInfo.COLUMN_CHAT_ID, session.chatId)
+                cv.put(DB.ChatSessionInfo.COLUMN_OTHER_USER_ID, otherUser.uid)
+                cv.put(DB.ChatSessionInfo.COLUMN_OTHER_USERNAME, otherUser.username)
+                cv.put(DB.ChatSessionInfo.COLUMN_OTHER_PIC_URL, otherUser.profilePictureUrl)
+                cv.put(DB.ChatSessionInfo.COLUMN_LAST_MESSAGE, session.lastMessage)
+                cv.put(DB.ChatSessionInfo.COLUMN_LAST_MESSAGE_TIMESTAMP, session.lastMessageTimestamp)
+                cv.put(DB.ChatSessionInfo.COLUMN_LAST_MESSAGE_SENDER_ID, session.lastMessageSenderId)
+
+                db.insert(DB.ChatSessionInfo.TABLE_NAME, null, cv)
             }
-        })
+            db.setTransactionSuccessful()
+        } catch (e: Exception) {
+            Log.e("DMS", "Error saving chats to DB: ${e.message}")
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    // --- NEW: Helper to update empty message ---
+    private fun updateNoChatsMessage() {
+        if (chatList.isEmpty()) {
+            recyclerView.visibility = View.GONE
+            noChatsMessage.visibility = View.VISIBLE
+        } else {
+            recyclerView.visibility = View.VISIBLE
+            noChatsMessage.visibility = View.GONE
+        }
     }
 }

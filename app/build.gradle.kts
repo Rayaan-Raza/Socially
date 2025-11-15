@@ -45,7 +45,7 @@ android {
 
 dependencies {
 
-
+    implementation("com.android.volley:volley:1.2.1")
     implementation("androidx.gridlayout:gridlayout:1.0.0")
     implementation("io.agora.rtc:full-sdk:4.2.6") // Or the latest 3.x version for stability
     implementation("io.agora.rtm:rtm-sdk:2.2.4")   // For signaling (optional but recommended)

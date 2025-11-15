@@ -11,7 +11,7 @@ const serviceAccount = JSON.parse(fs.readFileSync("./serviceAccountKey.json", "u
 // Initialize Firebase Admin SDK
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: "your-socially-firebase-database-link",
+  databaseURL: "https://socially-5a61a-default-rtdb.firebaseio.com/",
 });
 
 const db = admin.database();

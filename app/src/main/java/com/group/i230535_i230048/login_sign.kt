@@ -1,6 +1,7 @@
 package com.group.i230535_i230048
 
 import android.annotation.SuppressLint
+import android.content.Context // CHANGED: Added for SharedPreferences
 import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
@@ -10,20 +11,38 @@ import com.google.android.material.button.MaterialButton
 import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.google.firebase.auth.FirebaseAuth
+// REMOVED: import com.google.firebase.auth.FirebaseAuth
+
+// CHANGED: Central place for your SharedPreferences keys
+object AppGlobals {
+    const val PREFS_NAME = "SociallyPrefs"
+    const val KEY_USER_UID = "user_uid"
+    const val KEY_USERNAME = "username"
+    const val KEY_PROFILE_COMPLETE = "profile_complete" // ADDED THIS
+
+    // TODO: Replace with your actual server URL from Dev A
+    const val BASE_URL = "https://YOUR_SUBDOMAIN.infinityfreeapp.com/"
+
+    // SET THIS TO TRUE TO TEST WITHOUT A REAL BACKEND
+    const val IS_TESTING_MODE = true
+}
 
 class login_sign : AppCompatActivity() {
 
-    private lateinit var auth: FirebaseAuth
+    // REMOVED: private lateinit var auth: FirebaseAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_login_sign)
 
-        auth = FirebaseAuth.getInstance()
+        // REMOVED: auth = FirebaseAuth.getInstance()
 
-        if (auth.currentUser != null) {
+        // CHANGED: Session check now uses SharedPreferences
+        val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
+        val savedUid = prefs.getString(AppGlobals.KEY_USER_UID, null)
+
+        if (savedUid != null) {
             startActivity(Intent(this, home_page::class.java))
             finish()
             return
@@ -35,9 +54,8 @@ class login_sign : AppCompatActivity() {
             insets
         }
 
-        // NOTE: log_in is a MaterialButton in XML; use MaterialButton type
+        // NOTE: This logic remains the same. It just navigates.
         findViewById<MaterialButton>(R.id.log_in).setOnClickListener {
-            // No cached user → go to actual email/password screen
             startActivity(Intent(this, switch_account::class.java))
         }
 

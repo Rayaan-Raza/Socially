@@ -1,32 +1,50 @@
 package com.group.i230535_i230048
 
 import android.Manifest
+import android.content.ContentValues // CHANGED
+import android.content.Context // CHANGED
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.net.ConnectivityManager // CHANGED
+import android.net.NetworkCapabilities // CHANGED
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
+import android.util.Base64 // CHANGED
+import android.util.Log // CHANGED
 import android.widget.Toast
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
-import java.io.File
-import java.io.ByteArrayOutputStream
-import android.graphics.Bitmap
-import android.graphics.ImageDecoder
-import android.provider.MediaStore // <- only used on API < 28 (suppressed)
-import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.android.volley.Request // CHANGED
+import com.android.volley.RequestQueue // CHANGED
+import com.android.volley.toolbox.StringRequest // CHANGED
+import com.android.volley.toolbox.Volley // CHANGED
+// REMOVED: Firebase imports
+import com.group.i230535_i230048.AppDbHelper // CHANGED
+import com.group.i230535_i230048.DB // CHANGED
+import org.json.JSONObject // CHANGED
+import java.io.ByteArrayOutputStream
+import java.io.File
 
 class camera_activiy : AppCompatActivity() {
 
     private var tempCameraUri: Uri? = null
     private var tempFile: File? = null
 
-    // CAMERA permission
+    // --- CHANGED: Added Volley, DB, and session ---
+    private lateinit var queue: RequestQueue
+    private lateinit var dbHelper: AppDbHelper
+    private var currentUserId: String = ""
+    // ---
+
+    // (No changes to permission request)
     private val requestCameraPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) launchCamera()
@@ -36,11 +54,12 @@ class camera_activiy : AppCompatActivity() {
             }
         }
 
-    // Take a picture into our Uri
+    // (No changes to takePicture launcher)
     private val takePicture =
         registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
             if (success && tempCameraUri != null) {
-                uploadStoryToRealtimeDB(tempCameraUri!!)
+                // CHANGED: Call new Volley upload function
+                uploadStoryVolley(tempCameraUri!!)
             } else {
                 Toast.makeText(this, "Camera cancelled.", Toast.LENGTH_SHORT).show()
                 finish()
@@ -49,22 +68,23 @@ class camera_activiy : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // setContentView(R.layout.activity_camera_activiy) // optional
+        // setContentView(R.layout.activity_camera_activiy) // No layout needed
 
         enableEdgeToEdge()
 
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
-        }
-        // Must be logged in
-        if (FirebaseAuth.getInstance().currentUser?.uid == null) {
+        // --- CHANGED: Setup Volley, DB, and Session ---
+        queue = Volley.newRequestQueue(this)
+        dbHelper = AppDbHelper(this)
+
+        val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
+        currentUserId = prefs.getString(AppGlobals.KEY_USER_UID, "") ?: ""
+
+        if (currentUserId.isEmpty()) {
             Toast.makeText(this, "Please log in first.", Toast.LENGTH_SHORT).show()
             finish(); return
         }
+        // ---
 
-        // Prepare temp Uri
         tempCameraUri = createTempImageUri()
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
@@ -77,6 +97,7 @@ class camera_activiy : AppCompatActivity() {
     }
 
     private fun launchCamera() {
+        // (No changes here)
         val uri = tempCameraUri
         if (uri == null) {
             Toast.makeText(this, "Could not create image file.", Toast.LENGTH_LONG).show()
@@ -86,6 +107,7 @@ class camera_activiy : AppCompatActivity() {
     }
 
     private fun createTempImageUri(): Uri? {
+        // (No changes here)
         return try {
             val imagesDir = File(cacheDir, "images").apply { if (!exists()) mkdirs() }
             tempFile = File(imagesDir, "STORY_${System.currentTimeMillis()}.jpg")
@@ -99,10 +121,11 @@ class camera_activiy : AppCompatActivity() {
         }
     }
 
-    private fun uploadStoryToRealtimeDB(localUri: Uri) {
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+    // --- CHANGED: Replaced 'uploadStoryToRealtimeDB' with 'uploadStoryVolley' ---
+    private fun uploadStoryVolley(localUri: Uri) {
+        val uid = currentUserId
 
-        // 1) Decode bitmap from URI
+        // 1) Decode bitmap from URI (Your existing logic is perfect)
         val bitmap = try {
             if (Build.VERSION.SDK_INT >= 28) {
                 val src = ImageDecoder.createSource(contentResolver, localUri)
@@ -116,7 +139,7 @@ class camera_activiy : AppCompatActivity() {
             finish(); return
         }
 
-        // 2) Downscale + compress
+        // 2) Downscale + compress (Your existing logic is perfect)
         val maxSide = 900
         val w = bitmap.width
         val h = bitmap.height
@@ -128,35 +151,98 @@ class camera_activiy : AppCompatActivity() {
         val baos = ByteArrayOutputStream()
         scaled.compress(Bitmap.CompressFormat.JPEG, 60, baos)
         val bytes = baos.toByteArray()
-        val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+        val base64 = android.util.Base64.encodeToString(bytes, Base64.NO_WRAP)
 
-        // 3) Build node (under stories/{uid}/{storyId})
-        val now = System.currentTimeMillis()
-        val storyId = now.toString()
-        val storyNode = mapOf(
-            "storyId" to storyId,
-            "userId" to uid,                      // <- add userId
-            "mediaType" to "image",
-            "createdAt" to now,
-            "expiresAt" to (now + 24L * 60 * 60 * 1000),
-            "imageBase64" to base64
-        )
+        // 3) Create API Payload
+        val payloadParams = HashMap<String, String>()
+        payloadParams["user_id"] = uid
+        payloadParams["media_type"] = "image"
+        payloadParams["imageBase64"] = base64 // Assuming API can take Base64
 
-        // 4) Write to your RTDB URL explicitly
-        FirebaseDatabase.getInstance("https://socially-5a61a-default-rtdb.firebaseio.com")
-            .getReference("stories")
-            .child(uid)
-            .child(storyId)
-            .setValue(storyNode)
-            .addOnSuccessListener {
-                Toast.makeText(this, "Story uploaded!", Toast.LENGTH_SHORT).show()
-                // Clean up the temp file
-                try { tempFile?.delete() } catch (_: Exception) {}
-                finish()
+        val payloadJson = JSONObject()
+        payloadJson.put("user_id", uid)
+        payloadJson.put("media_type", "image")
+        payloadJson.put("imageBase64", base64)
+
+        // 4) Check network and send or queue
+        if (isNetworkAvailable(this)) {
+            val url = AppGlobals.BASE_URL + "upload_story.php" // (from ApiService.kt)
+            val stringRequest = object : StringRequest(Request.Method.POST, url,
+                { response ->
+                    try {
+                        val json = JSONObject(response)
+                        if (json.getBoolean("success")) {
+                            Toast.makeText(this, "Story uploaded!", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(this, "Upload failed: ${json.getString("message")}", Toast.LENGTH_LONG).show()
+                            saveToSyncQueue("upload_story.php", payloadJson) // Save on API error
+                        }
+                    } catch (e: Exception) {
+                        Log.e("camera_activity", "Error parsing response: ${e.message}")
+                        saveToSyncQueue("upload_story.php", payloadJson) // Save on parse error
+                    } finally {
+                        cleanupAndFinish()
+                    }
+                },
+                { error ->
+                    Log.e("camera_activity", "Volley error: ${error.message}")
+                    saveToSyncQueue("upload_story.php", payloadJson) // Save on network error
+                    cleanupAndFinish()
+                }) {
+                override fun getParams(): MutableMap<String, String> {
+                    return payloadParams
+                }
             }
-            .addOnFailureListener { e ->
-                Toast.makeText(this, "DB write failed: ${e.message}", Toast.LENGTH_LONG).show()
-                finish()
+            queue.add(stringRequest)
+        } else {
+            // 5) Offline - Save to queue
+            saveToSyncQueue("upload_story.php", payloadJson)
+            cleanupAndFinish()
+        }
+    }
+
+    private fun cleanupAndFinish() {
+        try { tempFile?.delete() } catch (_: Exception) {}
+        finish()
+    }
+
+    // --- NEW: HELPER FUNCTIONS FOR OFFLINE QUEUE & NETWORK ---
+    private fun saveToSyncQueue(endpoint: String, payload: JSONObject) {
+        Log.d("camera_activity", "Saving to sync queue. Endpoint: $endpoint")
+        try {
+            val db = dbHelper.writableDatabase
+            val cv = ContentValues()
+            cv.put(DB.SyncQueue.COLUMN_ENDPOINT, endpoint)
+            cv.put(DB.SyncQueue.COLUMN_PAYLOAD, payload.toString())
+            cv.put(DB.SyncQueue.COLUMN_STATUS, "PENDING")
+            db.insert(DB.SyncQueue.TABLE_NAME, null, cv)
+
+            runOnUiThread {
+                Toast.makeText(this, "Offline. Story will upload later.", Toast.LENGTH_SHORT).show()
             }
+        } catch (e: Exception) {
+            Log.e("camera_activity", "Failed to save to sync queue: ${e.message}")
+        }
+    }
+
+    private fun isNetworkAvailable(context: Context): Boolean {
+        val connectivityManager =
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val network = connectivityManager.activeNetwork ?: return false
+            val activeNetwork =
+                connectivityManager.getNetworkCapabilities(network) ?: return false
+            return when {
+                activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> true
+                activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> true
+                activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> true
+                else -> false
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            val networkInfo = connectivityManager.activeNetworkInfo ?: return false
+            @Suppress("DEPRECATION")
+            return networkInfo.isConnected
+        }
     }
 }

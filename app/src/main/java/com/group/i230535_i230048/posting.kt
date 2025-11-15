@@ -2,10 +2,14 @@ package com.group.i230535_i230048
 
 import android.Manifest
 import android.content.ContentUris
+import android.content.ContentValues // CHANGED: Added for SQLite
+import android.content.Context // CHANGED: Added for Network/Prefs
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.ConnectivityManager // CHANGED: Added for Network
+import android.net.NetworkCapabilities // CHANGED: Added for Network
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
@@ -22,23 +26,30 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
+// REMOVED: import com.google.firebase.auth.FirebaseAuth
+// REMOVED: import com.google.firebase.database.FirebaseDatabase
+// REMOVED: import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.tasks.await
 import java.io.ByteArrayOutputStream
 import java.util.UUID
 import kotlin.concurrent.thread
 import android.graphics.ImageDecoder
 import android.os.Build
 import android.util.Base64
+import android.util.Log // CHANGED: Added for logging
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.bumptech.glide.Glide
+import com.android.volley.Request // CHANGED: Added Volley
+import com.android.volley.toolbox.StringRequest // CHANGED: Added Volley
+import com.android.volley.toolbox.Volley // CHANGED: Added Volley
+import com.group.i230535_i230048.AppDbHelper // CHANGED: Added DB Helper
+import com.group.i230535_i230048.DB // CHANGED: Added DB Helper
+import org.json.JSONObject // CHANGED: Added JSON
 
 
 class posting : AppCompatActivity() {
@@ -49,6 +60,9 @@ class posting : AppCompatActivity() {
 
     private var lastPickedUri: Uri? = null
     private var isUploading = false
+
+    // CHANGED: Added DB Helper and Volley Queue
+    private lateinit var dbHelper: AppDbHelper
 
     private val askPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -66,6 +80,9 @@ class posting : AppCompatActivity() {
         setContentView(R.layout.activity_posting)
         enableEdgeToEdge()
 
+        // CHANGED: Initialize DB Helper
+        dbHelper = AppDbHelper(this)
+
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
@@ -79,22 +96,21 @@ class posting : AppCompatActivity() {
             finish()
         }
 
-        // 3-column gallery grid
+        // 3-column gallery grid (No changes)
         adapter = GalleryAdapter(mutableListOf()) { uri ->
             lastPickedUri = uri
-            // Use Glide for async preview (no UI jank)
             Glide.with(this).load(uri).into(mainImage)
             showCaptionDialog(uri)
         }
         galleryGrid.layoutManager = GridLayoutManager(this, 3)
         galleryGrid.adapter = adapter
 
-        // Let user tap preview to post again
+        // Let user tap preview to post again (No changes)
         mainImage.setOnClickListener {
             lastPickedUri?.let { showCaptionDialog(it) }
         }
 
-        // “Next” uses the last selected image
+        // “Next” uses the last selected image (No changes)
         findViewById<TextView>(R.id.next_btn).setOnClickListener {
             val uri = lastPickedUri
             if (uri == null) {
@@ -107,7 +123,7 @@ class posting : AppCompatActivity() {
         ensurePermissionAndLoad()
     }
 
-    // -------- Permissions & Gallery --------
+    // -------- Permissions & Gallery (No changes) --------
 
     private fun ensurePermissionAndLoad() {
         val permission = if (Build.VERSION.SDK_INT >= 33)
@@ -169,26 +185,24 @@ class posting : AppCompatActivity() {
         }
     }
 
-    // -------- Caption dialog & Upload --------
+    // -------- Caption dialog (No changes to this function) --------
 
     private fun showCaptionDialog(uri: Uri) {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_caption, null)
         val preview = view.findViewById<ImageView>(R.id.caption_preview)
         val input   = view.findViewById<EditText>(R.id.caption_input)
 
-        // Make sure it’s visible & editable
         input.isEnabled = true
         input.isFocusable = true
         input.isFocusableInTouchMode = true
         input.requestFocus()
 
-        // async preview with Glide (prevents UI jank)
         Glide.with(this).load(uri).into(preview)
 
         val dialog = AlertDialog.Builder(this)
             .setTitle("Add a caption")
             .setView(view)
-            .setPositiveButton("Post", null)  // override click below
+            .setPositiveButton("Post", null)
             .setNegativeButton("Cancel", null)
             .create()
 
@@ -204,20 +218,18 @@ class posting : AppCompatActivity() {
                     return@setOnClickListener
                 }
 
-                // Disable while uploading
                 isUploading = true
                 postBtn.isEnabled = false
                 cancelBtn.isEnabled = false
 
-                // Launch the upload off the UI thread
-                uploadPost(
+                // CHANGED: Swapped Firebase function with new offline-first function
+                uploadPostVolley(
                     uri = lastPickedUri!!,
                     caption = caption,
                     onDone = {
                         isUploading = false
                         postBtn.isEnabled = true
                         cancelBtn.isEnabled = true
-                        // return success so home_page can refresh
                         setResult(RESULT_OK)
                         dialog.dismiss()
                         finish()
@@ -236,24 +248,32 @@ class posting : AppCompatActivity() {
     }
 
     /**
-     * Uploads image to RTDB (Base64) and writes metadata.
-     * Heavy work (decode/compress) is off the UI thread.
+     * CHANGED: Replaced 'uploadPost' with 'uploadPostVolley'
+     * Encodes image to Base64, then attempts to upload via Volley.
+     * If offline or Volley fails, it saves the post to the local sync queue.
      */
-    private fun uploadPost(
+    private fun uploadPostVolley(
         uri: Uri,
         caption: String,
         onDone: () -> Unit,
         onError: (String) -> Unit
     ) {
-        val auth = FirebaseAuth.getInstance()
-        val uid = auth.currentUser?.uid ?: return onError("Not authenticated")
-        val db = FirebaseDatabase.getInstance().reference
+        // 1. Get user details from SharedPreferences
+        val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
+        val uid = prefs.getString(AppGlobals.KEY_USER_UID, null)
+        val username = prefs.getString(AppGlobals.KEY_USERNAME, "user")
+
+        if (uid == null) {
+            onError("Not authenticated")
+            return
+        }
+
         val postId = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
 
         lifecycleScope.launch {
             try {
-                // 1) Heavy work off main thread: decode+downsample+JPEG+Base64
+                // 2. Heavy work: encode image to Base64 (using your helper)
                 val base64 = withContext(Dispatchers.IO) {
                     encodeUriToBase64Safe(uri, maxWidth = 1080, jpegQuality = 80)
                 }
@@ -262,40 +282,59 @@ class posting : AppCompatActivity() {
                     return@launch
                 }
 
-                // 2) Read username (await, non-blocking)
-                val username = try {
-                    val snap = db.child("users").child(uid).child("username").get().await()
-                    (snap.getValue(String::class.java) ?: "").ifBlank { "user" }
-                } catch (e: Exception) {
-                    "user"
+                // 3. Create payload for Volley and Sync Queue
+                val payloadParams = HashMap<String, String>()
+                payloadParams["uid"] = uid
+                payloadParams["username"] = username ?: "user"
+                payloadParams["caption"] = caption
+                payloadParams["imageBase64"] = base64
+                payloadParams["createdAt"] = now.toString()
+                payloadParams["postId"] = postId
+
+                // Create a JSON version for the offline queue
+                val payloadJson = JSONObject()
+                payloadParams.forEach { (key, value) -> payloadJson.put(key, value) }
+
+                // 4. Check network and attempt upload
+                if (isNetworkAvailable(this@posting)) {
+                    val queue = Volley.newRequestQueue(this@posting)
+                    val url = AppGlobals.BASE_URL + "create_post.php" // (from ApiService.kt)
+
+                    val stringRequest = object : StringRequest(
+                        Request.Method.POST,
+                        url,
+                        { response ->
+                            // Online - Success
+                            try {
+                                val json = JSONObject(response)
+                                if (json.getBoolean("success")) {
+                                    Toast.makeText(this@posting, "Posted!", Toast.LENGTH_SHORT).show()
+                                    onDone()
+                                } else {
+                                    onError("Post failed: ${json.getString("message")}")
+                                }
+                            } catch (e: Exception) {
+                                onError("Error parsing response: ${e.message}")
+                            }
+                        },
+                        { error ->
+                            // Online - Network Error (e.g., server down)
+                            // Save to queue to try again later
+                            Log.e("posting.kt", "Volley error, saving to queue: ${error.message}")
+                            saveToSyncQueue("create_post.php", payloadJson)
+                            onDone() // Finish activity, user assumes it's fine
+                        }) {
+
+                        override fun getParams(): MutableMap<String, String> {
+                            return payloadParams
+                        }
+                    }
+                    queue.add(stringRequest)
+                } else {
+                    // 5. Offline - Save to queue immediately
+                    saveToSyncQueue("create_post.php", payloadJson)
+                    onDone() // Finish activity, user assumes it's fine
                 }
-
-                // 3) Compose post & write to RTDB
-                val post = mapOf(
-                    "postId" to postId,
-                    "uid" to uid,
-                    "username" to username,
-                    "imageUrl" to "",
-                    "imageBase64" to base64,
-                    "caption" to caption,
-                    "createdAt" to now,
-                    "likeCount" to 0,
-                    "commentCount" to 0
-                )
-
-                val updates = hashMapOf<String, Any>(
-                    "/posts/$uid/$postId" to post,
-                    "/postIndex/$postId" to mapOf(
-                        "postId" to postId,
-                        "uid" to uid,
-                        "createdAt" to now
-                    )
-                )
-
-                db.updateChildren(updates).await()
-
-                Toast.makeText(this@posting, "Posted!", Toast.LENGTH_SHORT).show()
-                onDone()
 
             } catch (oom: OutOfMemoryError) {
                 onError("Image too large (OOM). Try a smaller one.")
@@ -305,6 +344,7 @@ class posting : AppCompatActivity() {
         }
     }
 
+    // This is your excellent Base64 encoder. No changes needed.
     private fun encodeUriToBase64Safe(
         uri: Uri,
         maxWidth: Int,
@@ -321,7 +361,6 @@ class posting : AppCompatActivity() {
                     val tw = (w * scale).toInt().coerceAtLeast(1)
                     val th = (h * scale).toInt().coerceAtLeast(1)
                     decoder.setTargetSize(tw, th)
-                    // Let ImageDecoder handle orientation/EXIF
                 }
                 val baos = ByteArrayOutputStream()
                 bmp.compress(Bitmap.CompressFormat.JPEG, jpegQuality, baos)
@@ -332,16 +371,12 @@ class posting : AppCompatActivity() {
             }
 
             // --- Path B: Legacy devices (BitmapFactory with inSampleSize) ---
-            // 1) Read bounds
             val optsBounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             contentResolver.openInputStream(uri)?.use { input ->
                 BitmapFactory.decodeStream(input, null, optsBounds)
             }
-
             var srcW = optsBounds.outWidth
             var srcH = optsBounds.outHeight
-
-            // Some formats/URIs don’t populate bounds — fallback decode once
             if (srcW <= 0 || srcH <= 0) {
                 contentResolver.openInputStream(uri)?.use { input ->
                     val tmp = BitmapFactory.decodeStream(input)
@@ -352,33 +387,25 @@ class posting : AppCompatActivity() {
                     }
                 }
             }
-            if (srcW <= 0 || srcH <= 0) {
-                // Final fallback handled below (Glide)
-                throw IllegalStateException("Bounds not readable")
-            }
+            if (srcW <= 0 || srcH <= 0) throw IllegalStateException("Bounds not readable")
 
             var inSampleSize = 1
             if (srcW > maxWidth) {
-                val ratio = Math.ceil(srcW.toDouble() / maxWidth.toDouble()).toInt().coerceAtLeast(1)
-                inSampleSize = Integer.highestOneBit(ratio).coerceAtLeast(1)
+                inSampleSize = Integer.highestOneBit(Math.ceil(srcW.toDouble() / maxWidth.toDouble()).toInt())
             }
-
             val optsDecode = BitmapFactory.Options().apply {
                 this.inSampleSize = inSampleSize
                 inPreferredConfig = Bitmap.Config.RGB_565
             }
-
             val sampled = contentResolver.openInputStream(uri)?.use { input ->
                 BitmapFactory.decodeStream(input, null, optsDecode)
             }
-
             if (sampled != null) {
                 val finalBmp = if (sampled.width > maxWidth) {
                     val ratio = sampled.height.toFloat() / sampled.width.toFloat()
                     val h = (maxWidth * ratio).toInt().coerceAtLeast(1)
                     Bitmap.createScaledBitmap(sampled, maxWidth, h, true)
                 } else sampled
-
                 val baos = ByteArrayOutputStream()
                 finalBmp.compress(Bitmap.CompressFormat.JPEG, jpegQuality, baos)
                 if (finalBmp !== sampled) sampled.recycle()
@@ -392,8 +419,8 @@ class posting : AppCompatActivity() {
             val glideBmp = Glide.with(this)
                 .asBitmap()
                 .load(uri)
-                .submit(maxWidth, maxWidth) // Glide will keep aspect ratio
-                .get() // called on Dispatchers.IO by our caller
+                .submit(maxWidth, maxWidth)
+                .get()
 
             val baos = ByteArrayOutputStream()
             glideBmp.compress(Bitmap.CompressFormat.JPEG, jpegQuality, baos)
@@ -405,7 +432,6 @@ class posting : AppCompatActivity() {
         } catch (e: OutOfMemoryError) {
             return ""
         } catch (e: Exception) {
-            // As a last attempt, try Glide if not already tried
             return try {
                 val glideBmp = Glide.with(this)
                     .asBitmap()
@@ -425,7 +451,7 @@ class posting : AppCompatActivity() {
     }
 
 
-    // ---------- Gallery Adapter ----------
+    // ---------- Gallery Adapter (No changes) ----------
     private class GalleryAdapter(
         private val data: MutableList<Uri>,
         private val onClick: (Uri) -> Unit
@@ -443,7 +469,6 @@ class posting : AppCompatActivity() {
 
         override fun onBindViewHolder(holder: VH, position: Int) {
             val uri = data[position]
-            // use Glide for thumbnails as well (smooth scroll)
             Glide.with(holder.img.context).load(uri).into(holder.img)
             holder.img.setOnClickListener { onClick(uri) }
         }
@@ -454,6 +479,53 @@ class posting : AppCompatActivity() {
             data.clear()
             data.addAll(items)
             notifyDataSetChanged()
+        }
+    }
+
+    // --- CHANGED: ADDED HELPER FUNCTIONS ---
+
+    /**
+     * Saves a failed or offline request to the SQLite sync queue.
+     */
+    private fun saveToSyncQueue(endpoint: String, payload: JSONObject) {
+        Log.d("posting.kt", "Saving to sync queue. Endpoint: $endpoint")
+        try {
+            val db = dbHelper.writableDatabase
+            val cv = ContentValues()
+            cv.put(DB.SyncQueue.COLUMN_ENDPOINT, endpoint)
+            cv.put(DB.SyncQueue.COLUMN_PAYLOAD, payload.toString())
+            cv.put(DB.SyncQueue.COLUMN_STATUS, "PENDING")
+            db.insert(DB.SyncQueue.TABLE_NAME, null, cv)
+
+            runOnUiThread {
+                Toast.makeText(this, "Offline. Post will send later.", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Log.e("posting.kt", "Failed to save to sync queue: ${e.message}")
+        }
+    }
+
+    /**
+     * Checks if the device is connected to the internet.
+     */
+    private fun isNetworkAvailable(context: Context): Boolean {
+        val connectivityManager =
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val network = connectivityManager.activeNetwork ?: return false
+            val activeNetwork =
+                connectivityManager.getNetworkCapabilities(network) ?: return false
+            return when {
+                activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> true
+                activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> true
+                activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> true
+                else -> false
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            val networkInfo = connectivityManager.activeNetworkInfo ?: return false
+            @Suppress("DEPRECATION")
+            return networkInfo.isConnected
         }
     }
 }

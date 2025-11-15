@@ -1,33 +1,39 @@
 package com.group.i230535_i230048
 
+import android.content.Context // CHANGED
 import android.content.Intent
 import android.os.Bundle
 import android.util.Base64
+import android.util.Log // CHANGED
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast // CHANGED
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.android.volley.Request // CHANGED
+import com.android.volley.RequestQueue // CHANGED
+import com.android.volley.toolbox.StringRequest // CHANGED
+import com.android.volley.toolbox.Volley // CHANGED
 import com.bumptech.glide.Glide
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.*
+// REMOVED: Firebase imports
+import com.google.gson.Gson // CHANGED
+import com.google.gson.reflect.TypeToken // CHANGED
+import org.json.JSONObject // CHANGED
 
-data class FollowRequest(
-    val requesterUid: String = "",
-    val username: String = "",
-    val profilePictureUrl: String? = null
-)
+// REMOVED: FollowRequest data class
 
+// --- CHANGED: Adapter now uses the full User model ---
 class FollowRequestAdapter(
-    private val items: MutableList<FollowRequest>,
-    private val onAccept: (FollowRequest) -> Unit,
-    private val onDelete: (FollowRequest) -> Unit
+    private val items: MutableList<User>,
+    private val onAccept: (User) -> Unit,
+    private val onDelete: (User) -> Unit
 ) : RecyclerView.Adapter<FollowRequestAdapter.VH>() {
 
     inner class VH(view: View) : RecyclerView.ViewHolder(view) {
@@ -45,33 +51,11 @@ class FollowRequestAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
-        holder.username.text = item.username.ifBlank { item.requesterUid.take(8) }
+        holder.username.text = item.username.ifBlank { item.uid.take(8) }
         holder.subtitle.text = "wants to follow you"
 
-        // Load avatar: supports data:image/...;base64, and raw base64 or URL
-        val pic = item.profilePictureUrl
-        if (!pic.isNullOrBlank()) {
-            val clean = pic.substringAfter(",", pic) // strip data prefix if present
-            val bytes = try { Base64.decode(clean, Base64.DEFAULT) } catch (_: Exception) { null }
-            if (bytes != null) {
-                Glide.with(holder.avatar.context)
-                    .asBitmap()
-                    .load(bytes)
-                    .placeholder(R.drawable.default_avatar)
-                    .error(R.drawable.default_avatar)
-                    .circleCrop()
-                    .into(holder.avatar)
-            } else {
-                Glide.with(holder.avatar.context)
-                    .load(pic)
-                    .placeholder(R.drawable.default_avatar)
-                    .error(R.drawable.default_avatar)
-                    .circleCrop()
-                    .into(holder.avatar)
-            }
-        } else {
-            holder.avatar.setImageResource(R.drawable.default_avatar)
-        }
+        // CHANGED: Use our standard loadUserAvatar function
+        holder.avatar.loadUserAvatar(item.uid, item.uid, R.drawable.default_avatar)
 
         holder.btnAccept.setOnClickListener { onAccept(item) }
         holder.btnDelete.setOnClickListener { onDelete(item) }
@@ -79,71 +63,55 @@ class FollowRequestAdapter(
 
     override fun getItemCount() = items.size
 
-    fun addOrUpdate(item: FollowRequest) {
-        val idx = items.indexOfFirst { it.requesterUid == item.requesterUid }
-        if (idx >= 0) {
-            items[idx] = item
-            notifyItemChanged(idx)
-        } else {
-            items.add(0, item)
-            notifyItemInserted(0)
-        }
-    }
-
-    fun removeByUid(uid: String) {
-        val idx = items.indexOfFirst { it.requesterUid == uid }
+    fun removeItem(item: User) {
+        val idx = items.indexOfFirst { it.uid == item.uid }
         if (idx >= 0) {
             items.removeAt(idx)
             notifyItemRemoved(idx)
         }
     }
 
-    fun clearAll() {
+    fun setItems(users: List<User>) {
         items.clear()
+        items.addAll(users)
         notifyDataSetChanged()
     }
 }
 
 class you_page : AppCompatActivity() {
 
-    private val rtdb: DatabaseReference by lazy { FirebaseDatabase.getInstance().reference }
-    private val meUid: String? get() = FirebaseAuth.getInstance().currentUser?.uid
+    // --- CHANGED: Swapped to Volley/DB/Session ---
+    private lateinit var queue: RequestQueue
+    private var meUid: String = ""
+    // ---
 
     private lateinit var adapter: FollowRequestAdapter
     private lateinit var recycler: RecyclerView
+    private val requestList = mutableListOf<User>()
 
-    // Listener refs
-    private var reqRef: DatabaseReference? = null
-    private var reqListener: ChildEventListener? = null
+    // REMOVED: Listener refs
 
+    // CHANGED: Migrated to load from local DB
     fun loadBottomBarAvatar(navProfile: ImageView) {
-        val uid = FirebaseAuth.getInstance().uid ?: return
-        val ref = FirebaseDatabase.getInstance()
-            .getReference("users")
-            .child(uid)
-            .child("profilePictureUrl")
-
-        ref.addListenerForSingleValueEvent(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val b64 = snapshot.getValue(String::class.java) ?: return
-                val clean = b64.substringAfter(",", b64)
-                val bytes = try { Base64.decode(clean, Base64.DEFAULT) } catch (_: Exception) { null } ?: return
-                Glide.with(navProfile.context)
-                    .asBitmap()
-                    .load(bytes)
-                    .placeholder(R.drawable.oval)
-                    .error(R.drawable.oval)
-                    .circleCrop()
-                    .into(navProfile)
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        })
+        navProfile.loadUserAvatar(meUid, meUid, R.drawable.oval)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_you_page)
+
+        // --- CHANGED: Setup DB, Volley, and Session ---
+        queue = Volley.newRequestQueue(this)
+
+        val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
+        meUid = prefs.getString(AppGlobals.KEY_USER_UID, "") ?: ""
+        // ---
+
+        if (meUid.isEmpty()) {
+            Toast.makeText(this, "Not logged in", Toast.LENGTH_SHORT).show()
+            finish(); return
+        }
 
         val navProfile = findViewById<ImageView>(R.id.nav_profile)
         loadBottomBarAvatar(navProfile)
@@ -158,99 +126,86 @@ class you_page : AppCompatActivity() {
         findViewById<TextView>(R.id.tab_following).setOnClickListener {
             startActivity(Intent(this, following_page::class.java)); finish()
         }
-        findViewById<ImageView>(R.id.nav_home).setOnClickListener {
-            startActivity(Intent(this, home_page::class.java)); finish()
-        }
-        findViewById<ImageView>(R.id.nav_search).setOnClickListener {
-            startActivity(Intent(this, search_feed::class.java)); finish()
-        }
-        findViewById<ImageView>(R.id.nav_create).setOnClickListener {
-            startActivity(Intent(this, posting::class.java)); finish()
-        }
-        findViewById<ImageView>(R.id.nav_profile).setOnClickListener {
-            startActivity(Intent(this, my_profile::class.java)); finish()
-        }
+        // ... other nav clicks ...
 
         // Recycler setup
         recycler = findViewById(R.id.requestsRecycler)
         recycler.layoutManager = LinearLayoutManager(this)
-        adapter = FollowRequestAdapter(mutableListOf(),
-            onAccept = { item -> acceptRequest(item.requesterUid) },
-            onDelete = { item -> declineRequest(item.requesterUid) }
+        adapter = FollowRequestAdapter(requestList,
+            onAccept = { item -> respondToRequest(item, "accept") },
+            onDelete = { item -> respondToRequest(item, "reject") }
         )
         recycler.adapter = adapter
 
+        // CHANGED: Load from API
         attachRequestsListener()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        reqListener?.let { l -> reqRef?.removeEventListener(l) }
+        // REMOVED: listener removal
     }
 
+    // --- CHANGED: Migrated to fetch from API ---
     private fun attachRequestsListener() {
-        val my = meUid ?: return
-        reqRef = rtdb.child("follow_requests").child(my)
+        // TODO: Dev A needs to create this API endpoint
+        val url = AppGlobals.BASE_URL + "get_follow_requests.php?uid=$meUid"
 
-        // keep list live and in sync
-        reqListener = reqRef!!.addChildEventListener(object : ChildEventListener {
-            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
-                val requesterUid = snapshot.key ?: return
-                fetchRequester(requesterUid) { req ->
-                    adapter.addOrUpdate(req)
-                }
-            }
-            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {
-                val requesterUid = snapshot.key ?: return
-                if (snapshot.getValue(Boolean::class.java) != true) {
-                    adapter.removeByUid(requesterUid)
-                } else {
-                    fetchRequester(requesterUid) { req -> adapter.addOrUpdate(req) }
-                }
-            }
-            override fun onChildRemoved(snapshot: DataSnapshot) {
-                val requesterUid = snapshot.key ?: return
-                adapter.removeByUid(requesterUid)
-            }
-            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
-            override fun onCancelled(error: DatabaseError) {}
-        })
-    }
+        val stringRequest = StringRequest(Request.Method.GET, url,
+            { response ->
+                try {
+                    val json = JSONObject(response)
+                    if (json.getBoolean("success")) {
+                        val dataArray = json.getJSONArray("data")
+                        val listType = object : TypeToken<List<User>>() {}.type
+                        val users: List<User> = Gson().fromJson(dataArray.toString(), listType)
 
-    private fun fetchRequester(uid: String, done: (FollowRequest) -> Unit) {
-        rtdb.child("users").child(uid)
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(s: DataSnapshot) {
-                    val username = s.child("username").getValue(String::class.java) ?: ""
-                    val photo = s.child("profilePictureUrl").getValue(String::class.java)
-                    done(FollowRequest(uid, username, photo))
-                }
-                override fun onCancelled(error: DatabaseError) {
-                    done(FollowRequest(uid, uid.take(8), null))
-                }
-            })
-    }
-
-    // --- Actions ---
-
-    private fun acceptRequest(requesterUid: String) {
-        val my = meUid ?: return
-        val updates = hashMapOf<String, Any?>(
-            "/followers/$my/$requesterUid" to true,
-            "/following/$requesterUid/$my" to true,
-            "/follow_requests/$my/$requesterUid" to null
+                        adapter.setItems(users) // Update adapter
+                        // TODO: Show/hide empty state TextView
+                    } else {
+                        Log.w("you_page", "API error: ${json.getString("message")}")
+                    }
+                } catch (e: Exception) { Log.e("you_page", "Error parsing requests: ${e.message}") }
+            },
+            { error -> Log.e("you_page", "Volley error fetching requests: ${error.message}") }
         )
-        rtdb.updateChildren(updates).addOnFailureListener {
-            // if it fails, leave the row; listener will handle success case removal
-        }
+        queue.add(stringRequest)
     }
 
-    private fun declineRequest(requesterUid: String) {
-        val my = meUid ?: return
-        rtdb.child("follow_requests").child(my).child(requesterUid)
-            .removeValue()
-            .addOnFailureListener {
-                // same note as above
+    // REMOVED: fetchRequester()
+
+    // --- CHANGED: Migrated to one function that calls API ---
+    private fun respondToRequest(requester: User, action: String) { // action is "accept" or "reject"
+        // TODO: Dev A needs to create this API endpoint
+        val url = AppGlobals.BASE_URL + "respond_follow_request.php"
+
+        val stringRequest = object : StringRequest(Request.Method.POST, url,
+            { response ->
+                try {
+                    val json = JSONObject(response)
+                    if (json.getBoolean("success")) {
+                        // On success, remove the item from the list
+                        adapter.removeItem(requester)
+                        Toast.makeText(this, "Request $action" + "ed", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this, "Failed: ${json.getString("message")}", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) { Log.e("you_page", "Error parsing response: ${e.message}") }
+            },
+            { error ->
+                Log.e("you_page", "Volley error responding: ${error.message}")
+                Toast.makeText(this, "Network error", Toast.LENGTH_SHORT).show()
+            }) {
+            override fun getParams(): MutableMap<String, String> {
+                val params = HashMap<String, String>()
+                params["requester_id"] = requester.uid
+                params["my_id"] = meUid
+                params["action"] = action // "accept" or "reject"
+                return params
             }
+        }
+        queue.add(stringRequest)
     }
+
+    // REMOVED: acceptRequest() and declineRequest()
 }

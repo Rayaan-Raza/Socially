@@ -1,4 +1,3 @@
-// In SearchAdapter.kt
 package com.group.i230535_i230048
 
 import android.content.Context
@@ -6,6 +5,7 @@ import android.content.Intent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView // CHANGED
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
@@ -13,7 +13,9 @@ class SearchAdapter(private val context: Context, private val userList: List<Use
     RecyclerView.Adapter<SearchAdapter.UserViewHolder>() {
 
     inner class UserViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val avatar: TextView = itemView.findViewById(R.id.user_avatar)
+        // --- CHANGED: Corrected to ImageView ---
+        val avatar: ImageView = itemView.findViewById(R.id.user_avatar)
+        // ---
         val username: TextView = itemView.findViewById(R.id.user_username)
         val fullName: TextView = itemView.findViewById(R.id.user_fullname)
     }
@@ -27,27 +29,22 @@ class SearchAdapter(private val context: Context, private val userList: List<Use
         return userList.size
     }
 
-    // In SearchAdapter.kt
-
     override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
         val user = userList[position]
         holder.username.text = user.username
         holder.fullName.text = user.fullName
 
-        // Set initials for avatar
-        holder.avatar.text = user.fullName.split(" ")
-            .take(2).mapNotNull { it.firstOrNull()?.toString()?.uppercase() }.joinToString("")
+        // --- CHANGED: Load profile picture ---
+        // This uses our migrated function to load from the local DB
+        holder.avatar.loadUserAvatar(user.uid, user.uid, R.drawable.default_avatar)
+        // ---
 
-        // --- THIS IS THE CRUCIAL CHANGE ---
-        // Set click listener to open the view_profile activity with the selected user's ID
+        // (Click listener is correct, no changes)
         holder.itemView.setOnClickListener {
             val intent = Intent(context, view_profile::class.java).apply {
-                // Pass the unique ID of the clicked user to the next activity
                 putExtra("USER_ID", user.uid)
             }
             context.startActivity(intent)
         }
     }
-
 }
-

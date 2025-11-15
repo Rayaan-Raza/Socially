@@ -1,7 +1,10 @@
 package com.group.i230535_i230048
 
 import android.app.Activity
+import android.content.ContentValues // CHANGED
+import android.content.Context // CHANGED
 import android.content.Intent
+import android.database.sqlite.SQLiteDatabase // CHANGED
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
@@ -10,6 +13,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Base64
+import android.util.Log // CHANGED
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
@@ -17,15 +21,23 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.*
+import com.android.volley.Request // CHANGED
+import com.android.volley.RequestQueue // CHANGED
+import com.android.volley.toolbox.StringRequest // CHANGED
+import com.android.volley.toolbox.Volley // CHANGED
+// REMOVED: Firebase imports
+import com.group.i230535_i230048.AppDbHelper // CHANGED
+import com.group.i230535_i230048.DB // CHANGED
+import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 
 class edit_profile : AppCompatActivity() {
 
-    private lateinit var auth: FirebaseAuth
-    private lateinit var database: FirebaseDatabase
-    private lateinit var userRef: DatabaseReference
+    // --- CHANGED: Removed Firebase, added Volley, DB, and Session ---
+    private lateinit var dbHelper: AppDbHelper
+    private lateinit var queue: RequestQueue
+    private var currentUserId: String = ""
+    // ---
 
     // Views
     private lateinit var profileImage: ImageView
@@ -40,7 +52,6 @@ class edit_profile : AppCompatActivity() {
     private lateinit var btnDone: TextView
     private lateinit var txtChangePhoto: TextView
 
-    private var currentUserId: String = ""
     private var newProfileImageBase64: String? = null
     private val PICK_IMAGE = 103
 
@@ -54,9 +65,13 @@ class edit_profile : AppCompatActivity() {
             insets
         }
 
-        auth = FirebaseAuth.getInstance()
-        database = FirebaseDatabase.getInstance()
-        currentUserId = auth.currentUser?.uid ?: ""
+        // --- CHANGED: Setup DB, Volley, and Session ---
+        dbHelper = AppDbHelper(this)
+        queue = Volley.newRequestQueue(this)
+
+        val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
+        currentUserId = prefs.getString(AppGlobals.KEY_USER_UID, "") ?: ""
+        // ---
 
         if (currentUserId.isEmpty()) {
             Toast.makeText(this, "Not logged in", Toast.LENGTH_SHORT).show()
@@ -64,17 +79,14 @@ class edit_profile : AppCompatActivity() {
             return
         }
 
-        userRef = database.getReference("users").child(currentUserId)
-
-        // Initialize all views
+        // REMOVED: userRef
         initViews()
-        // Set up all click listeners
         setupClickListeners()
-        // Load existing user data into the views
         loadUserData()
     }
 
     private fun initViews() {
+        // (No changes here)
         profileImage = findViewById(R.id.img_profile)
         etName = findViewById(R.id.et_name)
         etUsername = findViewById(R.id.et_username)
@@ -89,61 +101,52 @@ class edit_profile : AppCompatActivity() {
     }
 
     private fun setupClickListeners() {
-        // Cancel button - correctly goes back without saving
+        // (No changes here)
         btnCancel.setOnClickListener {
-            // setResult(Activity.RESULT_CANCELED) // Optional: for startActivityForResult
             finish()
         }
-
-        // Done button - correctly saves the profile
         btnDone.setOnClickListener {
             saveProfile()
         }
-
-        // Change profile photo text
         txtChangePhoto.setOnClickListener {
             openGallery()
         }
-
-        // Profile image itself can also be clicked
         profileImage.setOnClickListener {
             openGallery()
         }
-
-        // Switch to professional account
         findViewById<TextView>(R.id.btn_switch_pro).setOnClickListener {
             Toast.makeText(this, "Professional account coming soon", Toast.LENGTH_SHORT).show()
         }
     }
 
+    // --- CHANGED: Migrated to load from local SQLite DB ---
     private fun loadUserData() {
-        userRef.get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                val user = snapshot.getValue(User::class.java)
-                if (user != null) {
-                    etName.setText(user.fullName)
-                    etUsername.setText(user.username)
-                    etWebsite.setText(user.website)
-                    etBio.setText(user.bio)
-                    etEmail.setText(user.email)
-                    etPhone.setText(user.phoneNumber)
-                    etGender.setText(user.gender)
+        Log.d("edit_profile", "Loading user data from DB...")
+        val db = dbHelper.readableDatabase
+        val cursor = db.query(
+            DB.User.TABLE_NAME, null,
+            "${DB.User.COLUMN_UID} = ?", arrayOf(currentUserId),
+            null, null, null
+        )
 
-                    if (!user.profilePictureUrl.isNullOrEmpty()) {
-                        try {
-                            val bitmap = decodeBase64(user.profilePictureUrl)
-                            profileImage.setImageBitmap(bitmap)
-                        } catch (e: Exception) {
-                            // Keep default image if decoding fails
-                        }
-                    }
-                }
-            }
-        }.addOnFailureListener {
+        if (cursor.moveToFirst()) {
+            etName.setText(cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_FULL_NAME)))
+            etUsername.setText(cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_USERNAME)))
+            // etWebsite.setText(cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_WEBSITE))) // TODO: Add WEBSITE to DB.User
+            etBio.setText(cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_BIO)))
+            etEmail.setText(cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_EMAIL)))
+            // etPhone.setText(cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_PHONE))) // TODO: Add PHONE to DB.User
+            // etGender.setText(cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_GENDER))) // TODO: Add GENDER to DB.User
+
+            // This now uses the local DB via AvatarUtils
+            profileImage.loadUserAvatar(currentUserId, currentUserId, R.drawable.default_avatar)
+        } else {
             Toast.makeText(this, "Failed to load profile data", Toast.LENGTH_SHORT).show()
         }
+        cursor.close()
     }
 
+    // --- CHANGED: Migrated to save to Volley API + local DB ---
     private fun saveProfile() {
         val fullName = etName.text.toString().trim()
         val username = etUsername.text.toString().trim()
@@ -161,45 +164,82 @@ class edit_profile : AppCompatActivity() {
         val firstName = nameParts.getOrNull(0) ?: fullName
         val lastName = nameParts.getOrNull(1) ?: ""
 
-        val updates = hashMapOf<String, Any>(
-            "fullName" to fullName,
-            "firstName" to firstName,
-            "lastName" to lastName,
-            "username" to username,
-            "bio" to bio
-        )
-
-        // Add optional fields only if they have a value
-        if (website.isNotEmpty()) updates["website"] = website
-        if (email.isNotEmpty()) updates["email"] = email
-        if (phone.isNotEmpty()) updates["phoneNumber"] = phone
-        if (gender.isNotEmpty()) updates["gender"] = gender
-
-        // **IMPORTANT**: Add the new profile picture to the updates if it exists
+        // 1. Create payload for Volley
+        val params = HashMap<String, String>()
+        params["uid"] = currentUserId
+        params["fullName"] = fullName
+        params["firstName"] = firstName
+        params["lastName"] = lastName
+        params["username"] = username
+        params["bio"] = bio
+        if (website.isNotEmpty()) params["website"] = website
+        if (email.isNotEmpty()) params["email"] = email
+        if (phone.isNotEmpty()) params["phoneNumber"] = phone
+        if (gender.isNotEmpty()) params["gender"] = gender
         if (newProfileImageBase64 != null) {
-            updates["profilePictureUrl"] = newProfileImageBase64!!
+            params["profilePictureBase64"] = newProfileImageBase64!!
         }
 
-        userRef.updateChildren(updates)
-            .addOnSuccessListener {
-                Toast.makeText(this, "Profile updated successfully", Toast.LENGTH_SHORT).show()
-                // setResult(Activity.RESULT_OK) // Optional: for startActivityForResult
-                finish() // Go back to the previous screen (my_profile or view_profile)
+        // 2. Create ContentValues for local DB update
+        val cv = ContentValues()
+        cv.put(DB.User.COLUMN_FULL_NAME, fullName)
+        cv.put(DB.User.COLUMN_USERNAME, username)
+        cv.put(DB.User.COLUMN_BIO, bio)
+        cv.put(DB.User.COLUMN_EMAIL, email)
+        if (newProfileImageBase64 != null) {
+            // TODO: The API doc saves Base64, but the User model expects a URL.
+            // Assuming the backend returns a URL. For now, we save what we have.
+            // This is a flaw in the API design (mixing Base64 and URLs).
+            // Let's assume the API returns the *new URL*
+        }
+
+        // TODO: Dev A needs to create this API endpoint
+        val url = AppGlobals.BASE_URL + "update_profile.php"
+        val stringRequest = object : StringRequest(Request.Method.POST, url,
+            { response ->
+                try {
+                    val json = JSONObject(response)
+                    if (json.getBoolean("success")) {
+                        // 3. On API success, update local DB
+                        val userObj = json.getJSONObject("data") // API should return the updated user
+
+                        // Update CV with data from server (e.g., new profilePictureUrl)
+                        cv.put(DB.User.COLUMN_PROFILE_PIC_URL, userObj.getString("profilePictureUrl"))
+
+                        dbHelper.writableDatabase.update(
+                            DB.User.TABLE_NAME, cv,
+                            "${DB.User.COLUMN_UID} = ?", arrayOf(currentUserId)
+                        )
+
+                        Toast.makeText(this, "Profile updated successfully", Toast.LENGTH_SHORT).show()
+                        finish() // Go back to my_profile
+                    } else {
+                        Toast.makeText(this, "Failed to update: ${json.getString("message")}", Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(this, "Error parsing response: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            },
+            { error ->
+                Toast.makeText(this, "Network error: ${error.message}", Toast.LENGTH_LONG).show()
+            }) {
+            override fun getParams(): MutableMap<String, String> {
+                return params
             }
-            .addOnFailureListener { e ->
-                Toast.makeText(this, "Failed to update profile: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+        }
+        queue.add(stringRequest)
     }
 
     private fun openGallery() {
+        // (No changes here)
         val intent = Intent(Intent.ACTION_PICK)
         intent.type = "image/*"
         startActivityForResult(intent, PICK_IMAGE)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        // (No changes here, this logic is correct)
         super.onActivityResult(requestCode, resultCode, data)
-
         if (requestCode == PICK_IMAGE && resultCode == Activity.RESULT_OK && data?.data != null) {
             val imageUri: Uri = data.data!!
             try {
@@ -220,14 +260,15 @@ class edit_profile : AppCompatActivity() {
     }
 
     private fun encodeImage(bitmap: Bitmap): String {
+        // (No changes here)
         val output = ByteArrayOutputStream()
-        // Compress the image to reduce its size before encoding
         bitmap.compress(Bitmap.CompressFormat.JPEG, 50, output)
         val imageBytes = output.toByteArray()
         return Base64.encodeToString(imageBytes, Base64.DEFAULT)
     }
 
     private fun decodeBase64(base64: String): Bitmap {
+        // (No changes here)
         val decodedBytes = Base64.decode(base64, Base64.DEFAULT)
         return BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
     }
