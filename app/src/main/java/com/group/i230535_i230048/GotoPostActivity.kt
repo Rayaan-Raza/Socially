@@ -193,8 +193,8 @@ class GotoPostActivity : AppCompatActivity() {
             return
         }
 
-        // 1. Fetch Post
-        val postUrl = AppGlobals.BASE_URL + "get_post.php?post_id=$postId&user_id=$myUid"
+        // 1. Fetch Post using post_get.php endpoint
+        val postUrl = AppGlobals.BASE_URL + "post_get.php?postId=$postId"
         val postRequest = StringRequest(Request.Method.GET, postUrl,
             { response ->
                 try {
@@ -204,9 +204,10 @@ class GotoPostActivity : AppCompatActivity() {
                         val cv = ContentValues()
                         cv.put(DB.Post.COLUMN_POST_ID, postObj.getString("postId"))
                         cv.put(DB.Post.COLUMN_UID, postObj.getString("uid"))
-                        cv.put(DB.Post.COLUMN_USERNAME, postObj.getString("username"))
-                        cv.put(DB.Post.COLUMN_CAPTION, postObj.getString("caption"))
-                        cv.put(DB.Post.COLUMN_IMAGE_URL, postObj.getString("imageUrl"))
+                        cv.put(DB.Post.COLUMN_USERNAME, postObj.optString("username", "user"))
+                        cv.put(DB.Post.COLUMN_CAPTION, postObj.optString("caption", ""))
+                        cv.put(DB.Post.COLUMN_IMAGE_URL, postObj.optString("imageUrl", ""))
+                        cv.put(DB.Post.COLUMN_IMAGE_BASE64, postObj.optString("imageBase64", ""))
                         cv.put(DB.Post.COLUMN_CREATED_AT, postObj.getLong("createdAt"))
                         cv.put(DB.Post.COLUMN_LIKE_COUNT, postObj.getLong("likeCount"))
                         cv.put(DB.Post.COLUMN_COMMENT_COUNT, postObj.getLong("commentCount"))
@@ -214,8 +215,8 @@ class GotoPostActivity : AppCompatActivity() {
 
                         loadPostDataFromDb() // Reload from DB to update UI
 
-                        val isLiked = postObj.optBoolean("isLikedByCurrentUser", false)
-                        btnLike.setImageResource(if (isLiked) R.drawable.liked else R.drawable.like)
+                        // Note: The API doesn't return "isLikedByCurrentUser", we'd need a separate endpoint
+                        // For now, keep the like state as-is or check locally
                         tvLikes.text = "${postObj.getLong("likeCount")} likes"
                     }
                 } catch (e: Exception) { Log.e("GotoPost", "Error parsing post: ${e.message}") }
@@ -229,21 +230,22 @@ class GotoPostActivity : AppCompatActivity() {
     }
 
     private fun fetchCommentsFromApi() {
-        val commentsUrl = AppGlobals.BASE_URL + "get_comments.php?post_id=$postId"
+        val commentsUrl = AppGlobals.BASE_URL + "post_comments_get.php?postId=$postId&limit=100"
         val commentsRequest = StringRequest(Request.Method.GET, commentsUrl,
             { response ->
                 try {
                     val json = JSONObject(response)
                     if (json.getBoolean("success")) {
-                        val dataArray = json.getJSONArray("data")
+                        val dataObj = json.getJSONObject("data")
+                        val commentsArray = dataObj.getJSONArray("comments")
                         val db = dbHelper.writableDatabase
 
                         db.delete(DB.Comment.TABLE_NAME, "${DB.Comment.COLUMN_POST_ID} = ?", arrayOf(postId))
 
                         db.beginTransaction()
                         try {
-                            for (i in 0 until dataArray.length()) {
-                                val commentObj = dataArray.getJSONObject(i)
+                            for (i in 0 until commentsArray.length()) {
+                                val commentObj = commentsArray.getJSONObject(i)
                                 val cv = ContentValues()
                                 cv.put(DB.Comment.COLUMN_COMMENT_ID, commentObj.getString("commentId"))
                                 cv.put(DB.Comment.COLUMN_POST_ID, commentObj.getString("postId"))
@@ -308,35 +310,44 @@ class GotoPostActivity : AppCompatActivity() {
         val wantLike = currentLikeRes != ContextCompat.getDrawable(this, R.drawable.liked)?.constantState
         btnLike.setImageResource(if (wantLike) R.drawable.liked else R.drawable.like)
 
-        val action = if (wantLike) "like" else "unlike"
+        val likedValue = if (wantLike) "1" else "0"
 
         val payload = JSONObject()
-        payload.put("post_id", localPostId)
-        payload.put("user_id", myUid)
-        payload.put("action", action)
+        payload.put("postId", localPostId)
+        payload.put("uid", myUid)
+        payload.put("liked", likedValue)
 
         if (isNetworkAvailable(this)) {
-            val url = AppGlobals.BASE_URL + "like_post.php"
+            val url = AppGlobals.BASE_URL + "posts_like.php"
             val stringRequest = object : StringRequest(Request.Method.POST, url,
                 { response ->
-                    Log.d("GotoPost", "Like action successful")
-                    fetchPostDetailsFromApi() // Refresh to get new count
+                    try {
+                        val json = JSONObject(response)
+                        if (json.getBoolean("success")) {
+                            val dataObj = json.getJSONObject("data")
+                            val newCount = dataObj.getInt("likeCount")
+                            tvLikes.text = "$newCount likes"
+                            Log.d("GotoPost", "Like action successful")
+                        }
+                    } catch (e: Exception) {
+                        Log.e("GotoPost", "Error parsing like response: ${e.message}")
+                    }
                 },
                 { error ->
                     Log.e("GotoPost", "Volley error liking: ${error.message}")
-                    saveToSyncQueue("like_post.php", payload)
+                    saveToSyncQueue("posts_like.php", payload)
                 }) {
                 override fun getParams(): MutableMap<String, String> {
                     val params = HashMap<String, String>()
-                    params["post_id"] = localPostId // Use local var
-                    params["user_id"] = myUid
-                    params["action"] = action
+                    params["postId"] = localPostId
+                    params["uid"] = myUid
+                    params["liked"] = likedValue
                     return params
                 }
             }
             queue.add(stringRequest)
         } else {
-            saveToSyncQueue("like_post.php", payload)
+            saveToSyncQueue("posts_like.php", payload)
         }
     }
 
@@ -361,15 +372,14 @@ class GotoPostActivity : AppCompatActivity() {
 
         val timestamp = System.currentTimeMillis()
         val payload = JSONObject()
-        payload.put("sender_id", myUid)
-        payload.put("receiver_id", recipientId)
-        payload.put("message_type", "post")
+        payload.put("senderUid", myUid)
+        payload.put("receiverUid", recipientId)
+        payload.put("messageType", "post")
         payload.put("content", "Shared a post")
-        payload.put("post_id", localPostId) // Use local var
-        payload.put("timestamp", timestamp)
+        payload.put("postId", localPostId)
 
         if (isNetworkAvailable(this)) {
-            val url = AppGlobals.BASE_URL + "send_message.php"
+            val url = AppGlobals.BASE_URL + "messages_send.php"
             val stringRequest = object : StringRequest(Request.Method.POST, url,
                 { response ->
                     try {
@@ -384,21 +394,21 @@ class GotoPostActivity : AppCompatActivity() {
                 },
                 { error ->
                     Log.e("GotoPost", "Volley error send_message: ${error.message}")
-                    saveToSyncQueue("send_message.php", payload)
+                    saveToSyncQueue("messages_send.php", payload)
                 }) {
                 override fun getParams(): MutableMap<String, String> {
                     val params = HashMap<String, String>()
-                    params["sender_id"] = myUid
-                    params["receiver_id"] = recipientId
-                    params["message_type"] = "post"
+                    params["senderUid"] = myUid
+                    params["receiverUid"] = recipientId
+                    params["messageType"] = "post"
                     params["content"] = "Shared a post"
-                    params["post_id"] = localPostId // Use local var
+                    params["postId"] = localPostId
                     return params
                 }
             }
             queue.add(stringRequest)
         } else {
-            saveToSyncQueue("send_message.php", payload)
+            saveToSyncQueue("messages_send.php", payload)
         }
     }
 
@@ -422,28 +432,28 @@ class GotoPostActivity : AppCompatActivity() {
         val timestamp = System.currentTimeMillis()
 
         val payload = JSONObject()
-        payload.put("post_id", localPostId)
-        payload.put("user_id", myUid)
+        payload.put("postId", localPostId)
+        payload.put("uid", myUid)
         payload.put("text", text)
-        payload.put("commentId", commentId) // Send local ID for tracking
+        payload.put("commentId", commentId)
         payload.put("username", myUsername)
         payload.put("createdAt", timestamp)
 
         if (isNetworkAvailable(this)) {
-            val url = AppGlobals.BASE_URL + "add_comment.php"
+            val url = AppGlobals.BASE_URL + "posts_comment_add.php"
             val stringRequest = object : StringRequest(Request.Method.POST, url,
                 { response ->
                     try {
                         val json = JSONObject(response)
                         if (json.getBoolean("success")) {
-                            val commentObj = json.getJSONObject("data")
+                            val dataObj = json.getJSONObject("data")
                             saveCommentToDb(
-                                commentObj.getString("commentId"),
-                                commentObj.getString("postId"),
-                                commentObj.getString("uid"),
-                                commentObj.getString("username"),
-                                commentObj.getString("text"),
-                                commentObj.getLong("createdAt")
+                                dataObj.getString("commentId"),
+                                dataObj.getString("postId"),
+                                dataObj.getString("uid"),
+                                dataObj.getString("username"),
+                                dataObj.getString("text"),
+                                dataObj.getLong("createdAt")
                             )
                             etCommentInput.text.clear()
                             loadCommentsFromDb()
@@ -459,7 +469,7 @@ class GotoPostActivity : AppCompatActivity() {
                 },
                 { error ->
                     Log.e("GotoPost", "Volley error add_comment: ${error.message}")
-                    saveToSyncQueue("add_comment.php", payload)
+                    saveToSyncQueue("posts_comment_add.php", payload)
                     // Optimistic update for offline error
                     saveCommentToDb(commentId, localPostId, myUid, myUsername, text, timestamp)
                     etCommentInput.text.clear()
@@ -469,8 +479,8 @@ class GotoPostActivity : AppCompatActivity() {
                 }) {
                 override fun getParams(): MutableMap<String, String> {
                     val params = HashMap<String, String>()
-                    params["post_id"] = localPostId // Use local var
-                    params["user_id"] = myUid
+                    params["postId"] = localPostId
+                    params["uid"] = myUid
                     params["text"] = text
                     return params
                 }
@@ -478,7 +488,7 @@ class GotoPostActivity : AppCompatActivity() {
             queue.add(stringRequest)
         } else {
             // Offline - Save to queue
-            saveToSyncQueue("add_comment.php", payload)
+            saveToSyncQueue("posts_comment_add.php", payload)
 
             // Optimistic UI: Add to local DB immediately
             saveCommentToDb(commentId, localPostId, myUid, myUsername, text, timestamp)

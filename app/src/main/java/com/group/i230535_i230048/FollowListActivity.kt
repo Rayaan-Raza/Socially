@@ -1,39 +1,34 @@
 package com.group.i230535_i230048
 
-import android.content.Context // CHANGED
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.util.Base64
-import android.util.Log // CHANGED
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import android.widget.Toast // CHANGED
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.android.volley.Request // CHANGED
-import com.android.volley.RequestQueue // CHANGED
-import com.android.volley.toolbox.StringRequest // CHANGED
-import com.android.volley.toolbox.Volley // CHANGED
-import com.bumptech.glide.Glide
-// REMOVED: Firebase imports
-import com.google.gson.Gson // CHANGED
-import com.google.gson.reflect.TypeToken // CHANGED
-import org.json.JSONObject // CHANGED
-
-// REMOVED: SimpleUser data class (using full User model now)
+import com.android.volley.Request
+import com.android.volley.RequestQueue
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import org.json.JSONObject
 
 class FollowListActivity : AppCompatActivity() {
 
     private lateinit var recycler: RecyclerView
     private lateinit var emptyText: TextView
-    private lateinit var queue: RequestQueue // CHANGED
+    private lateinit var queue: RequestQueue
 
-    private val list = mutableListOf<User>() // CHANGED: Now a list of full User
+    private val list = mutableListOf<User>()
     private lateinit var adapter: FollowUserAdapter
 
     private var mode: String = "followers"
@@ -43,7 +38,7 @@ class FollowListActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_follow_list)
 
-        queue = Volley.newRequestQueue(this) // CHANGED
+        queue = Volley.newRequestQueue(this)
 
         mode = intent.getStringExtra("mode") ?: "followers"
         targetUid = intent.getStringExtra("uid") ?: ""
@@ -59,7 +54,6 @@ class FollowListActivity : AppCompatActivity() {
         recycler.layoutManager = LinearLayoutManager(this)
         recycler.addItemDecoration(DividerItemDecoration(this, DividerItemDecoration.VERTICAL))
 
-        // CHANGED: Adapter now takes List<User>
         adapter = FollowUserAdapter(list) { clicked ->
             startActivity(Intent(this, view_profile::class.java).apply {
                 putExtra("userId", clicked.uid)
@@ -70,7 +64,6 @@ class FollowListActivity : AppCompatActivity() {
         loadListFromApi()
     }
 
-    // --- CHANGED: Replaced Firebase logic with a single API call ---
     private fun loadListFromApi() {
         if (targetUid.isEmpty()) {
             emptyText.visibility = View.VISIBLE
@@ -78,8 +71,9 @@ class FollowListActivity : AppCompatActivity() {
             return
         }
 
-        val endpoint = if (mode == "followers") "get_followers.php" else "get_following.php"
-        val url = AppGlobals.BASE_URL + "$endpoint?user_id=$targetUid" // (from ApiService.kt)
+        // API Spec: followers_list.php?uid=user_uid OR following_list.php?uid=user_uid
+        val endpoint = if (mode == "followers") "followers_list.php" else "following_list.php"
+        val url = AppGlobals.BASE_URL + "$endpoint?uid=$targetUid"
 
         val stringRequest = StringRequest(Request.Method.GET, url,
             { response ->
@@ -88,11 +82,24 @@ class FollowListActivity : AppCompatActivity() {
                     if (json.getBoolean("success")) {
                         val dataArray = json.getJSONArray("data")
 
-                        val listType = object : TypeToken<List<User>>() {}.type
-                        val users: List<User> = Gson().fromJson(dataArray.toString(), listType)
-
                         list.clear()
-                        list.addAll(users)
+                        for (i in 0 until dataArray.length()) {
+                            val userObj = dataArray.getJSONObject(i)
+                            list.add(
+                                User(
+                                    uid = userObj.getString("uid"),
+                                    username = userObj.getString("username"),
+                                    fullName = userObj.optString("fullName", ""),
+                                    bio = userObj.optString("bio", ""),
+                                    profilePictureUrl = userObj.optString("profilePictureUrl", ""),
+                                    photo = userObj.optString("photo", ""),
+                                    followersCount = userObj.optInt("followersCount", 0),
+                                    followingCount = userObj.optInt("followingCount", 0),
+                                    postsCount = userObj.optInt("postsCount", 0)
+                                )
+                            )
+                        }
+
                         adapter.notifyDataSetChanged()
 
                         if (list.isEmpty()) {
@@ -117,10 +124,8 @@ class FollowListActivity : AppCompatActivity() {
         )
         queue.add(stringRequest)
     }
-    // REMOVED: loadList() and fetchUsers()
 }
 
-// --- CHANGED: Adapter now uses the full User model ---
 class FollowUserAdapter(
     private val data: List<User>,
     private val onClick: (User) -> Unit
@@ -142,10 +147,7 @@ class FollowUserAdapter(
         h.username.text = u.username
         h.subtitle.text = u.fullName
 
-        // CHANGED: Use our standard loadUserAvatar function
         h.avatar.loadUserAvatar(u.uid, u.uid, R.drawable.default_avatar)
-
-        // REMOVED: Old complex Glide logic
 
         h.itemView.setOnClickListener { onClick(u) }
     }

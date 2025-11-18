@@ -1,39 +1,36 @@
 package com.group.i230535_i230048
 
-import android.content.Context // CHANGED
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Base64
-import android.util.Log // CHANGED
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import android.widget.Toast // CHANGED
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.android.volley.Request // CHANGED
-import com.android.volley.RequestQueue // CHANGED
-import com.android.volley.toolbox.StringRequest // CHANGED
-import com.android.volley.toolbox.Volley // CHANGED
+import com.android.volley.Request
+import com.android.volley.RequestQueue
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
 import com.bumptech.glide.Glide
-// REMOVED: Firebase imports
-import com.google.gson.Gson // CHANGED
-import com.google.gson.reflect.TypeToken // CHANGED
-import org.json.JSONObject // CHANGED
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import org.json.JSONObject
 
-// REMOVED: FollowRequest data class
-
-// --- CHANGED: Adapter now uses the full User model ---
+// Adapter for displaying follow requests
 class FollowRequestAdapter(
-    private val items: MutableList<User>,
-    private val onAccept: (User) -> Unit,
-    private val onDelete: (User) -> Unit
+    private val items: MutableList<FollowRequestItem>,
+    private val onAccept: (FollowRequestItem) -> Unit,
+    private val onDelete: (FollowRequestItem) -> Unit
 ) : RecyclerView.Adapter<FollowRequestAdapter.VH>() {
 
     inner class VH(view: View) : RecyclerView.ViewHolder(view) {
@@ -51,11 +48,22 @@ class FollowRequestAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
-        holder.username.text = item.username.ifBlank { item.uid.take(8) }
+        val profile = item.senderProfile
+
+        holder.username.text = profile?.username?.ifBlank { item.senderUid.take(8) } ?: item.senderUid.take(8)
         holder.subtitle.text = "wants to follow you"
 
-        // CHANGED: Use our standard loadUserAvatar function
-        holder.avatar.loadUserAvatar(item.uid, item.uid, R.drawable.default_avatar)
+        // Load avatar using existing avatar utility
+        try {
+            if (profile != null) {
+                holder.avatar.loadUserAvatar(profile.uid, profile.uid, R.drawable.default_avatar)
+            } else {
+                holder.avatar.setImageResource(R.drawable.default_avatar)
+            }
+        } catch (e: Exception) {
+            Log.e("FollowRequestAdapter", "Error loading avatar: ${e.message}")
+            holder.avatar.setImageResource(R.drawable.default_avatar)
+        }
 
         holder.btnAccept.setOnClickListener { onAccept(item) }
         holder.btnDelete.setOnClickListener { onDelete(item) }
@@ -63,37 +71,54 @@ class FollowRequestAdapter(
 
     override fun getItemCount() = items.size
 
-    fun removeItem(item: User) {
-        val idx = items.indexOfFirst { it.uid == item.uid }
+    fun removeItem(item: FollowRequestItem) {
+        val idx = items.indexOfFirst { it.senderUid == item.senderUid }
         if (idx >= 0) {
             items.removeAt(idx)
             notifyItemRemoved(idx)
         }
     }
 
-    fun setItems(users: List<User>) {
+    fun setItems(requests: List<FollowRequestItem>) {
         items.clear()
-        items.addAll(users)
+        items.addAll(requests)
         notifyDataSetChanged()
     }
 }
 
+// Data class matching the PHP response structure
+data class FollowRequestItem(
+    val requestId: String,
+    val senderUid: String,
+    val createdAt: Long,
+    val senderProfile: SenderProfile?
+)
+
+data class SenderProfile(
+    val uid: String,
+    val username: String,
+    val fullName: String,
+    val avatar: String?,
+    val avatarType: String?
+)
+
 class you_page : AppCompatActivity() {
 
-    // --- CHANGED: Swapped to Volley/DB/Session ---
     private lateinit var queue: RequestQueue
     private var meUid: String = ""
-    // ---
 
     private lateinit var adapter: FollowRequestAdapter
     private lateinit var recycler: RecyclerView
-    private val requestList = mutableListOf<User>()
+    private lateinit var emptyStateText: TextView
+    private val requestList = mutableListOf<FollowRequestItem>()
 
-    // REMOVED: Listener refs
-
-    // CHANGED: Migrated to load from local DB
     fun loadBottomBarAvatar(navProfile: ImageView) {
-        navProfile.loadUserAvatar(meUid, meUid, R.drawable.oval)
+        try {
+            navProfile.loadUserAvatar(meUid, meUid, R.drawable.oval)
+        } catch (e: Exception) {
+            Log.e("you_page", "Error loading avatar: ${e.message}")
+            navProfile.setImageResource(R.drawable.oval)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -101,16 +126,15 @@ class you_page : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(R.layout.activity_you_page)
 
-        // --- CHANGED: Setup DB, Volley, and Session ---
         queue = Volley.newRequestQueue(this)
 
         val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
         meUid = prefs.getString(AppGlobals.KEY_USER_UID, "") ?: ""
-        // ---
 
         if (meUid.isEmpty()) {
             Toast.makeText(this, "Not logged in", Toast.LENGTH_SHORT).show()
-            finish(); return
+            finish()
+            return
         }
 
         val navProfile = findViewById<ImageView>(R.id.nav_profile)
@@ -124,88 +148,169 @@ class you_page : AppCompatActivity() {
 
         // Tabs + nav
         findViewById<TextView>(R.id.tab_following).setOnClickListener {
-            startActivity(Intent(this, following_page::class.java)); finish()
+            startActivity(Intent(this, following_page::class.java))
+            finish()
         }
-        // ... other nav clicks ...
 
         // Recycler setup
         recycler = findViewById(R.id.requestsRecycler)
         recycler.layoutManager = LinearLayoutManager(this)
+
         adapter = FollowRequestAdapter(requestList,
             onAccept = { item -> respondToRequest(item, "accept") },
             onDelete = { item -> respondToRequest(item, "reject") }
         )
         recycler.adapter = adapter
 
-        // CHANGED: Load from API
-        attachRequestsListener()
+        // Empty state text
+        emptyStateText = findViewById(R.id.emptyStateText)
+
+        // Load follow requests
+        loadFollowRequests()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        // REMOVED: listener removal
     }
 
-    // --- CHANGED: Migrated to fetch from API ---
-    private fun attachRequestsListener() {
-        // TODO: Dev A needs to create this API endpoint
-        val url = AppGlobals.BASE_URL + "get_follow_requests.php?uid=$meUid"
+    private fun loadFollowRequests() {
+        Log.d("you_page", "Loading follow requests for uid: $meUid")
+
+        // Use existing follow_requests_list.php endpoint
+        val url = AppGlobals.BASE_URL + "follow_requests_list.php?uid=$meUid"
 
         val stringRequest = StringRequest(Request.Method.GET, url,
             { response ->
                 try {
+                    Log.d("you_page", "Raw response: $response")
                     val json = JSONObject(response)
-                    if (json.getBoolean("success")) {
-                        val dataArray = json.getJSONArray("data")
-                        val listType = object : TypeToken<List<User>>() {}.type
-                        val users: List<User> = Gson().fromJson(dataArray.toString(), listType)
 
-                        adapter.setItems(users) // Update adapter
-                        // TODO: Show/hide empty state TextView
+                    if (json.getBoolean("success")) {
+                        val dataObj = json.getJSONObject("data")
+                        val requestsArray = dataObj.getJSONArray("requests")
+
+                        Log.d("you_page", "Found ${requestsArray.length()} follow requests")
+
+                        val requests = mutableListOf<FollowRequestItem>()
+
+                        for (i in 0 until requestsArray.length()) {
+                            val reqObj = requestsArray.getJSONObject(i)
+
+                            val senderProfile = if (reqObj.has("senderProfile") && !reqObj.isNull("senderProfile")) {
+                                val profileObj = reqObj.getJSONObject("senderProfile")
+                                SenderProfile(
+                                    uid = profileObj.getString("uid"),
+                                    username = profileObj.optString("username", ""),
+                                    fullName = profileObj.optString("fullName", ""),
+                                    avatar = profileObj.optString("avatar", null),
+                                    avatarType = profileObj.optString("avatarType", null)
+                                )
+                            } else {
+                                null
+                            }
+
+                            requests.add(
+                                FollowRequestItem(
+                                    requestId = reqObj.getString("requestId"),
+                                    senderUid = reqObj.getString("senderUid"),
+                                    createdAt = reqObj.getLong("createdAt"),
+                                    senderProfile = senderProfile
+                                )
+                            )
+                        }
+
+                        adapter.setItems(requests)
+                        updateEmptyState(requests.isEmpty())
+
                     } else {
-                        Log.w("you_page", "API error: ${json.getString("message")}")
+                        val errorMsg = json.optString("message", "Unknown error")
+                        Log.w("you_page", "API error: $errorMsg")
+                        updateEmptyState(true)
                     }
-                } catch (e: Exception) { Log.e("you_page", "Error parsing requests: ${e.message}") }
+                } catch (e: Exception) {
+                    Log.e("you_page", "Error parsing requests: ${e.message}")
+                    Log.e("you_page", "Response was: $response")
+                    Log.e("you_page", "Stack trace: ${e.stackTraceToString()}")
+                    updateEmptyState(true)
+                }
             },
-            { error -> Log.e("you_page", "Volley error fetching requests: ${error.message}") }
+            { error ->
+                Log.e("you_page", "Volley error fetching requests: ${error.message}")
+                error.networkResponse?.let {
+                    Log.e("you_page", "Network response code: ${it.statusCode}")
+                    Log.e("you_page", "Network response: ${String(it.data)}")
+                }
+                Toast.makeText(this, "Failed to load requests", Toast.LENGTH_SHORT).show()
+                updateEmptyState(true)
+            }
         )
         queue.add(stringRequest)
     }
 
-    // REMOVED: fetchRequester()
+    private fun respondToRequest(request: FollowRequestItem, action: String) {
+        Log.d("you_page", "Responding to request - senderUid: ${request.senderUid}, action: $action")
 
-    // --- CHANGED: Migrated to one function that calls API ---
-    private fun respondToRequest(requester: User, action: String) { // action is "accept" or "reject"
-        // TODO: Dev A needs to create this API endpoint
-        val url = AppGlobals.BASE_URL + "respond_follow_request.php"
+        // Use existing follow_request_action.php endpoint
+        val url = AppGlobals.BASE_URL + "follow_request_action.php"
 
         val stringRequest = object : StringRequest(Request.Method.POST, url,
             { response ->
                 try {
+                    Log.d("you_page", "Response from action: $response")
                     val json = JSONObject(response)
+
                     if (json.getBoolean("success")) {
-                        // On success, remove the item from the list
-                        adapter.removeItem(requester)
-                        Toast.makeText(this, "Request $action" + "ed", Toast.LENGTH_SHORT).show()
+                        // Remove the request from the list
+                        adapter.removeItem(request)
+
+                        val message = if (action == "accept") "Request accepted" else "Request rejected"
+                        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+
+                        // Update empty state if needed
+                        updateEmptyState(adapter.itemCount == 0)
+
                     } else {
-                        Toast.makeText(this, "Failed: ${json.getString("message")}", Toast.LENGTH_SHORT).show()
+                        val errorMsg = json.optString("message", "Unknown error")
+                        Log.e("you_page", "Failed to $action request: $errorMsg")
+                        Toast.makeText(this, "Failed: $errorMsg", Toast.LENGTH_SHORT).show()
                     }
-                } catch (e: Exception) { Log.e("you_page", "Error parsing response: ${e.message}") }
+                } catch (e: Exception) {
+                    Log.e("you_page", "Error parsing response: ${e.message}")
+                    Log.e("you_page", "Response was: $response")
+                    Log.e("you_page", "Stack trace: ${e.stackTraceToString()}")
+                    Toast.makeText(this, "Error processing request", Toast.LENGTH_SHORT).show()
+                }
             },
             { error ->
                 Log.e("you_page", "Volley error responding: ${error.message}")
+                error.networkResponse?.let {
+                    Log.e("you_page", "Network response code: ${it.statusCode}")
+                    Log.e("you_page", "Network response: ${String(it.data)}")
+                }
                 Toast.makeText(this, "Network error", Toast.LENGTH_SHORT).show()
             }) {
             override fun getParams(): MutableMap<String, String> {
                 val params = HashMap<String, String>()
-                params["requester_id"] = requester.uid
-                params["my_id"] = meUid
-                params["action"] = action // "accept" or "reject"
+                // follow_request_action.php expects: uid, senderUid, action
+                params["uid"] = meUid           // receiver (me)
+                params["senderUid"] = request.senderUid  // sender (requester)
+                params["action"] = action       // "accept" or "reject"
+
+                Log.d("you_page", "Sending params: uid=$meUid, senderUid=${request.senderUid}, action=$action")
                 return params
             }
         }
         queue.add(stringRequest)
     }
 
-    // REMOVED: acceptRequest() and declineRequest()
+    private fun updateEmptyState(isEmpty: Boolean) {
+        if (isEmpty) {
+            emptyStateText.visibility = View.VISIBLE
+            recycler.visibility = View.GONE
+            emptyStateText.text = "No pending follow requests"
+        } else {
+            emptyStateText.visibility = View.GONE
+            recycler.visibility = View.VISIBLE
+        }
+    }
 }

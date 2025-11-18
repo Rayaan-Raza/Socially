@@ -23,6 +23,7 @@ import org.json.JSONObject
 class camera_story : AppCompatActivity() {
 
     private lateinit var queue: RequestQueue
+    private var currentUid: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,42 +38,58 @@ class camera_story : AppCompatActivity() {
 
         queue = Volley.newRequestQueue(this)
 
+        val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
+        currentUid = prefs.getString(AppGlobals.KEY_USER_UID, "") ?: ""
+
+        if (currentUid.isEmpty()) {
+            Toast.makeText(this, "Not logged in.", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+
         val img = findViewById<ImageView>(R.id.storyImage)
         val close = findViewById<ImageView>(R.id.closeBtn)
         close.setOnClickListener { finish() }
 
-        val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
-        val myUid = prefs.getString(AppGlobals.KEY_USER_UID, "") ?: ""
+        // Get target user ID from intent, default to current user (for "Your Story")
+        val targetUid = intent.getStringExtra("uid") ?: currentUid
 
-        val targetUid = intent.getStringExtra("uid") ?: myUid
+        // API REFERENCE: Section 4.3 - stories_get_user.php
+        // GET stories_get_user.php?user_uid=<uid>
+        // Returns non-expired stories of this user
+        fetchUserStoriesFromApi(targetUid, img)
+    }
 
-        if (targetUid.isEmpty()) {
-            Toast.makeText(this, "Not logged in.", Toast.LENGTH_SHORT).show()
-            finish(); return
-        }
+    private fun fetchUserStoriesFromApi(targetUid: String, imageView: ImageView) {
+        Log.d("camera_story", "Fetching stories for user: $targetUid")
 
-        val url = AppGlobals.BASE_URL + "get_stories.php?user_id=$targetUid"
+        val url = AppGlobals.BASE_URL + "stories_get_user.php?user_uid=$targetUid"
 
         val stringRequest = StringRequest(Request.Method.GET, url,
             { response ->
                 try {
+                    Log.d("camera_story", "Raw API response: $response")
                     val json = JSONObject(response)
                     if (json.getBoolean("success")) {
-                        val dataArray = json.getJSONArray("data")
+                        val dataArray = json.getJSONArray("stories")
+                        Log.d("camera_story", "Stories array: $dataArray")
 
-                        // --- CORRECTED: Use your Story_data class ---
                         val listType = object : TypeToken<List<Story_data>>() {}.type
                         val stories: List<Story_data> = Gson().fromJson(dataArray.toString(), listType)
-                        // ---
 
-                        // Replicate original logic: Find latest, unexpired story
+                        Log.d("camera_story", "Parsed ${stories.size} stories")
+
+                        if (stories.isEmpty()) {
+                            Toast.makeText(this, "No active stories!", Toast.LENGTH_SHORT).show()
+                            finish()
+                            return@StringRequest
+                        }
+
+                        // Find latest non-expired story
                         val now = System.currentTimeMillis()
-
-                        // --- CORRECTED: Use properties from Story_data ---
                         val latestStory = stories
                             .filter { it.expiresAt > now }
                             .maxByOrNull { it.createdAt }
-                        // ---
 
                         if (latestStory == null) {
                             Toast.makeText(this, "No active stories!", Toast.LENGTH_SHORT).show()
@@ -80,32 +97,98 @@ class camera_story : AppCompatActivity() {
                             return@StringRequest
                         }
 
-                        // --- CORRECTED: Only use mediaUrl ---
-                        if (latestStory.mediaUrl.isNotEmpty()) {
-                            // Your Story_data model only has mediaUrl, so we use Glide
-                            Glide.with(this).load(latestStory.mediaUrl).into(img)
-                        } else {
-                            // The model does not have Base64, so this is an error
-                            throw Exception("Story media is empty")
-                        }
-                        // ---
+                        Log.d("camera_story", "Latest story - storyId: ${latestStory.storyId}, mediaUrl: ${latestStory.mediaUrl.take(50)}, mediaBase64 length: ${latestStory.mediaBase64.length}")
+
+                        // Load story media
+                        loadStoryMedia(latestStory, imageView)
 
                     } else {
-                        Toast.makeText(this, "No active stories!", Toast.LENGTH_SHORT).show()
+                        val errorMsg = json.optString("message", "No active stories")
+                        Log.w("camera_story", "API error: $errorMsg")
+                        Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show()
                         finish()
                     }
                 } catch (e: Exception) {
                     Log.e("camera_story", "Error parsing stories: ${e.message}")
-                    Toast.makeText(this, "Error loading story.", Toast.LENGTH_SHORT).show()
+                    Log.e("camera_story", "Response was: $response")
+                    Log.e("camera_story", "Stack trace: ${e.stackTraceToString()}")
+                    Toast.makeText(this, "Error loading story: ${e.message}", Toast.LENGTH_SHORT).show()
                     finish()
                 }
             },
             { error ->
                 Log.e("camera_story", "Volley error: ${error.message}")
-                Toast.makeText(this, "Failed to load story.", Toast.LENGTH_LONG).show()
+                error.networkResponse?.let {
+                    Log.e("camera_story", "Network response code: ${it.statusCode}")
+                    Log.e("camera_story", "Network response data: ${String(it.data)}")
+                }
+                Toast.makeText(this, "Failed to load story: ${error.message}", Toast.LENGTH_LONG).show()
                 finish()
             }
         )
         queue.add(stringRequest)
+    }
+
+    private fun loadStoryMedia(story: Story_data, imageView: ImageView) {
+        try {
+            Log.d("camera_story", "Loading story media...")
+            Log.d("camera_story", "mediaUrl: ${story.mediaUrl.take(100)}")
+            Log.d("camera_story", "mediaBase64 length: ${story.mediaBase64.length}")
+
+            // Priority 1: Check if mediaBase64 has data (this is what PHP returns)
+            if (story.mediaBase64.isNotEmpty()) {
+                try {
+                    Log.d("camera_story", "Attempting to load from mediaBase64 field")
+                    val imageBytes = Base64.decode(story.mediaBase64, Base64.DEFAULT)
+                    val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                    if (bitmap != null) {
+                        imageView.setImageBitmap(bitmap)
+                        Log.d("camera_story", "Successfully loaded story from mediaBase64")
+                        return
+                    } else {
+                        Log.w("camera_story", "Bitmap decode returned null from mediaBase64")
+                    }
+                } catch (e: Exception) {
+                    Log.e("camera_story", "Failed to load from mediaBase64: ${e.message}")
+                }
+            }
+
+            // Priority 2: Check if it's a URL
+            if (story.mediaUrl.isNotEmpty() &&
+                (story.mediaUrl.startsWith("http://") || story.mediaUrl.startsWith("https://"))) {
+                Log.d("camera_story", "Attempting to load from URL: ${story.mediaUrl}")
+                Glide.with(this)
+                    .load(story.mediaUrl)
+                    .placeholder(R.drawable.person1)
+                    .error(R.drawable.person1)
+                    .into(imageView)
+                return
+            }
+
+            // Priority 3: Check if mediaUrl contains base64 data (fallback)
+            if (story.mediaUrl.isNotEmpty()) {
+                try {
+                    Log.d("camera_story", "Attempting to load mediaUrl as base64")
+                    val imageBytes = Base64.decode(story.mediaUrl, Base64.DEFAULT)
+                    val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                    if (bitmap != null) {
+                        imageView.setImageBitmap(bitmap)
+                        Log.d("camera_story", "Successfully loaded story from mediaUrl as base64")
+                        return
+                    }
+                } catch (e: Exception) {
+                    Log.e("camera_story", "Failed to load mediaUrl as base64: ${e.message}")
+                }
+            }
+
+            // If we get here, nothing worked
+            throw Exception("Story has no valid media data")
+
+        } catch (e: Exception) {
+            Log.e("camera_story", "Error loading story media: ${e.message}")
+            Log.e("camera_story", "Stack trace: ${e.stackTraceToString()}")
+            Toast.makeText(this, "Could not load story image: ${e.message}", Toast.LENGTH_SHORT).show()
+            imageView.setImageResource(R.drawable.person1)
+        }
     }
 }

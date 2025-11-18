@@ -2,7 +2,7 @@ package com.group.i230535_i230048 // Your main package
 
 import android.app.Application
 import androidx.work.*
-import com.group.i230535_i230048.sync.SyncWorker
+import com.group.i230535_i230048.SyncWorker
 import java.util.concurrent.TimeUnit
 
 class SyncApplication : Application() {

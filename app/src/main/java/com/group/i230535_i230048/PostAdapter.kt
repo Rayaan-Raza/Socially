@@ -98,22 +98,9 @@ class PostFeedAdapter(
         h.username.text = shownName
         h.tvCaption.text = "$shownName  ${item.caption}"
 
-        // If username is missing from post, fetch, cache, and update UI
-        if (item.username.isBlank() && !usernameCache.containsKey(item.uid)) {
-            val userRef = FirebaseDatabase.getInstance().getReference("users").child(item.uid)
-            userRef.child("username").addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(s: DataSnapshot) {
-                    val name = (s.getValue(String::class.java) ?: "user").ifBlank { "user" }
-                    usernameCache[item.uid] = name // Cache it
-                    item.username = name // Update item in list
-                    notifyItemChanged(position) // Re-bind this view
-                }
-                override fun onCancelled(error: DatabaseError) {}
-            })
-        }
-
-        // --- Avatar (can be enhanced to load user's real avatar) ---
-        h.avatar.setImageResource(R.drawable.oval)
+        // --- Avatar ---
+        // Using the loadUserAvatar extension function
+        h.avatar.loadUserAvatar(item.uid, item.uid, R.drawable.oval)
 
         // --- Post Image (URL preferred, Base64 as fallback) ---
         if (item.imageUrl.isNotEmpty()) {
@@ -162,7 +149,7 @@ class PostFeedAdapter(
             val decodedBytes = Base64.decode(base64String, Base64.DEFAULT)
             BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
         } catch (e: IllegalArgumentException) {
-            null // Handle invalid Base64 string gracefully
+            null
         }
     }
 }

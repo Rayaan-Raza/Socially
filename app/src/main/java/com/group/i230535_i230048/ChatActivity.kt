@@ -2,19 +2,19 @@ package com.group.i230535_i230048
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.content.ContentValues // CHANGED
-import android.content.Context // CHANGED
+import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.database.ContentObserver
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
-import android.net.ConnectivityManager // CHANGED
-import android.net.NetworkCapabilities // CHANGED
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler // CHANGED
-import android.os.Looper // CHANGED
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
@@ -27,27 +27,20 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-// REMOVED: All Firebase imports
-import com.android.volley.Request // CHANGED
-import com.android.volley.RequestQueue // CHANGED
-import com.android.volley.toolbox.StringRequest // CHANGED
-import com.android.volley.toolbox.Volley // CHANGED
-import com.google.gson.Gson // CHANGED
-import com.google.gson.reflect.TypeToken // CHANGED
-import com.group.i230535_i230048.AppDbHelper // CHANGED
-import com.group.i230535_i230048.DB // CHANGED
-import org.json.JSONObject // CHANGED
+import com.android.volley.Request
+import com.android.volley.RequestQueue
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
+import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.util.UUID
 
 class ChatActivity : AppCompatActivity() {
 
-    // --- CHANGED: Removed Firebase, added Volley, DB, and session ---
     private lateinit var dbHelper: AppDbHelper
     private lateinit var queue: RequestQueue
     private var myUid: String = ""
     private var myUsername: String = ""
-    // ---
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var messageInput: EditText
@@ -60,10 +53,13 @@ class ChatActivity : AppCompatActivity() {
 
     private val PICK_IMAGE = 102
 
-    // --- CHANGED: Added for online status polling ---
     private val statusHandler = Handler(Looper.getMainLooper())
     private var statusRunnable: Runnable? = null
-    // ---
+
+    // For polling new messages
+    private val messagePollingHandler = Handler(Looper.getMainLooper())
+    private var messagePollingRunnable: Runnable? = null
+    private var lastMessageTimestamp: Long = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,14 +72,12 @@ class ChatActivity : AppCompatActivity() {
             insets
         }
 
-        // --- CHANGED: Setup DB, Volley, and Session ---
         dbHelper = AppDbHelper(this)
         queue = Volley.newRequestQueue(this)
 
         val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
         myUid = prefs.getString(AppGlobals.KEY_USER_UID, "") ?: ""
         myUsername = prefs.getString(AppGlobals.KEY_USERNAME, "user") ?: "user"
-        // ---
 
         if (myUid.isEmpty()) {
             Toast.makeText(this, "Not logged in", Toast.LENGTH_SHORT).show()
@@ -91,7 +85,6 @@ class ChatActivity : AppCompatActivity() {
             return
         }
 
-        // Intent extras
         otherUserId = intent.getStringExtra("userId") ?: ""
         otherUserName = intent.getStringExtra("username") ?: ""
 
@@ -109,36 +102,63 @@ class ChatActivity : AppCompatActivity() {
 
         Log.d("ChatActivity", "Chat ID: $chatId")
 
-        // REMOVED: Firebase references
-
-        // This is a requirement (Task #12)
         registerScreenshotObserver()
-
         setupViews()
         setupRecyclerView()
 
-        // REMOVED: createOrGetChat (backend's send_message.php will handle this)
+        // Ensure chat exists in backend
+        ensureChatExists()
     }
 
-    // --- CHANGED: Moved message loading to onStart ---
     override fun onStart() {
         super.onStart()
-        // 1. Load messages from local DB first
         loadMessagesFromDb()
-        // 2. Fetch new messages from API
         fetchMessagesFromApi()
-        // 3. Start polling for user's online status
         startPollingUserStatus()
+        startPollingMessages()
     }
 
     override fun onStop() {
         super.onStop()
-        // 4. Stop polling when activity is not visible
         stopPollingUserStatus()
+        stopPollingMessages()
+    }
+
+    /**
+     * Ensures the chat exists on the server before fetching messages
+     * Uses chat_create.php
+     */
+    private fun ensureChatExists() {
+        if (!isNetworkAvailable(this)) return
+
+        val url = AppGlobals.BASE_URL + "chat_create.php"
+        val stringRequest = object : StringRequest(Request.Method.POST, url,
+            { response ->
+                try {
+                    val cleaned = cleanJsonResponse(response)
+                    val json = JSONObject(cleaned)
+                    if (json.getBoolean("success")) {
+                        val dataObj = json.getJSONObject("data")
+                        val createdNow = dataObj.optBoolean("createdNow", false)
+                        Log.d("ChatActivity", "Chat exists/created. createdNow: $createdNow")
+                    }
+                } catch (e: Exception) {
+                    Log.e("ChatActivity", "Error ensuring chat exists: ${e.message}")
+                }
+            },
+            { error -> Log.e("ChatActivity", "Error creating chat: ${error.message}") }
+        ) {
+            override fun getParams(): MutableMap<String, String> {
+                val params = HashMap<String, String>()
+                params["uid1"] = myUid
+                params["uid2"] = otherUserId
+                return params
+            }
+        }
+        queue.add(stringRequest)
     }
 
     private fun registerScreenshotObserver() {
-        // --- This logic for screenshot detection is fine ---
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requestPermissions(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES), 1)
         } else {
@@ -149,7 +169,6 @@ class ChatActivity : AppCompatActivity() {
             override fun onChange(selfChange: Boolean) {
                 super.onChange(selfChange)
                 Log.d("Screenshot", "Screenshot detected!")
-                // CHANGED: Call our new API function
                 sendScreenshotEventToApi()
             }
         }
@@ -165,8 +184,11 @@ class ChatActivity : AppCompatActivity() {
         findViewById<ImageView>(R.id.back).setOnClickListener { finish() }
         findViewById<TextView>(R.id.username).text = otherUserName
 
-        // TODO: Load avatar using loadUserAvatar
-        // findViewById<ImageView>(R.id.avatar_image).loadUserAvatar(otherUserId, myUid, R.drawable.oval)
+        // Avatar is a TextView showing initials, not an ImageView
+        val initials = if (otherUserName.isNotEmpty()) {
+            otherUserName.split(" ").take(2).map { it.first() }.joinToString("").uppercase()
+        } else "?"
+        findViewById<TextView>(R.id.avatar).text = initials
 
         messageInput = findViewById(R.id.message_input)
         findViewById<ImageView>(R.id.sendButton).setOnClickListener { sendTextMessage() }
@@ -190,19 +212,14 @@ class ChatActivity : AppCompatActivity() {
             showUserInfo()
         }
 
-        // --- CHANGED: Call buttons need to be migrated (Task #7) ---
         findViewById<ImageView>(R.id.voice).setOnClickListener {
-            // REMOVED: CallManager.initiateCall
-            // TODO: This now needs to call your backend to get an Agora token
-            // and send an FCM to the other user.
-            Toast.makeText(this, "Calling... (feature pending)", Toast.LENGTH_SHORT).show()
-            // initiateAgoraCall(isVideoCall = false)
+            // Initiate audio call
+            initiateCall(isVideoCall = false)
         }
 
         findViewById<ImageView>(R.id.video).setOnClickListener {
-            // REMOVED: CallManager.initiateCall
-            Toast.makeText(this, "Video calling... (feature pending)", Toast.LENGTH_SHORT).show()
-            // initiateAgoraCall(isVideoCall = true)
+            // Initiate video call
+            initiateCall(isVideoCall = true)
         }
     }
 
@@ -212,14 +229,34 @@ class ChatActivity : AppCompatActivity() {
             showMessageOptions(message)
         }
         val layoutManager = LinearLayoutManager(this)
-        layoutManager.stackFromEnd = true // Keep this
+        layoutManager.stackFromEnd = true
         recyclerView.layoutManager = layoutManager
         recyclerView.adapter = adapter
     }
 
-    // REMOVED: createOrGetChat()
+    /**
+     * Helper to clean PHP errors from JSON response
+     */
+    private fun cleanJsonResponse(response: String): String {
+        var cleaned = response.trim()
 
-    // --- NEW: Load messages from local SQLite DB ---
+        if (cleaned.contains("Fatal error") || cleaned.contains("Parse error") || cleaned.contains("Uncaught")) {
+            Log.e("ChatActivity", "PHP Fatal error in response")
+            return "{\"success\": false, \"message\": \"Server error\"}"
+        }
+
+        if (!cleaned.startsWith("{") && !cleaned.startsWith("[")) {
+            val jsonStart = cleaned.indexOf("{\"")
+            if (jsonStart > 0) {
+                cleaned = cleaned.substring(jsonStart)
+            } else if (jsonStart == -1) {
+                return "{\"success\": false, \"message\": \"Invalid response\"}"
+            }
+        }
+
+        return cleaned
+    }
+
     private fun loadMessagesFromDb() {
         Log.d("ChatActivity", "Loading messages from DB...")
         messagesList.clear()
@@ -234,20 +271,29 @@ class ChatActivity : AppCompatActivity() {
         )
 
         while (cursor.moveToNext()) {
-            messagesList.add(
-                Message(
-                    messageId = cursor.getString(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_MESSAGE_ID)),
-                    senderId = cursor.getString(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_SENDER_ID)),
-                    receiverId = cursor.getString(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_RECEIVER_ID)),
-                    messageType = cursor.getString(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_MESSAGE_TYPE)),
-                    content = cursor.getString(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_CONTENT)),
-                    imageUrl = cursor.getString(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_IMAGE_URL)),
-                    postId = cursor.getString(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_POST_ID)),
-                    timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_TIMESTAMP)),
-                    isEdited = cursor.getInt(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_IS_EDITED)) == 1,
-                    isDeleted = cursor.getInt(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_IS_DELETED)) == 1
+            try {
+                val timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_TIMESTAMP))
+                messagesList.add(
+                    Message(
+                        messageId = cursor.getString(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_MESSAGE_ID)) ?: "",
+                        senderId = cursor.getString(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_SENDER_ID)) ?: "",
+                        receiverId = cursor.getString(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_RECEIVER_ID)) ?: "",
+                        messageType = cursor.getString(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_MESSAGE_TYPE)) ?: "text",
+                        content = cursor.getString(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_CONTENT)) ?: "",
+                        imageUrl = cursor.getString(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_IMAGE_URL)) ?: "",
+                        postId = cursor.getString(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_POST_ID)) ?: "",
+                        timestamp = timestamp,
+                        isEdited = cursor.getInt(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_IS_EDITED)) == 1,
+                        isDeleted = cursor.getInt(cursor.getColumnIndexOrThrow(DB.Message.COLUMN_IS_DELETED)) == 1
+                    )
                 )
-            )
+                // Track latest timestamp
+                if (timestamp > lastMessageTimestamp) {
+                    lastMessageTimestamp = timestamp
+                }
+            } catch (e: Exception) {
+                Log.e("ChatActivity", "Error parsing message from DB: ${e.message}")
+            }
         }
         cursor.close()
 
@@ -258,28 +304,62 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
-    // --- NEW: Fetch new messages from API ---
+    /**
+     * Fetch all messages using messages_get.php (existing API)
+     */
     private fun fetchMessagesFromApi() {
         if (!isNetworkAvailable(this)) {
             Log.d("ChatActivity", "Offline, skipping API message fetch.")
             return
         }
 
-        val url = AppGlobals.BASE_URL + "get_messages.php?chat_id=$chatId" // (from ApiService.kt)
+        // Use existing API: messages_get.php
+        val url = AppGlobals.BASE_URL + "messages_get.php?chatId=$chatId&uid=$myUid&limit=100"
+        Log.d("ChatActivity", "Fetching messages from: $url")
+
         val stringRequest = StringRequest(Request.Method.GET, url,
             { response ->
                 try {
-                    val json = JSONObject(response)
+                    val cleaned = cleanJsonResponse(response)
+                    val json = JSONObject(cleaned)
                     if (json.getBoolean("success")) {
-                        val dataArray = json.getJSONArray("data")
-                        val listType = object : TypeToken<List<Message>>() {}.type
-                        val newMessages: List<Message> = Gson().fromJson(dataArray.toString(), listType)
+                        val dataObj = json.getJSONObject("data")
+                        val messagesArray = dataObj.getJSONArray("messages")
 
-                        // Save new messages to DB
+                        val newMessages = mutableListOf<Message>()
+                        for (i in 0 until messagesArray.length()) {
+                            val msgObj = messagesArray.getJSONObject(i)
+
+                            // Parse timestamp - handle both old and new field names
+                            val createdAt = msgObj.optLong("createdAt",
+                                msgObj.optLong("timestamp", System.currentTimeMillis()))
+
+                            newMessages.add(
+                                Message(
+                                    messageId = msgObj.optString("messageId", msgObj.optString("message_id", "")),
+                                    senderId = msgObj.optString("senderId", msgObj.optString("sender_uid", "")),
+                                    receiverId = msgObj.optString("receiverId", msgObj.optString("receiver_uid", "")),
+                                    messageType = msgObj.optString("messageType", msgObj.optString("type", "text")),
+                                    content = msgObj.optString("content", msgObj.optString("text", "")),
+                                    imageUrl = msgObj.optString("mediaBase64", msgObj.optString("image_url", "")),
+                                    postId = msgObj.optString("postId", msgObj.optString("post_id", "")),
+                                    timestamp = createdAt,
+                                    isEdited = msgObj.optBoolean("edited", msgObj.optInt("is_edited", 0) == 1),
+                                    isDeleted = msgObj.optBoolean("deleted", msgObj.optInt("is_deleted", 0) == 1),
+                                    editableUntil = msgObj.optLong("editableUntil", createdAt + 300000)
+                                )
+                            )
+
+                            // Track latest timestamp
+                            if (createdAt > lastMessageTimestamp) {
+                                lastMessageTimestamp = createdAt
+                            }
+                        }
+
+                        // Save to DB
                         val db = dbHelper.writableDatabase
                         db.beginTransaction()
                         try {
-                            // Simple approach: delete old, insert new
                             val selection = "(${DB.Message.COLUMN_SENDER_ID} = ? AND ${DB.Message.COLUMN_RECEIVER_ID} = ?) OR " +
                                     "(${DB.Message.COLUMN_SENDER_ID} = ? AND ${DB.Message.COLUMN_RECEIVER_ID} = ?)"
                             val selectionArgs = arrayOf(myUid, otherUserId, otherUserId, myUid)
@@ -304,23 +384,114 @@ class ChatActivity : AppCompatActivity() {
                             db.endTransaction()
                         }
 
-                        // Reload from DB to refresh UI
                         loadMessagesFromDb()
+                        Log.d("ChatActivity", "✅ Loaded ${newMessages.size} messages from API")
+                    } else {
+                        Log.w("ChatActivity", "API returned success=false: ${json.optString("message")}")
                     }
-                } catch (e: Exception) { Log.e("ChatActivity", "Error parsing messages: ${e.message}") }
+                } catch (e: Exception) {
+                    Log.e("ChatActivity", "Error parsing messages: ${e.message}")
+                    e.printStackTrace()
+                }
             },
             { error -> Log.e("ChatActivity", "Volley error fetching messages: ${error.message}") }
         )
         queue.add(stringRequest)
     }
 
-    // --- NEW: Polling for online status (Task #11) ---
+    /**
+     * Poll for new messages using chat_update.php
+     * NOTE: Disabled until chat_update.php is deployed on server
+     */
+    private fun startPollingMessages() {
+        Log.d("ChatActivity", "Message polling disabled - chat_update.php not deployed yet")
+        // TODO: Enable when chat_update.php is deployed
+        /*
+        messagePollingRunnable = object : Runnable {
+            override fun run() {
+                pollForNewMessages()
+                messagePollingHandler.postDelayed(this, 5000) // Poll every 5 seconds
+            }
+        }
+        messagePollingHandler.postDelayed(messagePollingRunnable!!, 5000)
+        */
+    }
+
+    private fun stopPollingMessages() {
+        Log.d("ChatActivity", "Stopping message polling.")
+        messagePollingRunnable?.let { messagePollingHandler.removeCallbacks(it) }
+    }
+
+    private fun pollForNewMessages() {
+        if (!isNetworkAvailable(this)) return
+
+        // NEW API: chat_update.php with since parameter
+        val url = AppGlobals.BASE_URL +
+                "chat_update.php?chatId=$chatId&uid=$myUid&since=$lastMessageTimestamp"
+
+        val stringRequest = StringRequest(Request.Method.GET, url,
+            { response ->
+                try {
+                    val cleaned = cleanJsonResponse(response)
+                    val json = JSONObject(cleaned)
+                    if (json.getBoolean("success")) {
+                        val dataObj = json.getJSONObject("data")
+                        val messagesArray = dataObj.getJSONArray("messages")
+
+                        if (messagesArray.length() > 0) {
+                            Log.d("ChatActivity", "📨 Received ${messagesArray.length()} new messages")
+
+                            for (i in 0 until messagesArray.length()) {
+                                val msgObj = messagesArray.getJSONObject(i)
+                                val createdAt = msgObj.getLong("createdAt")
+
+                                val newMsg = Message(
+                                    messageId = msgObj.getString("messageId"),
+                                    senderId = msgObj.getString("senderId"),
+                                    receiverId = msgObj.getString("receiverId"),
+                                    messageType = msgObj.optString("messageType", "text"),
+                                    content = msgObj.optString("content", ""),
+                                    imageUrl = msgObj.optString("mediaBase64", ""),
+                                    postId = msgObj.optString("postId", ""),
+                                    timestamp = createdAt,
+                                    isEdited = msgObj.optBoolean("edited", false),
+                                    isDeleted = msgObj.optBoolean("deleted", false),
+                                    editableUntil = msgObj.optLong("editableUntil", createdAt + 300000)
+                                )
+
+                                // Add to list if not already there
+                                if (messagesList.none { it.messageId == newMsg.messageId }) {
+                                    messagesList.add(newMsg)
+                                    saveMessageToDb(newMsg)
+                                }
+
+                                // Update timestamp
+                                if (createdAt > lastMessageTimestamp) {
+                                    lastMessageTimestamp = createdAt
+                                }
+                            }
+
+                            // Sort by timestamp and update UI
+                            messagesList.sortBy { it.timestamp }
+                            adapter.notifyDataSetChanged()
+                            recyclerView.scrollToPosition(messagesList.size - 1)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("ChatActivity", "Error polling messages: ${e.message}")
+                }
+            },
+            { error -> Log.w("ChatActivity", "Poll error: ${error.message}") }
+        )
+        queue.add(stringRequest)
+    }
+
     private fun startPollingUserStatus() {
         Log.d("ChatActivity", "Starting status polling...")
         statusRunnable = object : Runnable {
             override fun run() {
                 fetchUserStatus()
-                statusHandler.postDelayed(this, 15000) // Poll every 15 seconds
+                statusHandler.postDelayed(this, 15000)
             }
         }
         statusHandler.post(statusRunnable!!)
@@ -334,18 +505,17 @@ class ChatActivity : AppCompatActivity() {
     private fun fetchUserStatus() {
         if (!isNetworkAvailable(this)) return
 
-        // TODO: Dev A needs to create this API
-        val url = AppGlobals.BASE_URL + "get_user_status.php?uid=$otherUserId"
+        val url = AppGlobals.BASE_URL + "user_basic_get.php?uid=$otherUserId"
         val stringRequest = StringRequest(Request.Method.GET, url,
             { response ->
                 try {
-                    val json = JSONObject(response)
+                    val cleaned = cleanJsonResponse(response)
+                    val json = JSONObject(cleaned)
                     if (json.getBoolean("success")) {
-                        val isOnline = json.optBoolean("isOnline", false)
+                        val dataObj = json.getJSONObject("data")
+                        val isOnline = dataObj.optBoolean("isOnline", false)
                         Log.d("ChatActivity", "Other user online: $isOnline")
-                        // TODO: Update your UI (e.g., a green dot)
-                        // val onlineIndicator = findViewById<ImageView>(R.id.online_indicator)
-                        // onlineIndicator.visibility = if (isOnline) View.VISIBLE else View.GONE
+                        // TODO: Update UI with online indicator
                     }
                 } catch (e: Exception) { Log.e("ChatActivity", "Error parsing status: ${e.message}")}
             },
@@ -353,7 +523,6 @@ class ChatActivity : AppCompatActivity() {
         )
         queue.add(stringRequest)
     }
-    // --- End of status polling ---
 
     private fun sendTextMessage() {
         val text = messageInput.text.toString().trim()
@@ -364,11 +533,10 @@ class ChatActivity : AppCompatActivity() {
         messageInput.setText("")
     }
 
-    // --- CHANGED: Migrated sendMessage to Volley + Offline Queue ---
     private fun sendMessage(messageType: String, content: String, imageUrl: String, postId: String) {
-        val messageId = UUID.randomUUID().toString() // Create local ID
+        val messageId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
-        val editableUntil = timestamp + 300000 // 5 minutes
+        val editableUntil = timestamp + 300000
 
         val message = Message(
             messageId = messageId,
@@ -384,72 +552,85 @@ class ChatActivity : AppCompatActivity() {
             editableUntil = editableUntil
         )
 
-        // 1. Optimistic UI update
+        // Optimistic UI
         messagesList.add(message)
         adapter.notifyItemInserted(messagesList.size - 1)
         recyclerView.scrollToPosition(messagesList.size - 1)
 
-        // 2. Save to local DB immediately
-        saveMessageToDb(message, "PENDING") // TODO: Add a "status" field to DB.Message
+        // Save to DB
+        saveMessageToDb(message)
 
-        // 3. Create payload for API
+        // Update last timestamp
+        lastMessageTimestamp = timestamp
+
+        // API payload
         val payload = JSONObject()
-        payload.put("messageId", messageId)
-        payload.put("sender_id", myUid)
-        payload.put("receiver_id", otherUserId)
-        payload.put("message_type", messageType)
+        payload.put("senderUid", myUid)
+        payload.put("receiverUid", otherUserId)
+        payload.put("messageType", messageType)
         payload.put("content", content)
-        payload.put("imageUrl", imageUrl) // This will be Base64 for images
-        payload.put("post_id", postId)
-        payload.put("timestamp", timestamp)
+        if (imageUrl.isNotEmpty()) payload.put("imageBase64", imageUrl)
+        if (postId.isNotEmpty()) payload.put("postId", postId)
 
-        // 4. Check network and send or queue
         if (isNetworkAvailable(this)) {
-            val url = AppGlobals.BASE_URL + "send_message.php"
+            val url = AppGlobals.BASE_URL + "messages_send.php"
+            Log.d("ChatActivity", "📤 Sending to: $url")
+            Log.d("ChatActivity", "📤 sender=$myUid, receiver=$otherUserId, type=$messageType")
+
             val stringRequest = object : StringRequest(Request.Method.POST, url,
                 { response ->
+                    Log.d("ChatActivity", "📥 Raw response (${response.length} chars): ${response.take(500)}")
                     try {
-                        val json = JSONObject(response)
+                        val cleaned = cleanJsonResponse(response)
+                        val json = JSONObject(cleaned)
                         if (json.getBoolean("success")) {
-                            Log.d("ChatActivity", "✅ Message sent and confirmed by server")
-                            // TODO: Update message status in DB to "SENT"
+                            Log.d("ChatActivity", "✅ Message sent successfully")
+                            // No toast needed - message already shown in UI
                         } else {
-                            Log.e("ChatActivity", "API error sending message: ${json.getString("message")}")
-                            saveToSyncQueue("send_message.php", payload)
+                            val errorMsg = json.optString("message", "Unknown error")
+                            Log.e("ChatActivity", "❌ Message send failed: $errorMsg")
+                            saveToSyncQueue("messages_send.php", payload)
+                            runOnUiThread {
+                                Toast.makeText(this@ChatActivity, "Send failed: $errorMsg", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     } catch (e: Exception) {
-                        Log.e("ChatActivity", "Error parsing send response: ${e.message}")
-                        saveToSyncQueue("send_message.php", payload)
+                        Log.e("ChatActivity", "❌ Error parsing send response: ${e.message}")
+                        Log.e("ChatActivity", "❌ Raw response was: $response")
+                        e.printStackTrace()
+                        saveToSyncQueue("messages_send.php", payload)
+                        runOnUiThread {
+                            Toast.makeText(this@ChatActivity, "Parse error: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 },
                 { error ->
-                    Log.e("ChatActivity", "Volley error sending message: ${error.message}")
-                    saveToSyncQueue("send_message.php", payload)
+                    Log.e("ChatActivity", "❌ Network error sending message: ${error.message}")
+                    error.networkResponse?.let {
+                        Log.e("ChatActivity", "Status code: ${it.statusCode}")
+                        Log.e("ChatActivity", "Response: ${String(it.data)}")
+                    }
+                    saveToSyncQueue("messages_send.php", payload)
                 }) {
                 override fun getParams(): MutableMap<String, String> {
-                    // This assumes send_message.php takes form-urlencoded
-                    // If it takes multipart, this needs to be a different request type
                     val params = HashMap<String, String>()
-                    params["messageId"] = messageId
-                    params["sender_id"] = myUid
-                    params["receiver_id"] = otherUserId
-                    params["message_type"] = messageType
+                    params["senderUid"] = myUid
+                    params["receiverUid"] = otherUserId
+                    params["messageType"] = messageType
                     params["content"] = content
-                    params["imageUrl"] = imageUrl
-                    params["post_id"] = postId
-                    params["timestamp"] = timestamp.toString()
+                    if (imageUrl.isNotEmpty()) params["imageBase64"] = imageUrl
+                    if (postId.isNotEmpty()) params["postId"] = postId
                     return params
                 }
             }
             queue.add(stringRequest)
         } else {
-            // Offline
-            saveToSyncQueue("send_message.php", payload)
+            Log.d("ChatActivity", "📴 No network, saving to sync queue")
+            saveToSyncQueue("messages_send.php", payload)
         }
     }
 
-    // --- NEW: Helper to save message to DB ---
-    private fun saveMessageToDb(msg: Message, status: String) { // TODO: Add 'status' param
+    private fun saveMessageToDb(msg: Message) {
         try {
             val cv = ContentValues()
             cv.put(DB.Message.COLUMN_MESSAGE_ID, msg.messageId)
@@ -462,7 +643,6 @@ class ChatActivity : AppCompatActivity() {
             cv.put(DB.Message.COLUMN_TIMESTAMP, msg.timestamp)
             cv.put(DB.Message.COLUMN_IS_EDITED, if (msg.isEdited) 1 else 0)
             cv.put(DB.Message.COLUMN_IS_DELETED, if (msg.isDeleted) 1 else 0)
-            // cv.put(DB.Message.COLUMN_STATUS, status) // Add this column to your DB
             dbHelper.writableDatabase.insertWithOnConflict(DB.Message.TABLE_NAME, null, cv,
                 android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE)
         } catch (e: Exception) {
@@ -470,10 +650,7 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
-    // REMOVED: updateLastMessage (Backend should handle this)
-
     private fun openGallery() {
-        // (No changes here)
         val intent = Intent(Intent.ACTION_PICK)
         intent.type = "image/*"
         startActivityForResult(intent, PICK_IMAGE)
@@ -494,7 +671,6 @@ class ChatActivity : AppCompatActivity() {
                         MediaStore.Images.Media.getBitmap(contentResolver, imageUri)
                     }
                     val base64Image = encodeImage(bitmap)
-                    // CHANGED: This now calls our new offline-ready function
                     sendMessage("image", "📷 Photo", base64Image, "")
                 } catch (e: Exception) {
                     Toast.makeText(this, "Failed to load image: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -504,7 +680,6 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun encodeImage(bitmap: Bitmap): String {
-        // (No changes here)
         val output = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.JPEG, 50, output)
         val imageBytes = output.toByteArray()
@@ -512,7 +687,6 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun showMessageOptions(message: Message) {
-        // (No changes here, this logic is fine)
         if (message.senderId != myUid) {
             Toast.makeText(this, "You can only edit your own messages", Toast.LENGTH_SHORT).show()
             return
@@ -534,7 +708,6 @@ class ChatActivity : AppCompatActivity() {
             .show()
     }
 
-    // --- CHANGED: Migrated editMessage to Volley + Offline Queue ---
     private fun editMessage(message: Message) {
         if (message.messageType != "text") {
             Toast.makeText(this, "Can only edit text messages", Toast.LENGTH_SHORT).show()
@@ -550,44 +723,42 @@ class ChatActivity : AppCompatActivity() {
             .setPositiveButton("Save") { _, _ ->
                 val newContent = input.text.toString().trim()
                 if (newContent.isNotEmpty()) {
-                    // 1. Optimistic UI
                     val index = messagesList.indexOfFirst { it.messageId == message.messageId }
                     if (index != -1) {
                         messagesList[index] = message.copy(content = newContent, isEdited = true)
                         adapter.notifyItemChanged(index)
                     }
 
-                    // 2. Update local DB
                     val cv = ContentValues()
                     cv.put(DB.Message.COLUMN_CONTENT, newContent)
                     cv.put(DB.Message.COLUMN_IS_EDITED, 1)
                     dbHelper.writableDatabase.update(DB.Message.TABLE_NAME, cv,
                         "${DB.Message.COLUMN_MESSAGE_ID} = ?", arrayOf(message.messageId))
 
-                    // 3. Create payload
                     val payload = JSONObject()
-                    payload.put("message_id", message.messageId)
-                    payload.put("new_content", newContent)
+                    payload.put("uid", myUid)
+                    payload.put("messageId", message.messageId)
+                    payload.put("newText", newContent)
 
-                    // 4. Check network and send or queue
                     if (isNetworkAvailable(this)) {
-                        val url = AppGlobals.BASE_URL + "edit_message.php" // (from ApiService.kt)
+                        val url = AppGlobals.BASE_URL + "messages_edit.php"
                         val stringRequest = object : StringRequest(Request.Method.POST, url,
-                            { response -> Log.d("ChatActivity", "Message edit confirmed by server") },
+                            { response -> Log.d("ChatActivity", "Message edit confirmed") },
                             { error ->
                                 Log.e("ChatActivity", "Volley error editing: ${error.message}")
-                                saveToSyncQueue("edit_message.php", payload)
+                                saveToSyncQueue("messages_edit.php", payload)
                             }) {
                             override fun getParams(): MutableMap<String, String> {
                                 val params = HashMap<String, String>()
-                                params["message_id"] = message.messageId
-                                params["new_content"] = newContent
+                                params["uid"] = myUid
+                                params["messageId"] = message.messageId
+                                params["newText"] = newContent
                                 return params
                             }
                         }
                         queue.add(stringRequest)
                     } else {
-                        saveToSyncQueue("edit_message.php", payload)
+                        saveToSyncQueue("messages_edit.php", payload)
                     }
                 }
             }
@@ -595,77 +766,70 @@ class ChatActivity : AppCompatActivity() {
             .show()
     }
 
-    // --- CHANGED: Migrated deleteMessage to Volley + Offline Queue ---
     private fun deleteMessage(message: Message) {
-        // 1. Optimistic UI
         val index = messagesList.indexOfFirst { it.messageId == message.messageId }
         if (index != -1) {
             messagesList[index] = message.copy(content = "This message was deleted", isDeleted = true)
             adapter.notifyItemChanged(index)
         }
 
-        // 2. Update local DB
         val cv = ContentValues()
         cv.put(DB.Message.COLUMN_CONTENT, "This message was deleted")
         cv.put(DB.Message.COLUMN_IS_DELETED, 1)
         dbHelper.writableDatabase.update(DB.Message.TABLE_NAME, cv,
             "${DB.Message.COLUMN_MESSAGE_ID} = ?", arrayOf(message.messageId))
 
-        // 3. Create payload
         val payload = JSONObject()
-        payload.put("message_id", message.messageId)
+        payload.put("uid", myUid)
+        payload.put("messageId", message.messageId)
 
-        // 4. Check network and send or queue
         if (isNetworkAvailable(this)) {
-            val url = AppGlobals.BASE_URL + "delete_message.php" // (from ApiService.kt)
+            val url = AppGlobals.BASE_URL + "message_delete.php"
             val stringRequest = object : StringRequest(Request.Method.POST, url,
-                { response -> Log.d("ChatActivity", "Message delete confirmed by server") },
+                { response -> Log.d("ChatActivity", "Message delete confirmed") },
                 { error ->
                     Log.e("ChatActivity", "Volley error deleting: ${error.message}")
-                    saveToSyncQueue("delete_message.php", payload)
+                    saveToSyncQueue("message_delete.php", payload)
                 }) {
                 override fun getParams(): MutableMap<String, String> {
                     val params = HashMap<String, String>()
-                    params["message_id"] = message.messageId
+                    params["uid"] = myUid
+                    params["messageId"] = message.messageId
                     return params
                 }
             }
             queue.add(stringRequest)
         } else {
-            saveToSyncQueue("delete_message.php", payload)
+            saveToSyncQueue("message_delete.php", payload)
         }
     }
 
-    // --- CHANGED: Migrated to Volley + Offline Queue (Task #12) ---
     @SuppressLint("MissingPermission")
     private fun sendScreenshotEventToApi() {
-        // TODO: Dev A needs to create this API endpoint
-        val endpoint = "report_screenshot.php"
+        val endpoint = "screenshot_log.php"
 
-        // 1. Create Payload
         val payload = JSONObject()
         payload.put("chatId", chatId)
-        payload.put("takerId", myUid)
-        payload.put("receiverId", otherUserId)
+        payload.put("takerUid", myUid)
+        payload.put("receiverUid", otherUserId)
         payload.put("timestamp", System.currentTimeMillis())
 
-        // 2. Check network and send or queue
         if (isNetworkAvailable(this)) {
             val url = AppGlobals.BASE_URL + endpoint
             val stringRequest = object : StringRequest(Request.Method.POST, url,
                 { response ->
-                    Log.d("ScreenshotEvent", "📸 Screenshot logged to server for chat: $chatId")
+                    Log.d("ScreenshotEvent", "📸 Screenshot logged")
                     Toast.makeText(this, "Screenshot detected!", Toast.LENGTH_SHORT).show()
                 },
                 { error ->
-                    Log.e("ScreenshotEvent", "❌ Failed to log screenshot: ${error.message}")
+                    Log.e("ScreenshotEvent", "Error: ${error.message}")
                     saveToSyncQueue(endpoint, payload)
                 }) {
                 override fun getParams(): MutableMap<String, String> {
                     val params = HashMap<String, String>()
                     params["chatId"] = chatId
-                    params["takerId"] = myUid
-                    params["receiverId"] = otherUserId
+                    params["takerUid"] = myUid
+                    params["receiverUid"] = otherUserId
                     return params
                 }
             }
@@ -675,15 +839,12 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
-
     private fun showUserInfo() {
         Toast.makeText(this, "Viewing info for $otherUserName", Toast.LENGTH_SHORT).show()
     }
 
-    // --- NEW: HELPER FUNCTIONS FOR OFFLINE QUEUE & NETWORK ---
-
     private fun saveToSyncQueue(endpoint: String, payload: JSONObject) {
-        Log.d("ChatActivity", "Saving to sync queue. Endpoint: $endpoint")
+        Log.d("ChatActivity", "💾 Saving to sync queue. Endpoint: $endpoint")
         try {
             val db = dbHelper.writableDatabase
             val cv = ContentValues()
@@ -692,9 +853,13 @@ class ChatActivity : AppCompatActivity() {
             cv.put(DB.SyncQueue.COLUMN_STATUS, "PENDING")
             db.insert(DB.SyncQueue.TABLE_NAME, null, cv)
 
-            runOnUiThread {
-                Toast.makeText(this, "Offline. Action will sync later.", Toast.LENGTH_SHORT).show()
+            // Only show toast if explicitly offline
+            if (!isNetworkAvailable(this)) {
+                runOnUiThread {
+                    Toast.makeText(this, "Offline. Will sync when connected.", Toast.LENGTH_SHORT).show()
+                }
             }
+            // If online but API failed, don't show "offline" toast - the specific error toast is shown above
         } catch (e: Exception) {
             Log.e("ChatActivity", "Failed to save to sync queue: ${e.message}")
         }
@@ -719,5 +884,24 @@ class ChatActivity : AppCompatActivity() {
             @Suppress("DEPRECATION")
             return networkInfo.isConnected
         }
+    }
+
+    /**
+     * Initiate a voice or video call to the other user
+     */
+    private fun initiateCall(isVideoCall: Boolean) {
+        val callType = if (isVideoCall) "video" else "voice"
+        Log.d("ChatActivity", "📞 Initiating $callType call to $otherUserName")
+
+        Toast.makeText(this, "Calling $otherUserName...", Toast.LENGTH_SHORT).show()
+
+        CallManager.initiateCall(
+            context = this,
+            currentUserId = myUid,
+            currentUserName = myUsername,
+            otherUserId = otherUserId,
+            otherUserName = otherUserName,
+            isVideoCall = isVideoCall
+        )
     }
 }

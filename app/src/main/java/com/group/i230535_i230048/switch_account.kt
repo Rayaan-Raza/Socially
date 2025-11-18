@@ -1,32 +1,25 @@
 package com.group.i230535_i230048
 
-import android.content.Context // CHANGED
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.util.Patterns
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
-// CHANGED: Added Volley and JSON imports
 import com.android.volley.Request
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
 import org.json.JSONObject
-// REMOVED: Firebase imports
-// import com.google.firebase.auth.FirebaseAuth
-// import com.google.firebase.database.FirebaseDatabase
 
 class switch_account : AppCompatActivity() {
-
-    // REMOVED: private lateinit var auth: FirebaseAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_switch_account)
-
-        // REMOVED: auth = FirebaseAuth.getInstance()
 
         val etEmail = findViewById<EditText>(R.id.username)
         val etPassword = findViewById<EditText>(R.id.password)
@@ -43,7 +36,7 @@ class switch_account : AppCompatActivity() {
             val email = etEmail.text.toString().trim().lowercase()
             val pass = etPassword.text.toString().trim()
 
-            // --- VALIDATION (No changes) ---
+            // Validation
             if (email.isEmpty()) {
                 etEmail.error = "Email is required."
                 etEmail.requestFocus()
@@ -59,15 +52,11 @@ class switch_account : AppCompatActivity() {
                 etPassword.requestFocus()
                 return@setOnClickListener
             }
-            // --- END OF VALIDATION ---
 
             Toast.makeText(this, "Logging in...", Toast.LENGTH_SHORT).show()
 
-            // --- CHANGED: Replaced Firebase block with Volley ---
-
             if (AppGlobals.IS_TESTING_MODE) {
-                // --- THIS IS YOUR TEST BLOCK ---
-                // We'll simulate a successful login for a user whose profile is NOT complete
+                // Mock test mode
                 val mockResponse = """
                 {
                     "success": true,
@@ -100,80 +89,69 @@ class switch_account : AppCompatActivity() {
                     }
                 }
                 """
-                // Manually call the function that handles the response
                 handleLoginResponse(mockResponse)
 
             } else {
-                // --- THIS IS YOUR REAL NETWORK CODE ---
+                // Real network call
                 val queue = Volley.newRequestQueue(this)
-                val url = AppGlobals.BASE_URL + "login.php" // [cite: 193-194]
+                val url = AppGlobals.BASE_URL + "login.php"
 
                 val stringRequest = object : StringRequest(
-                    Request.Method.POST, //
+                    Request.Method.POST,
                     url,
                     { response ->
-                        // Success: Pass the real response to the handler
                         handleLoginResponse(response)
                     },
                     { error ->
-                        // Error
                         Toast.makeText(this, "Network error: ${error.message}", Toast.LENGTH_LONG).show()
                     }) {
 
                     override fun getParams(): MutableMap<String, String> {
                         val params = HashMap<String, String>()
-                        params["email"] = email //
-                        params["password"] = pass //
+                        params["email"] = email
+                        params["password"] = pass
                         return params
                     }
                 }
                 queue.add(stringRequest)
             }
-            // --- END OF CHANGED BLOCK ---
         }
 
         tvForgot.setOnClickListener {
-            // --- CHANGED: "Forgot Password" ---
-            // The provided API doc does not have an endpoint for password reset.
-            // You must ask Dev A to create a "forgot_password.php" endpoint.
-            // For now, this feature cannot be implemented.
             Toast.makeText(this, "Feature not available yet.", Toast.LENGTH_LONG).show()
-
-            /*
-            // OLD FIREBASE CODE:
-            val email = etEmail.text.toString().trim()
-            if (email.isEmpty()) { ... }
-            auth.sendPasswordResetEmail(email) ...
-            */
         }
     }
 
-    /**
-     * A new function to handle the login response,
-     * whether it's from the real network or your mock test.
-     */
     private fun handleLoginResponse(response: String) {
         try {
             val jsonResponse = JSONObject(response)
-            if (jsonResponse.getBoolean("success")) { // [cite: 206]
-                // Login successful
-                val userObject = jsonResponse.getJSONObject("data") // [cite: 208]
+            if (jsonResponse.getBoolean("success")) {
+                val userObject = jsonResponse.getJSONObject("data")
 
-                // Get the data from the API response
-                val uid = userObject.getString("uid") // [cite: 123]
-                val username = userObject.getString("username") // [cite: 126]
-                // The API sends profileCompleted as an Int (0 or 1) [cite: 142]
+                val uid = userObject.getString("uid")
+                val username = userObject.getString("username")
                 val isProfileComplete = userObject.getInt("profileCompleted") == 1
 
-                // Save the session
+                // Save session
                 val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE).edit()
                 prefs.putString(AppGlobals.KEY_USER_UID, uid)
                 prefs.putString(AppGlobals.KEY_USERNAME, username)
                 prefs.putBoolean(AppGlobals.KEY_PROFILE_COMPLETE, isProfileComplete)
                 prefs.apply()
 
-                // Navigate based on profile completion status
-                // This matches your original app's logic
+                Log.d("Login", "✅ User logged in: $username ($uid)")
+
+                // ========== REGISTER FCM TOKEN FOR CALLS ==========
+                CallManager.registerFcmToken(this, uid) { success ->
+                    if (success) {
+                        Log.d("Login", "✅ FCM token registered - user can receive calls")
+                    } else {
+                        Log.w("Login", "⚠️ Failed to register FCM token - calls may not work")
+                    }
+                }
+                // ==================================================
+
+                // Navigate based on profile completion
                 val nextActivity = if (isProfileComplete) home_page::class.java else signup_page::class.java
 
                 Toast.makeText(this, "Login Successful!", Toast.LENGTH_SHORT).show()
@@ -183,7 +161,6 @@ class switch_account : AppCompatActivity() {
                 finish()
 
             } else {
-                // Login failed (e.g., "Invalid email or password") [cite: 222]
                 val message = jsonResponse.getString("message")
                 Toast.makeText(this, "Login failed: $message", Toast.LENGTH_LONG).show()
             }

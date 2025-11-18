@@ -5,15 +5,83 @@ import android.content.Intent
 import android.util.Log
 import android.widget.Toast
 import com.android.volley.Request
+import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
+import com.google.firebase.messaging.FirebaseMessaging
 import org.json.JSONObject
 
 object CallManager {
 
+    private const val TAG = "CallManager"
+
+    // TODO: Update this to your Node.js server URL
+    // For testing with ngrok: "https://your-ngrok-url.ngrok.io"
+    // For production: Your deployed server URL
+    private const val CALL_SERVER_URL = "http://YOUR_NODEJS_SERVER:3000"
+
     /**
-     * Step 1: Called by the caller (in ChatActivity).
-     * Tells our backend to send an FCM to the other user.
+     * Register FCM token with backend
+     * Call this after user logs in
+     */
+    fun registerFcmToken(context: Context, userId: String, onComplete: ((Boolean) -> Unit)? = null) {
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (!task.isSuccessful) {
+                Log.e(TAG, "Failed to get FCM token: ${task.exception}")
+                onComplete?.invoke(false)
+                return@addOnCompleteListener
+            }
+
+            val token = task.result
+            Log.d(TAG, "FCM Token obtained: ${token.take(20)}...")
+
+            // Save locally
+            val prefs = context.getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putString("fcm_token", token).apply()
+
+            // Send to server
+            val queue = Volley.newRequestQueue(context)
+            val url = AppGlobals.BASE_URL + "user_update_fcm.php"
+
+            val request = object : StringRequest(Request.Method.POST, url,
+                { response ->
+                    try {
+                        val json = JSONObject(response)
+                        if (json.getBoolean("success")) {
+                            Log.d(TAG, "✅ FCM token registered on server")
+                            onComplete?.invoke(true)
+                        } else {
+                            Log.e(TAG, "❌ Failed: ${json.optString("message")}")
+                            onComplete?.invoke(false)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error: ${e.message}")
+                        onComplete?.invoke(false)
+                    }
+                },
+                { error ->
+                    Log.e(TAG, "Network error: ${error.message}")
+                    onComplete?.invoke(false)
+                }
+            ) {
+                override fun getParams(): MutableMap<String, String> {
+                    return hashMapOf(
+                        "uid" to userId,
+                        "fcmToken" to token
+                    )
+                }
+            }
+            queue.add(request)
+        }
+    }
+
+    /**
+     * Initiate a call to another user
+     *
+     * Flow:
+     * 1. Get receiver's FCM token from PHP backend
+     * 2. Send call notification via Node.js server
+     * 3. Open outgoing call screen
      */
     fun initiateCall(
         context: Context,
@@ -23,103 +91,314 @@ object CallManager {
         otherUserName: String,
         isVideoCall: Boolean
     ) {
-        val queue = Volley.newRequestQueue(context)
-        // TODO: Dev A must create this API endpoint
-        val url = AppGlobals.BASE_URL + "initiate_call.php"
+        Log.d(TAG, "📞 Initiating ${if (isVideoCall) "video" else "audio"} call to $otherUserName")
 
-        val stringRequest = object : StringRequest(Request.Method.POST, url,
+        val queue = Volley.newRequestQueue(context)
+
+        // Step 1: Get receiver's FCM token
+        val fcmUrl = AppGlobals.BASE_URL + "user_fcm_get.php?uid=$otherUserId"
+
+        val fcmRequest = StringRequest(Request.Method.GET, fcmUrl,
             { response ->
                 try {
                     val json = JSONObject(response)
                     if (json.getBoolean("success")) {
-                        // Server successfully sent FCM to other user.
-                        // Now we join the call.
-                        val data = json.getJSONObject("data")
-                        val channelName = data.getString("channelName")
-                        val token = data.getString("agoraToken")
+                        val dataObj = json.getJSONObject("data")
+                        val receiverFcmToken = dataObj.getString("fcmToken")
 
-                        Log.d("CallManager", "✅ Call initiated. Joining channel: $channelName")
+                        Log.d(TAG, "Got receiver's FCM token")
 
-                        // Start call page for caller
+                        // Step 2: Send call notification via Node.js
+                        sendCallNotificationViaNodeJS(
+                            context,
+                            currentUserId,
+                            currentUserName,
+                            otherUserId,
+                            otherUserName,
+                            receiverFcmToken,
+                            isVideoCall
+                        )
+                    } else {
+                        val errorMsg = json.optString("message", "User not available")
+                        Log.e(TAG, "❌ $errorMsg")
+                        Toast.makeText(context, "Cannot call: $errorMsg", Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error parsing FCM token response: ${e.message}")
+                    Toast.makeText(context, "Failed to initiate call", Toast.LENGTH_LONG).show()
+                }
+            },
+            { error ->
+                Log.e(TAG, "Network error getting FCM token: ${error.message}")
+                Toast.makeText(context, "User is not available for calls", Toast.LENGTH_LONG).show()
+            }
+        )
+
+        queue.add(fcmRequest)
+    }
+
+    private fun sendCallNotificationViaNodeJS(
+        context: Context,
+        callerUid: String,
+        callerName: String,
+        receiverUid: String,
+        receiverName: String,
+        receiverFcmToken: String,
+        isVideoCall: Boolean
+    ) {
+        val queue = Volley.newRequestQueue(context)
+        val url = "$CALL_SERVER_URL/call/initiate"
+
+        // Generate channel name for Agora
+        val channelName = if (callerUid < receiverUid) {
+            "${callerUid}_${receiverUid}"
+        } else {
+            "${receiverUid}_${callerUid}"
+        }
+
+        val payload = JSONObject().apply {
+            put("callerUid", callerUid)
+            put("callerName", callerName)
+            put("receiverFcmToken", receiverFcmToken)
+            put("callType", if (isVideoCall) "video" else "audio")
+            put("channelName", channelName)
+        }
+
+        Log.d(TAG, "Sending call notification to Node.js server...")
+
+        val request = JsonObjectRequest(Request.Method.POST, url, payload,
+            { response ->
+                try {
+                    if (response.getBoolean("success")) {
+                        val dataObj = response.getJSONObject("data")
+                        val callId = dataObj.getString("callId")
+
+                        Log.d(TAG, "✅ Call initiated. Call ID: $callId, Channel: $channelName")
+
+                        // Save call state
+                        saveCallState(context, callId, channelName, receiverFcmToken, receiverUid, isVideoCall)
+
+                        // Open outgoing call screen
                         val intent = Intent(context, call_page::class.java).apply {
+                            putExtra("CALL_ID", callId)
                             putExtra("CHANNEL_NAME", channelName)
-                            putExtra("AGORA_TOKEN", token)
-                            putExtra("USER_NAME", otherUserName) // Name of person we are calling
-                            putExtra("USER_ID", otherUserId)
+                            putExtra("USER_NAME", receiverName)
+                            putExtra("USER_ID", receiverUid)
                             putExtra("IS_VIDEO_CALL", isVideoCall)
+                            putExtra("IS_OUTGOING", true)
                         }
                         context.startActivity(intent)
 
                     } else {
-                        Toast.makeText(context, "Call failed: ${json.getString("message")}", Toast.LENGTH_LONG).show()
+                        val errorMsg = response.optString("message", "Failed to initiate call")
+                        Log.e(TAG, "❌ $errorMsg")
+                        Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
                     }
                 } catch (e: Exception) {
-                    Log.e("CallManager", "Error parsing initiate_call: ${e.message}")
+                    Log.e(TAG, "Error parsing call response: ${e.message}")
+                    Toast.makeText(context, "Failed to initiate call", Toast.LENGTH_LONG).show()
                 }
             },
             { error ->
-                Log.e("CallManager", "Volley error initiating call: ${error.message}")
-                Toast.makeText(context, "Network error. Could not start call.", Toast.LENGTH_LONG).show()
-            }) {
-            override fun getParams(): MutableMap<String, String> {
-                val params = HashMap<String, String>()
-                params["callerId"] = currentUserId
-                params["callerName"] = currentUserName
-                params["receiverId"] = otherUserId
-                params["receiverName"] = otherUserName
-                params["isVideoCall"] = isVideoCall.toString()
-                return params
+                Log.e(TAG, "Network error: ${error.message}")
+                Toast.makeText(context, "Call server unavailable", Toast.LENGTH_LONG).show()
             }
-        }
-        queue.add(stringRequest)
+        )
+
+        queue.add(request)
     }
 
     /**
-     * Step 2: Called by the receiver (in IncomingCallActivity)
-     * This simply joins the call. No network request needed.
+     * Accept an incoming call
+     * Called by IncomingCall activity
      */
     fun acceptCall(
         context: Context,
+        callId: String,
         channelName: String,
-        token: String,
         callerName: String,
-        callerId: String,
+        callerUid: String,
         isVideoCall: Boolean
     ) {
-        Log.d("CallManager", "Accepting call. Joining channel: $channelName")
+        Log.d(TAG, "✅ Accepting call $callId")
 
+        // Notify caller that call was accepted
+        notifyCallAnswered(context, callId, callerUid)
+
+        // Open call screen
         val intent = Intent(context, call_page::class.java).apply {
+            putExtra("CALL_ID", callId)
             putExtra("CHANNEL_NAME", channelName)
-            putExtra("AGORA_TOKEN", token)
-            putExtra("USER_NAME", callerName) // Name of person who is calling us
-            putExtra("USER_ID", callerId)
+            putExtra("USER_NAME", callerName)
+            putExtra("USER_ID", callerUid)
             putExtra("IS_VIDEO_CALL", isVideoCall)
+            putExtra("IS_OUTGOING", false)
         }
         context.startActivity(intent)
     }
 
     /**
-     * Step 3: Called by receiver to decline, or by anyone to end.
-     * Tells the backend to notify the other user that the call is over.
+     * Decline an incoming call
      */
-    fun endOrDeclineCall(context: Context, channelName: String, otherUserId: String) {
-        Log.d("CallManager", "Ending/Declining call: $channelName")
+    fun declineCall(context: Context, callId: String, callerUid: String) {
+        Log.d(TAG, "❌ Declining call $callId")
+        notifyCallDeclined(context, callId, callerUid)
+    }
 
-        val queue = Volley.newRequestQueue(context)
-        // TODO: Dev A must create this API endpoint
-        val url = AppGlobals.BASE_URL + "end_call.php"
+    /**
+     * End an ongoing call
+     */
+    fun endCall(context: Context, callId: String) {
+        Log.d(TAG, "📴 Ending call $callId")
 
-        val stringRequest = object : StringRequest(Request.Method.POST, url,
-            { response -> Log.d("CallManager", "Call end reported to server.") },
-            { error -> Log.e("CallManager", "Volley error ending call: ${error.message}") }
-        ) {
-            override fun getParams(): MutableMap<String, String> {
-                val params = HashMap<String, String>()
-                params["channelName"] = channelName
-                params["notifyUserId"] = otherUserId // Tell server who to notify
-                return params
-            }
+        val callState = getCurrentCallState(context) ?: return
+        val otherUserFcmToken = callState["otherFcmToken"] as? String ?: ""
+        val otherUserId = callState["otherUserId"] as? String ?: ""
+
+        if (otherUserFcmToken.isNotEmpty()) {
+            sendCallEndNotification(context, callId, otherUserFcmToken, "ended")
+        } else if (otherUserId.isNotEmpty()) {
+            // Fetch token and then send
+            fetchTokenAndSendEnd(context, callId, otherUserId, "ended")
         }
-        queue.add(stringRequest)
+
+        clearCallState(context)
+    }
+
+    private fun notifyCallAnswered(context: Context, callId: String, callerUid: String) {
+        // Get caller's FCM token and notify them
+        val queue = Volley.newRequestQueue(context)
+        val fcmUrl = AppGlobals.BASE_URL + "user_fcm_get.php?uid=$callerUid"
+
+        val request = StringRequest(Request.Method.GET, fcmUrl,
+            { response ->
+                try {
+                    val json = JSONObject(response)
+                    if (json.getBoolean("success")) {
+                        val token = json.getJSONObject("data").getString("fcmToken")
+                        sendCallAnsweredNotification(context, callId, token)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error: ${e.message}")
+                }
+            },
+            { error -> Log.e(TAG, "Error: ${error.message}") }
+        )
+        queue.add(request)
+    }
+
+    private fun notifyCallDeclined(context: Context, callId: String, callerUid: String) {
+        val queue = Volley.newRequestQueue(context)
+        val fcmUrl = AppGlobals.BASE_URL + "user_fcm_get.php?uid=$callerUid"
+
+        val request = StringRequest(Request.Method.GET, fcmUrl,
+            { response ->
+                try {
+                    val json = JSONObject(response)
+                    if (json.getBoolean("success")) {
+                        val token = json.getJSONObject("data").getString("fcmToken")
+                        sendCallEndNotification(context, callId, token, "declined")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error: ${e.message}")
+                }
+            },
+            { error -> Log.e(TAG, "Error: ${error.message}") }
+        )
+        queue.add(request)
+    }
+
+    private fun fetchTokenAndSendEnd(context: Context, callId: String, userId: String, reason: String) {
+        val queue = Volley.newRequestQueue(context)
+        val fcmUrl = AppGlobals.BASE_URL + "user_fcm_get.php?uid=$userId"
+
+        val request = StringRequest(Request.Method.GET, fcmUrl,
+            { response ->
+                try {
+                    val json = JSONObject(response)
+                    if (json.getBoolean("success")) {
+                        val token = json.getJSONObject("data").getString("fcmToken")
+                        sendCallEndNotification(context, callId, token, reason)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error: ${e.message}")
+                }
+            },
+            { error -> Log.e(TAG, "Error: ${error.message}") }
+        )
+        queue.add(request)
+    }
+
+    private fun sendCallAnsweredNotification(context: Context, callId: String, callerFcmToken: String) {
+        val queue = Volley.newRequestQueue(context)
+        val url = "$CALL_SERVER_URL/call/answered"
+
+        val payload = JSONObject().apply {
+            put("callerFcmToken", callerFcmToken)
+            put("callId", callId)
+        }
+
+        val request = JsonObjectRequest(Request.Method.POST, url, payload,
+            { Log.d(TAG, "Call answered notification sent") },
+            { error -> Log.e(TAG, "Error: ${error.message}") }
+        )
+        queue.add(request)
+    }
+
+    private fun sendCallEndNotification(context: Context, callId: String, fcmToken: String, reason: String) {
+        val queue = Volley.newRequestQueue(context)
+        val url = "$CALL_SERVER_URL/call/end"
+
+        val payload = JSONObject().apply {
+            put("receiverFcmToken", fcmToken)
+            put("callId", callId)
+            put("reason", reason)
+        }
+
+        val request = JsonObjectRequest(Request.Method.POST, url, payload,
+            { Log.d(TAG, "Call end notification sent") },
+            { error -> Log.e(TAG, "Error: ${error.message}") }
+        )
+        queue.add(request)
+    }
+
+    // ========== CALL STATE MANAGEMENT ==========
+
+    private fun saveCallState(
+        context: Context,
+        callId: String,
+        channelName: String,
+        otherFcmToken: String,
+        otherUserId: String,
+        isVideoCall: Boolean
+    ) {
+        val prefs = context.getSharedPreferences("call_state", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString("call_id", callId)
+            .putString("channel_name", channelName)
+            .putString("other_fcm_token", otherFcmToken)
+            .putString("other_user_id", otherUserId)
+            .putBoolean("is_video_call", isVideoCall)
+            .putLong("call_start_time", System.currentTimeMillis())
+            .apply()
+    }
+
+    fun getCurrentCallState(context: Context): Map<String, Any>? {
+        val prefs = context.getSharedPreferences("call_state", Context.MODE_PRIVATE)
+        val callId = prefs.getString("call_id", null) ?: return null
+
+        return mapOf(
+            "callId" to callId,
+            "channelName" to (prefs.getString("channel_name", "") ?: ""),
+            "otherFcmToken" to (prefs.getString("other_fcm_token", "") ?: ""),
+            "otherUserId" to (prefs.getString("other_user_id", "") ?: ""),
+            "isVideoCall" to prefs.getBoolean("is_video_call", false),
+            "callStartTime" to prefs.getLong("call_start_time", 0L)
+        )
+    }
+
+    fun clearCallState(context: Context) {
+        val prefs = context.getSharedPreferences("call_state", Context.MODE_PRIVATE)
+        prefs.edit().clear().apply()
     }
 }

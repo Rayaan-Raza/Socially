@@ -2,7 +2,7 @@ package com.group.i230535_i230048
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.content.Context // CHANGED: Added for SharedPreferences
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
@@ -11,25 +11,21 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Base64
+import android.util.Log
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
-// CHANGED: Added Volley and JSON imports
 import com.android.volley.Request
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
 import org.json.JSONObject
-// REMOVED: Firebase imports
-// import com.google.firebase.auth.FirebaseAuth
-// import com.google.firebase.database.FirebaseDatabase
 import java.io.ByteArrayOutputStream
 
 class signup_page : AppCompatActivity() {
 
-    // REMOVED: private lateinit var auth: FirebaseAuth
     private lateinit var profileCircle: FrameLayout
     private lateinit var profileImage: ImageView
     private var selectedImageBase64: String? = null
@@ -40,8 +36,6 @@ class signup_page : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_signup_page)
-
-        // REMOVED: auth = FirebaseAuth.getInstance()
 
         findViewById<ImageView>(R.id.left_arrow).setOnClickListener {
             startActivity(Intent(this, login_sign::class.java))
@@ -78,32 +72,41 @@ class signup_page : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // --- CHANGED: Replaced entire Firebase block with Volley ---
-
             val queue = Volley.newRequestQueue(this)
-            val url = AppGlobals.BASE_URL + "signup.php" // [cite: 151-154]
+            val url = AppGlobals.BASE_URL + "signup.php"
 
             val stringRequest = object : StringRequest(
                 Request.Method.POST,
                 url,
                 { response ->
-                    // Success listener
                     try {
                         val jsonResponse = JSONObject(response)
-                        val success = jsonResponse.getBoolean("success") // [cite: 111, 116]
+                        val success = jsonResponse.getBoolean("success")
 
                         if (success) {
                             Toast.makeText(this, "Account created!", Toast.LENGTH_SHORT).show()
 
                             // Parse the user data from response
-                            val userObject = jsonResponse.getJSONObject("data") // [cite: 113, 177]
-                            val uid = userObject.getString("uid") // [cite: 123]
-                            val newUsername = userObject.getString("username") // [cite: 126]
+                            val userObject = jsonResponse.getJSONObject("data")
+                            val uid = userObject.getString("uid")
+                            val newUsername = userObject.getString("username")
 
                             // Save session to log the user in
                             val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
                             prefs.edit().putString(AppGlobals.KEY_USER_UID, uid).apply()
                             prefs.edit().putString(AppGlobals.KEY_USERNAME, newUsername).apply()
+
+                            Log.d("Signup", "✅ Account created: $newUsername ($uid)")
+
+                            // ========== REGISTER FCM TOKEN FOR CALLS ==========
+                            CallManager.registerFcmToken(this, uid) { fcmSuccess ->
+                                if (fcmSuccess) {
+                                    Log.d("Signup", "✅ FCM token registered - user can receive calls")
+                                } else {
+                                    Log.w("Signup", "⚠️ Failed to register FCM token - calls may not work")
+                                }
+                            }
+                            // ==================================================
 
                             // Go to home page
                             startActivity(Intent(this, home_page::class.java))
@@ -111,47 +114,41 @@ class signup_page : AppCompatActivity() {
 
                         } else {
                             // API returned an error (e.g., "Email or username already in use")
-                            val message = jsonResponse.getString("message") // [cite: 112, 186, 191]
+                            val message = jsonResponse.getString("message")
                             Toast.makeText(this, "Signup failed: $message", Toast.LENGTH_LONG).show()
                         }
                     } catch (e: Exception) {
                         Toast.makeText(this, "Error parsing response: ${e.message}", Toast.LENGTH_LONG).show()
+                        Log.e("Signup", "Error: ${e.message}", e)
                     }
                 },
                 { error ->
-                    // Network error listener
                     Toast.makeText(this, "Network error: ${error.message}", Toast.LENGTH_LONG).show()
+                    Log.e("Signup", "Network error: ${error.message}")
                 }) {
 
-                // Override getParams to send data as x-www-form-urlencoded
                 override fun getParams(): MutableMap<String, String> {
                     val params = HashMap<String, String>()
-                    params["email"] = email       // [cite: 159]
-                    params["password"] = pass     // [cite: 160]
-                    params["username"] = username // [cite: 161]
-                    params["firstName"] = first   // [cite: 162]
-                    params["lastName"] = last     // [cite: 163]
-                    params["dob"] = dob           // [cite: 164]
+                    params["email"] = email
+                    params["password"] = pass
+                    params["username"] = username
+                    params["firstName"] = first
+                    params["lastName"] = last
+                    params["dob"] = dob
 
                     // Add optional profile picture if user selected one
                     selectedImageBase64?.let {
-                        params["profilePictureBase64"] = it // [cite: 171]
+                        params["profilePictureBase64"] = it
                     }
                     return params
                 }
             }
-            // Add the request to the queue
             queue.add(stringRequest)
-            // --- END OF CHANGED BLOCK ---
         }
     }
 
-    // REMOVED: setUserOnlineStatus function (backend handles this)
-
-    // This image picker logic is perfect, no changes needed.
-    // It already provides the Base64 string that the API needs.
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
+        super.onActivityResult(requestCode, resultCode,data)
 
         if (requestCode == PICK_IMAGE && resultCode == Activity.RESULT_OK && data != null) {
             val imageUri: Uri? = data.data
@@ -170,7 +167,6 @@ class signup_page : AppCompatActivity() {
 
     private fun encodeImage(bitmap: Bitmap): String {
         val output = ByteArrayOutputStream()
-        // Reduced quality to 50 to avoid request payload being too large
         bitmap.compress(Bitmap.CompressFormat.JPEG, 50, output)
         val imageBytes = output.toByteArray()
         return Base64.encodeToString(imageBytes, Base64.DEFAULT)

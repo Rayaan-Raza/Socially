@@ -2,14 +2,14 @@ package com.group.i230535_i230048
 
 import android.Manifest
 import android.content.ContentUris
-import android.content.ContentValues // CHANGED: Added for SQLite
-import android.content.Context // CHANGED: Added for Network/Prefs
+import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.net.ConnectivityManager // CHANGED: Added for Network
-import android.net.NetworkCapabilities // CHANGED: Added for Network
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
@@ -26,9 +26,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-// REMOVED: import com.google.firebase.auth.FirebaseAuth
-// REMOVED: import com.google.firebase.database.FirebaseDatabase
-// REMOVED: import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -39,18 +36,15 @@ import kotlin.concurrent.thread
 import android.graphics.ImageDecoder
 import android.os.Build
 import android.util.Base64
-import android.util.Log // CHANGED: Added for logging
+import android.util.Log
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.bumptech.glide.Glide
-import com.android.volley.Request // CHANGED: Added Volley
-import com.android.volley.toolbox.StringRequest // CHANGED: Added Volley
-import com.android.volley.toolbox.Volley // CHANGED: Added Volley
-import com.group.i230535_i230048.AppDbHelper // CHANGED: Added DB Helper
-import com.group.i230535_i230048.DB // CHANGED: Added DB Helper
-import org.json.JSONObject // CHANGED: Added JSON
-
+import com.android.volley.Request
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
+import org.json.JSONObject
 
 class posting : AppCompatActivity() {
 
@@ -61,7 +55,6 @@ class posting : AppCompatActivity() {
     private var lastPickedUri: Uri? = null
     private var isUploading = false
 
-    // CHANGED: Added DB Helper and Volley Queue
     private lateinit var dbHelper: AppDbHelper
 
     private val askPermission = registerForActivityResult(
@@ -80,7 +73,6 @@ class posting : AppCompatActivity() {
         setContentView(R.layout.activity_posting)
         enableEdgeToEdge()
 
-        // CHANGED: Initialize DB Helper
         dbHelper = AppDbHelper(this)
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
@@ -96,7 +88,6 @@ class posting : AppCompatActivity() {
             finish()
         }
 
-        // 3-column gallery grid (No changes)
         adapter = GalleryAdapter(mutableListOf()) { uri ->
             lastPickedUri = uri
             Glide.with(this).load(uri).into(mainImage)
@@ -105,12 +96,10 @@ class posting : AppCompatActivity() {
         galleryGrid.layoutManager = GridLayoutManager(this, 3)
         galleryGrid.adapter = adapter
 
-        // Let user tap preview to post again (No changes)
         mainImage.setOnClickListener {
             lastPickedUri?.let { showCaptionDialog(it) }
         }
 
-        // “Next” uses the last selected image (No changes)
         findViewById<TextView>(R.id.next_btn).setOnClickListener {
             val uri = lastPickedUri
             if (uri == null) {
@@ -122,8 +111,6 @@ class posting : AppCompatActivity() {
 
         ensurePermissionAndLoad()
     }
-
-    // -------- Permissions & Gallery (No changes) --------
 
     private fun ensurePermissionAndLoad() {
         val permission = if (Build.VERSION.SDK_INT >= 33)
@@ -185,8 +172,6 @@ class posting : AppCompatActivity() {
         }
     }
 
-    // -------- Caption dialog (No changes to this function) --------
-
     private fun showCaptionDialog(uri: Uri) {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_caption, null)
         val preview = view.findViewById<ImageView>(R.id.caption_preview)
@@ -222,7 +207,6 @@ class posting : AppCompatActivity() {
                 postBtn.isEnabled = false
                 cancelBtn.isEnabled = false
 
-                // CHANGED: Swapped Firebase function with new offline-first function
                 uploadPostVolley(
                     uri = lastPickedUri!!,
                     caption = caption,
@@ -248,8 +232,8 @@ class posting : AppCompatActivity() {
     }
 
     /**
-     * CHANGED: Replaced 'uploadPost' with 'uploadPostVolley'
      * Encodes image to Base64, then attempts to upload via Volley.
+     * Uses post_create.php endpoint from final API spec.
      * If offline or Volley fails, it saves the post to the local sync queue.
      */
     private fun uploadPostVolley(
@@ -258,7 +242,6 @@ class posting : AppCompatActivity() {
         onDone: () -> Unit,
         onError: (String) -> Unit
     ) {
-        // 1. Get user details from SharedPreferences
         val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
         val uid = prefs.getString(AppGlobals.KEY_USER_UID, null)
         val username = prefs.getString(AppGlobals.KEY_USERNAME, "user")
@@ -273,7 +256,6 @@ class posting : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                // 2. Heavy work: encode image to Base64 (using your helper)
                 val base64 = withContext(Dispatchers.IO) {
                     encodeUriToBase64Safe(uri, maxWidth = 1080, jpegQuality = 80)
                 }
@@ -282,29 +264,25 @@ class posting : AppCompatActivity() {
                     return@launch
                 }
 
-                // 3. Create payload for Volley and Sync Queue
+                // API expects: uid, caption, imageBase64 (optional: imageUrl)
                 val payloadParams = HashMap<String, String>()
                 payloadParams["uid"] = uid
-                payloadParams["username"] = username ?: "user"
                 payloadParams["caption"] = caption
                 payloadParams["imageBase64"] = base64
-                payloadParams["createdAt"] = now.toString()
-                payloadParams["postId"] = postId
 
-                // Create a JSON version for the offline queue
                 val payloadJson = JSONObject()
                 payloadParams.forEach { (key, value) -> payloadJson.put(key, value) }
+                payloadJson.put("postId", postId) // For tracking in queue
+                payloadJson.put("createdAt", now)
 
-                // 4. Check network and attempt upload
                 if (isNetworkAvailable(this@posting)) {
                     val queue = Volley.newRequestQueue(this@posting)
-                    val url = AppGlobals.BASE_URL + "create_post.php" // (from ApiService.kt)
+                    val url = AppGlobals.BASE_URL + "post_create.php"
 
                     val stringRequest = object : StringRequest(
                         Request.Method.POST,
                         url,
                         { response ->
-                            // Online - Success
                             try {
                                 val json = JSONObject(response)
                                 if (json.getBoolean("success")) {
@@ -318,11 +296,10 @@ class posting : AppCompatActivity() {
                             }
                         },
                         { error ->
-                            // Online - Network Error (e.g., server down)
-                            // Save to queue to try again later
                             Log.e("posting.kt", "Volley error, saving to queue: ${error.message}")
-                            saveToSyncQueue("create_post.php", payloadJson)
-                            onDone() // Finish activity, user assumes it's fine
+                            saveToSyncQueue("post_create.php", payloadJson)
+                            Toast.makeText(this@posting, "Offline. Post will send later.", Toast.LENGTH_SHORT).show()
+                            onDone()
                         }) {
 
                         override fun getParams(): MutableMap<String, String> {
@@ -331,9 +308,9 @@ class posting : AppCompatActivity() {
                     }
                     queue.add(stringRequest)
                 } else {
-                    // 5. Offline - Save to queue immediately
-                    saveToSyncQueue("create_post.php", payloadJson)
-                    onDone() // Finish activity, user assumes it's fine
+                    saveToSyncQueue("post_create.php", payloadJson)
+                    Toast.makeText(this@posting, "Offline. Post will send later.", Toast.LENGTH_SHORT).show()
+                    onDone()
                 }
 
             } catch (oom: OutOfMemoryError) {
@@ -344,14 +321,12 @@ class posting : AppCompatActivity() {
         }
     }
 
-    // This is your excellent Base64 encoder. No changes needed.
     private fun encodeUriToBase64Safe(
         uri: Uri,
         maxWidth: Int,
         jpegQuality: Int
     ): String {
         try {
-            // --- Path A: Modern, reliable decoder (API 28+) ---
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 val src = ImageDecoder.createSource(contentResolver, uri)
                 val bmp = ImageDecoder.decodeBitmap(src) { decoder, info, _ ->
@@ -370,7 +345,6 @@ class posting : AppCompatActivity() {
                 return Base64.encodeToString(bytes, Base64.NO_WRAP)
             }
 
-            // --- Path B: Legacy devices (BitmapFactory with inSampleSize) ---
             val optsBounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             contentResolver.openInputStream(uri)?.use { input ->
                 BitmapFactory.decodeStream(input, null, optsBounds)
@@ -415,7 +389,6 @@ class posting : AppCompatActivity() {
                 return Base64.encodeToString(out, Base64.NO_WRAP)
             }
 
-            // --- Path C: Ultimate fallback via Glide (handles cloud/HEIC/etc.) ---
             val glideBmp = Glide.with(this)
                 .asBitmap()
                 .load(uri)
@@ -450,8 +423,6 @@ class posting : AppCompatActivity() {
         }
     }
 
-
-    // ---------- Gallery Adapter (No changes) ----------
     private class GalleryAdapter(
         private val data: MutableList<Uri>,
         private val onClick: (Uri) -> Unit
@@ -482,11 +453,6 @@ class posting : AppCompatActivity() {
         }
     }
 
-    // --- CHANGED: ADDED HELPER FUNCTIONS ---
-
-    /**
-     * Saves a failed or offline request to the SQLite sync queue.
-     */
     private fun saveToSyncQueue(endpoint: String, payload: JSONObject) {
         Log.d("posting.kt", "Saving to sync queue. Endpoint: $endpoint")
         try {
@@ -496,18 +462,11 @@ class posting : AppCompatActivity() {
             cv.put(DB.SyncQueue.COLUMN_PAYLOAD, payload.toString())
             cv.put(DB.SyncQueue.COLUMN_STATUS, "PENDING")
             db.insert(DB.SyncQueue.TABLE_NAME, null, cv)
-
-            runOnUiThread {
-                Toast.makeText(this, "Offline. Post will send later.", Toast.LENGTH_SHORT).show()
-            }
         } catch (e: Exception) {
             Log.e("posting.kt", "Failed to save to sync queue: ${e.message}")
         }
     }
 
-    /**
-     * Checks if the device is connected to the internet.
-     */
     private fun isNetworkAvailable(context: Context): Boolean {
         val connectivityManager =
             context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
