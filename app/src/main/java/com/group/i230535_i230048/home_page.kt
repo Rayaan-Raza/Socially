@@ -239,19 +239,23 @@ class home_page : AppCompatActivity() {
         try {
             storyList.clear()
 
-            // Add "Your Story" bubble
+            // 1. Always add "Your Story" first
             storyList.add(StoryBubble(currentUid, "Your Story", null, false))
 
-            // Load from story_bubbles table if it exists
+            // 2. Load others from DB
             val db = dbHelper.readableDatabase
             val cursor = db.query(
-                "story_bubbles", // Assuming you have this table
+                "story_bubbles",
                 null, null, null, null, null, null
             )
 
             while (cursor.moveToNext()) {
                 try {
                     val uid = cursor.getString(cursor.getColumnIndexOrThrow("uid"))
+
+                    // --- FIX: Skip current user (prevents "Your Story" + "Username" duplicate) ---
+                    if (uid == currentUid) continue
+
                     val username = cursor.getString(cursor.getColumnIndexOrThrow("username"))
                     val profileUrl = cursor.getString(cursor.getColumnIndexOrThrow("profileUrl"))
                     val hasUnseen = cursor.getInt(cursor.getColumnIndexOrThrow("hasUnseen")) == 1
@@ -266,7 +270,6 @@ class home_page : AppCompatActivity() {
             storyAdapter.notifyDataSetChanged()
         } catch (e: Exception) {
             Log.e("home_page", "Error in loadStoriesFromDb: ${e.message}")
-            // Ensure at least "Your Story" is shown
             if (storyList.isEmpty()) {
                 storyList.add(StoryBubble(currentUid, "Your Story", null, false))
                 storyAdapter.notifyDataSetChanged()
@@ -311,63 +314,51 @@ class home_page : AppCompatActivity() {
     private fun fetchStoriesFromApi() {
         Log.d("home_page", "📖 Fetching stories from API...")
         val url = AppGlobals.BASE_URL + "stories_bubbles_get.php?uid=$currentUid"
-        Log.d("home_page", "URL: $url")
 
         val stringRequest = StringRequest(Request.Method.GET, url,
             { response ->
                 try {
-                    Log.d("home_page", "📥 Raw story response length: ${response.length}")
                     val cleaned = cleanJsonResponse(response)
                     val json = JSONObject(cleaned)
 
                     if (json.getBoolean("success")) {
                         val dataArray = json.getJSONArray("data")
-                        Log.d("home_page", "✅ Got ${dataArray.length()} story bubbles from API")
-
                         val bubbles = mutableListOf<StoryBubble>()
+
                         for (i in 0 until dataArray.length()) {
                             try {
                                 val bubbleObj = dataArray.getJSONObject(i)
+                                val uid = bubbleObj.optString("uid", "")
+
+                                // --- FIX: Skip current user here too ---
+                                if (uid == currentUid) continue
+
                                 val bubble = StoryBubble(
-                                    uid = bubbleObj.optString("uid", ""),
+                                    uid = uid,
                                     username = bubbleObj.optString("username", "User"),
                                     profileUrl = bubbleObj.optString("profileUrl", null),
                                     hasStories = bubbleObj.optBoolean("hasStories", false)
                                 )
                                 bubbles.add(bubble)
-                                Log.d("home_page", "Story bubble: ${bubble.username} hasStories=${bubble.hasStories}")
-                            } catch (e: Exception) {
-                                Log.e("home_page", "Error parsing bubble at index $i: ${e.message}")
-                            }
+                            } catch (e: Exception) { }
                         }
 
                         storyList.clear()
+                        // Add Your Story First
                         storyList.add(StoryBubble(currentUid, "Your Story", null, false))
+                        // Add others
                         storyList.addAll(bubbles)
-                        storyAdapter.notifyDataSetChanged()
-                        Log.d("home_page", "✅ Story list updated with ${storyList.size} items")
 
-                        // Save to DB
+                        storyAdapter.notifyDataSetChanged()
+
+                        // Save to DB (only others)
                         saveStoriesToDb(bubbles)
-                    } else {
-                        val errorMsg = json.optString("message", "Unknown error")
-                        Log.e("home_page", "❌ API returned error: $errorMsg")
                     }
                 } catch (e: Exception) {
                     Log.e("home_page", "❌ Error parsing stories: ${e.message}")
-                    Log.e("home_page", "Raw response: ${response.take(500)}")
-                    e.printStackTrace()
                 }
             },
-            { error ->
-                Log.e("home_page", "❌ Volley error fetching stories: ${error.message}")
-                error.networkResponse?.let {
-                    Log.e("home_page", "Status code: ${it.statusCode}")
-                    try {
-                        Log.e("home_page", "Response: ${String(it.data).take(500)}")
-                    } catch (e: Exception) { }
-                }
-            }
+            { error -> Log.e("home_page", "❌ Volley error fetching stories: ${error.message}") }
         )
         queue.add(stringRequest)
     }

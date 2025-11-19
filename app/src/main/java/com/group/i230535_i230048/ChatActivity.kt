@@ -691,13 +691,14 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
+    // In your ChatActivity.kt -> encodeImage function
     private fun encodeImage(bitmap: Bitmap): String {
         val output = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 50, output)
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 50, output) // Quality 50 to keep it small
         val imageBytes = output.toByteArray()
-        return Base64.encodeToString(imageBytes, Base64.DEFAULT)
+        // Use NO_WRAP to ensure the string is one long line (safer for JSON/PHP)
+        return Base64.encodeToString(imageBytes, Base64.NO_WRAP)
     }
-
     private fun showMessageOptions(message: Message) {
         if (message.senderId != myUid) {
             Toast.makeText(this, "You can only edit your own messages", Toast.LENGTH_SHORT).show()

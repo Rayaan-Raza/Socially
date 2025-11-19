@@ -2,6 +2,7 @@ package com.group.i230535_i230048
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.util.Base64
 import android.util.Log
 import android.view.LayoutInflater
@@ -96,7 +97,7 @@ class MessageAdapter(
                     messageImage?.visibility = View.VISIBLE
 
                     messageImage?.let { imgView ->
-                        // Load using smart helper (handles URL vs Base64)
+                        // --- THIS IS THE FIX ---
                         loadSmartImage(itemView.context, message.imageUrl, imgView)
                     }
                     setupLongClickListener(message)
@@ -112,8 +113,6 @@ class MessageAdapter(
 
                         imgView.setOnClickListener {
                             if (message.postId.isNotEmpty()) {
-                                // Open post using the SenderID (Post Owner) if available,
-                                // otherwise fallback to current message sender
                                 val targetUid = if(message.senderId.isNotEmpty()) message.senderId else ""
                                 openPostDetails(itemView.context, message.postId, targetUid)
                             } else {
@@ -149,36 +148,62 @@ class MessageAdapter(
         }
 
         /**
-         * Smart Image Loader:
-         * 1. Checks if string is a Web URL.
-         * 2. If not, assumes Base64, decodes to bytes, and lets Glide load it efficiently.
+         * THE CORE FIX FOR MYSQL FLICKERING
          */
+        // Inside MessageAdapter.kt -> MessageViewHolder class
+
         private fun loadSmartImage(context: Context, source: String, imageView: ImageView) {
             if (source.isBlank()) {
-                imageView.setImageResource(R.drawable.city) // Placeholder
+                imageView.setImageResource(R.drawable.city) // Your placeholder
                 return
             }
 
+            // 1. Check for Full URL (http/https)
             if (source.startsWith("http", ignoreCase = true)) {
-                // It is a Server URL
                 Glide.with(context)
                     .load(source)
                     .placeholder(R.drawable.city)
                     .error(R.drawable.city)
                     .into(imageView)
-            } else {
-                // It is Base64 (Optimistic Send)
+            }
+            // 2. Check for Relative Path (e.g. "uploads/img.jpg")
+            else if (source.length < 250 && source.contains(".")) {
+                val fullUrl = AppGlobals.BASE_URL + source
+                Glide.with(context)
+                    .load(fullUrl)
+                    .placeholder(R.drawable.city)
+                    .error(R.drawable.city)
+                    .into(imageView)
+            }
+            // 3. Base64 (The logic that was failing)
+            else {
                 try {
-                    val cleanBase64 = source.substringAfter("base64,", source)
+                    // FIX: Clean the string of JSON artifacts and newlines
+                    var cleanBase64 = source
+                        .replace("\\n", "")   // Remove escaped newlines
+                        .replace("\n", "")    // Remove actual newlines
+                        .replace(" ", "")     // Remove spaces (rare but possible)
+                        .trim()
+
+                    // Remove the data URI prefix if present (e.g., "data:image/jpeg;base64,")
+                    if (cleanBase64.contains(",")) {
+                        cleanBase64 = cleanBase64.substringAfter(",")
+                    }
+
+                    // Decode
                     val imageBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
 
+                    // Load
                     Glide.with(context)
-                        .load(imageBytes) // Glide can load raw bytes!
+                        .asBitmap()
+                        .load(imageBytes)
                         .placeholder(R.drawable.city)
                         .error(R.drawable.city)
                         .into(imageView)
+
                 } catch (e: Exception) {
-                    Log.e("MessageAdapter", "Base64 error", e)
+                    // Debug log to see WHY it failed in Logcat
+                    Log.e("MessageAdapter", "Image Decode Failed! Length: ${source.length}", e)
                     imageView.setImageResource(R.drawable.city)
                 }
             }
