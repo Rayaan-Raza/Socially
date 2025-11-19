@@ -31,6 +31,10 @@ import org.json.JSONObject
 
 class view_profile : AppCompatActivity() {
 
+    companion object {
+        private const val TAG = "view_profile"
+    }
+
     private lateinit var dbHelper: AppDbHelper
     private lateinit var queue: RequestQueue
     private var meUid: String = ""
@@ -58,59 +62,82 @@ class view_profile : AppCompatActivity() {
     private var hasLoadedProfile: Boolean = false
 
     fun loadBottomBarAvatar(navProfile: ImageView) {
-        navProfile.loadUserAvatar(meUid, meUid, R.drawable.oval)
+        Log.d(TAG, "loadBottomBarAvatar: meUid=$meUid")
+        try {
+            navProfile.loadUserAvatar(meUid, meUid, R.drawable.oval)
+        } catch (e: Exception) {
+            Log.e(TAG, "loadBottomBarAvatar: Error", e)
+            navProfile.setImageResource(R.drawable.oval)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_view_profile)
+        Log.d(TAG, "onCreate: Starting view_profile")
 
-        dbHelper = AppDbHelper(this)
-        queue = Volley.newRequestQueue(this)
+        try {
+            setContentView(R.layout.activity_view_profile)
 
-        val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
-        meUid = prefs.getString(AppGlobals.KEY_USER_UID, "") ?: ""
+            dbHelper = AppDbHelper(this)
+            queue = Volley.newRequestQueue(this)
 
-        targetUid = intent.getStringExtra("userId")
-            ?: intent.getStringExtra("USER_ID")
-                    ?: intent.getStringExtra("uid")
-                    ?: ""
+            val prefs = getSharedPreferences(AppGlobals.PREFS_NAME, Context.MODE_PRIVATE)
+            meUid = prefs.getString(AppGlobals.KEY_USER_UID, "") ?: ""
 
-        Log.d("view_profile", "Target UID: $targetUid, My UID: $meUid")
+            targetUid = intent.getStringExtra("userId")
+                ?: intent.getStringExtra("USER_ID")
+                        ?: intent.getStringExtra("uid")
+                        ?: ""
 
-        if (targetUid.isEmpty() || meUid.isEmpty()) {
-            Toast.makeText(this, "User ID is missing.", Toast.LENGTH_LONG).show()
-            finish(); return
-        }
+            Log.d(TAG, "onCreate: Target UID=$targetUid, My UID=$meUid")
 
-        if (targetUid == meUid) {
-            startActivity(Intent(this, my_profile::class.java))
+            if (targetUid.isEmpty() || meUid.isEmpty()) {
+                Log.e(TAG, "onCreate: Missing user IDs")
+                Toast.makeText(this, "User ID is missing.", Toast.LENGTH_LONG).show()
+                finish()
+                return
+            }
+
+            if (targetUid == meUid) {
+                Log.d(TAG, "onCreate: Viewing own profile, redirecting to my_profile")
+                startActivity(Intent(this, my_profile::class.java))
+                finish()
+                return
+            }
+
+            val navProfile = findViewById<ImageView>(R.id.navProfile)
+            loadBottomBarAvatar(navProfile)
+
+            enableEdgeToEdge()
+            ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
+                val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+                insets
+            }
+
+            initializeViews()
+            findViewById<ImageView>(R.id.backButton).setOnClickListener {
+                Log.d(TAG, "Back button clicked")
+                finish()
+            }
+
+            setupPostsGrid()
+            setupMessageButton()
+            setupBottomNavigationBar()
+
+            showLoadingState()
+            Log.d(TAG, "onCreate: Initialization complete")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "onCreate: Exception", e)
+            Toast.makeText(this, "Error initializing: ${e.message}", Toast.LENGTH_SHORT).show()
             finish()
-            return
         }
-
-        val navProfile = findViewById<ImageView>(R.id.navProfile)
-        loadBottomBarAvatar(navProfile)
-
-        enableEdgeToEdge()
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
-        }
-
-        initializeViews()
-        findViewById<ImageView>(R.id.backButton).setOnClickListener { finish() }
-
-        setupPostsGrid()
-        setupMessageButton()
-        setupBottomNavigationBar()
-
-        showLoadingState()
     }
 
     override fun onStart() {
         super.onStart()
+        Log.d(TAG, "onStart: Loading data")
 
         val hasLocalData = loadUserProfileFromDb()
 
@@ -118,45 +145,38 @@ class view_profile : AppCompatActivity() {
         fetchUserPostsFromApi()
 
         if (!hasLocalData) {
-            Log.d("view_profile", "No local data found, waiting for API response")
+            Log.d(TAG, "onStart: No local data found, waiting for API response")
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        Log.d(TAG, "onDestroy")
     }
 
-    /**
-     * Helper function to clean PHP error output from JSON response.
-     * PHP sometimes outputs HTML warnings/errors before the JSON, which breaks parsing.
-     * This strips out HTML junk and returns only the JSON part.
-     */
     private fun cleanJsonResponse(response: String): String {
         var cleaned = response.trim()
 
-        Log.d("view_profile", "Raw API response (first 500 chars): ${cleaned.take(500)}")
-        Log.d("view_profile", "Response length: ${cleaned.length}, First char: '${cleaned.firstOrNull()}'")
+        Log.d(TAG, "cleanJsonResponse: Raw response (first 500 chars): ${cleaned.take(500)}")
 
-        // Check if this is a pure PHP error (Fatal error means no JSON at all)
+        // Check if this is a pure PHP error
         if (cleaned.contains("Fatal error") || cleaned.contains("Parse error") || cleaned.contains("Uncaught")) {
-            Log.e("view_profile", "❌ PHP Fatal error detected - no valid JSON in response!")
+            Log.e(TAG, "cleanJsonResponse: PHP Fatal error detected!")
 
-            // Extract the actual error message for debugging
             val errorMessage = if (cleaned.contains("Unknown column")) {
-                "Database column mismatch. Tell partner to check: from_uid should be sender_uid, to_uid should be receiver_uid in follow_requests table query"
+                "Database column mismatch"
             } else {
                 "PHP server error"
             }
 
-            Log.e("view_profile", "FIX NEEDED: $errorMessage")
+            Log.e(TAG, "cleanJsonResponse: $errorMessage")
             return "{\"success\": false, \"message\": \"$errorMessage\"}"
         }
 
         // Check if response starts with JSON
         if (!cleaned.startsWith("{") && !cleaned.startsWith("[")) {
-            Log.w("view_profile", "⚠️ Response doesn't start with JSON! First 50 chars: ${cleaned.take(50)}")
+            Log.w(TAG, "cleanJsonResponse: Response doesn't start with JSON! First 50 chars: ${cleaned.take(50)}")
 
-            // Try to find actual JSON (look for {" pattern which is more reliable)
             val jsonObjectStart = cleaned.indexOf("{\"")
             val jsonArrayStart = cleaned.indexOf("[{")
 
@@ -169,16 +189,16 @@ class view_profile : AppCompatActivity() {
 
             if (jsonStart > 0) {
                 val beforeJson = cleaned.substring(0, jsonStart)
-                Log.e("view_profile", "Content before JSON: $beforeJson")
+                Log.e(TAG, "cleanJsonResponse: Content before JSON: $beforeJson")
                 cleaned = cleaned.substring(jsonStart)
-                Log.d("view_profile", "Cleaned JSON starts with: ${cleaned.take(100)}")
+                Log.d(TAG, "cleanJsonResponse: Cleaned JSON starts with: ${cleaned.take(100)}")
             } else if (jsonStart == -1) {
-                Log.e("view_profile", "❌ No JSON found in response! Full response: $cleaned")
+                Log.e(TAG, "cleanJsonResponse: No JSON found in response!")
                 return "{\"success\": false, \"message\": \"Invalid server response\"}"
             }
         }
 
-        // Also check for and remove any trailing garbage after JSON
+        // Remove trailing garbage
         val lastBrace = cleaned.lastIndexOf('}')
         val lastBracket = cleaned.lastIndexOf(']')
         val jsonEnd = maxOf(lastBrace, lastBracket)
@@ -186,7 +206,7 @@ class view_profile : AppCompatActivity() {
         if (jsonEnd > 0 && jsonEnd < cleaned.length - 1) {
             val afterJson = cleaned.substring(jsonEnd + 1)
             if (afterJson.isNotBlank()) {
-                Log.w("view_profile", "Content after JSON: $afterJson")
+                Log.w(TAG, "cleanJsonResponse: Content after JSON: $afterJson")
                 cleaned = cleaned.substring(0, jsonEnd + 1)
             }
         }
@@ -195,94 +215,130 @@ class view_profile : AppCompatActivity() {
     }
 
     private fun showLoadingState() {
-        usernameTextView.text = "Loading..."
-        displayNameTextView.text = "Loading..."
-        bioTextView.text = ""
-        postsCountTextView.text = "0"
-        followersCountTextView.text = "0"
-        followingCountTextView.text = "0"
+        Log.d(TAG, "showLoadingState: Setting loading state")
+        try {
+            usernameTextView.text = "Loading..."
+            displayNameTextView.text = "Loading..."
+            bioTextView.text = ""
+            postsCountTextView.text = "0"
+            followersCountTextView.text = "0"
+            followingCountTextView.text = "0"
 
-        followButton.isEnabled = false
-        followButton.alpha = 0.5f
-        messageButton.isEnabled = false
-        messageButton.alpha = 0.5f
+            followButton.isEnabled = false
+            followButton.alpha = 0.5f
+            messageButton.isEnabled = false
+            messageButton.alpha = 0.5f
+        } catch (e: Exception) {
+            Log.e(TAG, "showLoadingState: Error", e)
+        }
     }
 
     private fun initializeViews() {
-        profileImageView = findViewById(R.id.profile_image)
-        usernameTextView = findViewById(R.id.username)
-        displayNameTextView = findViewById(R.id.displayName)
-        bioTextView = findViewById(R.id.bioText)
-        postsCountTextView = findViewById(R.id.postsCount)
-        followersCountTextView = findViewById(R.id.followersCount)
-        followingCountTextView = findViewById(R.id.followingCount)
-        postsRecyclerView = findViewById(R.id.posts_recycler_view)
-        followButton = findViewById(R.id.followingButton)
-        messageButton = findViewById(R.id.messageButton)
+        Log.d(TAG, "initializeViews: Initializing views")
+        try {
+            profileImageView = findViewById(R.id.profile_image)
+            usernameTextView = findViewById(R.id.username)
+            displayNameTextView = findViewById(R.id.displayName)
+            bioTextView = findViewById(R.id.bioText)
+            postsCountTextView = findViewById(R.id.postsCount)
+            followersCountTextView = findViewById(R.id.followersCount)
+            followingCountTextView = findViewById(R.id.followingCount)
+            postsRecyclerView = findViewById(R.id.posts_recycler_view)
+            followButton = findViewById(R.id.followingButton)
+            messageButton = findViewById(R.id.messageButton)
+            Log.d(TAG, "initializeViews: All views initialized")
+        } catch (e: Exception) {
+            Log.e(TAG, "initializeViews: Error", e)
+            throw e
+        }
     }
 
     private fun loadUserProfileFromDb(): Boolean {
-        Log.d("view_profile", "Loading profile from DB for UID: $targetUid")
-        val db = dbHelper.readableDatabase
-        val cursor = db.query(
-            DB.User.TABLE_NAME, null,
-            "${DB.User.COLUMN_UID} = ?", arrayOf(targetUid),
-            null, null, null
-        )
+        Log.d(TAG, "loadUserProfileFromDb: Loading profile for targetUid=$targetUid")
+        try {
+            val db = dbHelper.readableDatabase
+            val cursor = db.query(
+                DB.User.TABLE_NAME, null,
+                "${DB.User.COLUMN_UID} = ?", arrayOf(targetUid),
+                null, null, null
+            )
 
-        var hasData = false
-        if (cursor.moveToFirst()) {
-            try {
-                val user = User(
-                    uid = cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_UID)),
-                    username = cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_USERNAME)) ?: "",
-                    fullName = cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_FULL_NAME)) ?: "",
-                    bio = cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_BIO)) ?: "",
-                    profilePictureUrl = cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_PROFILE_PIC_URL)) ?: ""
-                )
-                Log.d("view_profile", "Found user in DB: ${user.username}")
-                populateProfileData(user)
-                hasData = true
-            } catch (e: Exception) {
-                Log.e("view_profile", "Error reading user from DB: ${e.message}")
+            var hasData = false
+            if (cursor.moveToFirst()) {
+                try {
+                    val user = User(
+                        uid = cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_UID)),
+                        username = cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_USERNAME)) ?: "",
+                        fullName = cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_FULL_NAME)) ?: "",
+                        bio = cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_BIO)) ?: "",
+                        profilePictureUrl = cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_PROFILE_PIC_URL)) ?: ""
+                    )
+                    Log.d(TAG, "loadUserProfileFromDb: Found user: ${user.username}")
+                    populateProfileData(user)
+                    hasData = true
+                } catch (e: Exception) {
+                    Log.e(TAG, "loadUserProfileFromDb: Error reading user", e)
+                }
+            } else {
+                Log.d(TAG, "loadUserProfileFromDb: User not found in DB")
             }
-        } else {
-            Log.d("view_profile", "User not found in local DB")
-        }
-        cursor.close()
+            cursor.close()
 
-        if (hasData) {
-            loadUserPostsFromDb()
-        }
+            if (hasData) {
+                loadUserPostsFromDb()
+            }
 
-        return hasData
+            return hasData
+        } catch (e: Exception) {
+            Log.e(TAG, "loadUserProfileFromDb: Exception", e)
+            return false
+        }
+    }
+
+    private fun populateProfileData(user: User) {
+        Log.d(TAG, "populateProfileData: Populating UI for ${user.username}")
+        try {
+            runOnUiThread {
+                targetUsername = user.username
+                usernameTextView.text = user.username
+                displayNameTextView.text = user.fullName.takeIf { it.isNotBlank() } ?: user.username
+                bioTextView.text = user.bio.takeIf { it.isNotBlank() } ?: "No bio available."
+
+                try {
+                    profileImageView.loadUserAvatar(user.uid, meUid, R.drawable.default_avatar)
+                } catch (e: Exception) {
+                    Log.e(TAG, "populateProfileData: Error loading avatar", e)
+                    profileImageView.setImageResource(R.drawable.default_avatar)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "populateProfileData: Error", e)
+        }
     }
 
     private fun fetchUserProfileFromApi() {
         if (!isNetworkAvailable(this)) {
-            Log.d("view_profile", "Offline, skipping profile fetch")
+            Log.d(TAG, "fetchUserProfileFromApi: Offline, skipping")
             if (!hasLoadedProfile) {
                 Toast.makeText(this, "No internet connection", Toast.LENGTH_SHORT).show()
             }
             return
         }
 
-        val url = AppGlobals.BASE_URL + "user_profile_get.php?uid=$meUid&targetUid=$targetUid"
-        Log.d("view_profile", "Fetching profile from: $url")
+        val url = "${AppGlobals.BASE_URL}user_profile_get.php?uid=$meUid&targetUid=$targetUid"
+        Log.d(TAG, "fetchUserProfileFromApi: Fetching from: $url")
 
         val stringRequest = StringRequest(Request.Method.GET, url,
             { response ->
-                Log.d("view_profile", "Got API response, length: ${response.length}")
+                Log.d(TAG, "fetchUserProfileFromApi: Response received, length=${response.length}")
                 try {
                     val cleanedResponse = cleanJsonResponse(response)
-
                     val json = JSONObject(cleanedResponse)
-                    Log.d("view_profile", "Parsed JSON success: ${json.getBoolean("success")}")
+
+                    Log.d(TAG, "fetchUserProfileFromApi: success=${json.getBoolean("success")}")
 
                     if (json.getBoolean("success")) {
                         val dataObj = json.getJSONObject("data")
-                        Log.d("view_profile", "Data object keys: ${dataObj.keys().asSequence().toList()}")
-
                         val userObj = dataObj.getJSONObject("user")
                         val relationshipObj = dataObj.getJSONObject("relationship")
 
@@ -291,148 +347,145 @@ class view_profile : AppCompatActivity() {
                         val fullName = userObj.getString("fullName")
                         val bio = userObj.optString("bio", "")
                         val profilePictureUrl = userObj.optString("profilePictureUrl", "")
+                        val photo = userObj.optString("photo", "")
                         val postsCount = userObj.getInt("postsCount")
                         val followersCount = userObj.getInt("followersCount")
                         val followingCount = userObj.getInt("followingCount")
 
-                        Log.d("view_profile", "✅ Parsed user - username: $username, fullName: $fullName, uid: $uid")
+                        Log.d(TAG, "fetchUserProfileFromApi: username=$username, fullName=$fullName")
 
-                        val cv = ContentValues()
-                        cv.put(DB.User.COLUMN_UID, uid)
-                        cv.put(DB.User.COLUMN_USERNAME, username)
-                        cv.put(DB.User.COLUMN_FULL_NAME, fullName)
-                        cv.put(DB.User.COLUMN_PROFILE_PIC_URL, profilePictureUrl)
-                        cv.put(DB.User.COLUMN_BIO, bio)
+                        // Save to DB
+                        val cv = ContentValues().apply {
+                            put(DB.User.COLUMN_UID, uid)
+                            put(DB.User.COLUMN_USERNAME, username)
+                            put(DB.User.COLUMN_FULL_NAME, fullName)
+                            put(DB.User.COLUMN_PROFILE_PIC_URL, profilePictureUrl)
+                            put(DB.User.COLUMN_PHOTO, photo)
+                            put(DB.User.COLUMN_BIO, bio)
+                        }
 
-                        val result = dbHelper.writableDatabase.insertWithOnConflict(
-                            DB.User.TABLE_NAME, null, cv, SQLiteDatabase.CONFLICT_REPLACE)
-                        Log.d("view_profile", "Saved user to DB, result: $result")
+                        dbHelper.writableDatabase.insertWithOnConflict(
+                            DB.User.TABLE_NAME, null, cv, SQLiteDatabase.CONFLICT_REPLACE
+                        )
+                        Log.d(TAG, "fetchUserProfileFromApi: Saved to DB")
 
+                        // Update UI
                         runOnUiThread {
-                            targetUsername = username
-                            usernameTextView.text = username
-                            displayNameTextView.text = fullName
-                            bioTextView.text = bio.takeIf { it.isNotBlank() } ?: "No bio available."
+                            try {
+                                targetUsername = username
+                                usernameTextView.text = username
+                                displayNameTextView.text = fullName
+                                bioTextView.text = bio.takeIf { it.isNotBlank() } ?: "No bio available."
 
-                            profileImageView.loadUserAvatar(uid, meUid, R.drawable.default_avatar)
+                                profileImageView.loadUserAvatar(uid, meUid, R.drawable.default_avatar)
 
-                            postsCountTextView.text = postsCount.toString()
-                            followersCountTextView.text = followersCount.toString()
-                            followingCountTextView.text = followingCount.toString()
+                                postsCountTextView.text = postsCount.toString()
+                                followersCountTextView.text = followersCount.toString()
+                                followingCountTextView.text = followingCount.toString()
 
-                            isFollowing = relationshipObj.getBoolean("isFollowing")
-                            isRequested = relationshipObj.getBoolean("isRequested")
-                            setupFollowButton(isFollowing, isRequested)
+                                isFollowing = relationshipObj.getBoolean("isFollowing")
+                                isRequested = relationshipObj.getBoolean("isRequested")
 
-                            messageButton.isEnabled = true
-                            messageButton.alpha = 1.0f
+                                Log.d(TAG, "fetchUserProfileFromApi: isFollowing=$isFollowing, isRequested=$isRequested")
 
-                            hasLoadedProfile = true
-                            Log.d("view_profile", "✅ UI updated successfully")
+                                setupFollowButton(isFollowing, isRequested)
+
+                                messageButton.isEnabled = true
+                                messageButton.alpha = 1.0f
+
+                                hasLoadedProfile = true
+                                Log.d(TAG, "fetchUserProfileFromApi: UI updated successfully")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "fetchUserProfileFromApi: Error updating UI", e)
+                            }
                         }
                     } else {
                         val errorMsg = json.optString("message", "Unknown error")
-                        Log.e("view_profile", "API returned success=false: $errorMsg")
+                        Log.e(TAG, "fetchUserProfileFromApi: API error: $errorMsg")
                         runOnUiThread {
                             Toast.makeText(this, "Error: $errorMsg", Toast.LENGTH_SHORT).show()
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e("view_profile", "❌ Error parsing profile: ${e.message}")
-                    Log.e("view_profile", "Stack trace: ", e)
+                    Log.e(TAG, "fetchUserProfileFromApi: Parse error", e)
                     e.printStackTrace()
                     runOnUiThread {
-                        Toast.makeText(this, "Error loading profile: ${e.message}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, "Error loading profile", Toast.LENGTH_LONG).show()
                     }
                 }
             },
             { error ->
-                Log.e("view_profile", "Volley error fetching profile: ${error.message}")
-                Log.e("view_profile", "Network response: ${error.networkResponse}")
-                if (error.networkResponse != null) {
-                    Log.e("view_profile", "Status code: ${error.networkResponse.statusCode}")
-                    try {
-                        Log.e("view_profile", "Response data: ${String(error.networkResponse.data)}")
-                    } catch (e: Exception) {
-                        Log.e("view_profile", "Could not read response data")
-                    }
-                }
-                error.printStackTrace()
+                Log.e(TAG, "fetchUserProfileFromApi: Network error", error)
                 runOnUiThread {
-                    Toast.makeText(this, "Network error: ${error.message}", Toast.LENGTH_SHORT).show()
+                    if (!hasLoadedProfile) {
+                        Toast.makeText(this, "Network error", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         )
         queue.add(stringRequest)
     }
 
-    private fun populateProfileData(user: User) {
-        Log.d("view_profile", "Populating UI with user: ${user.username}")
-        targetUsername = user.username
-        usernameTextView.text = user.username.ifBlank { "user" }
-        displayNameTextView.text = user.fullName.ifBlank { "User" }
-        bioTextView.text = user.bio.takeIf { it.isNotBlank() } ?: "No bio available."
-        profileImageView.loadUserAvatar(user.uid, meUid, R.drawable.default_avatar)
-
-        if (!targetUsername.isNullOrEmpty()) {
-            messageButton.isEnabled = true
-            messageButton.alpha = 1.0f
-        }
-
-        hasLoadedProfile = true
-    }
-
     private fun loadUserPostsFromDb() {
-        postList.clear()
-        val db = dbHelper.readableDatabase
-        val cursor = db.query(
-            DB.Post.TABLE_NAME, null,
-            "${DB.Post.COLUMN_UID} = ?", arrayOf(targetUid),
-            null, null, DB.Post.COLUMN_CREATED_AT + " DESC"
-        )
+        Log.d(TAG, "loadUserPostsFromDb: Loading posts for targetUid=$targetUid")
+        try {
+            postList.clear()
+            val db = dbHelper.readableDatabase
+            val cursor = db.query(
+                DB.Post.TABLE_NAME, null,
+                "${DB.Post.COLUMN_UID} = ?", arrayOf(targetUid),
+                null, null, "${DB.Post.COLUMN_CREATED_AT} DESC"
+            )
 
-        while (cursor.moveToNext()) {
-            try {
-                postList.add(
-                    Post(
-                        postId = cursor.getString(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_POST_ID)),
-                        uid = cursor.getString(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_UID)),
-                        imageUrl = cursor.getString(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_IMAGE_URL)) ?: "",
-                        imageBase64 = cursor.getString(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_IMAGE_BASE64)) ?: "",
-                        caption = cursor.getString(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_CAPTION)) ?: "",
-                        createdAt = cursor.getLong(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_CREATED_AT)),
-                        likeCount = cursor.getLong(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_LIKE_COUNT)),
-                        commentCount = cursor.getLong(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_COMMENT_COUNT))
+            while (cursor.moveToNext()) {
+                try {
+                    postList.add(
+                        Post(
+                            postId = cursor.getString(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_POST_ID)),
+                            uid = cursor.getString(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_UID)),
+                            username = cursor.getString(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_USERNAME)) ?: "",
+                            caption = cursor.getString(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_CAPTION)) ?: "",
+                            imageUrl = cursor.getString(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_IMAGE_URL)) ?: "",
+                            imageBase64 = cursor.getString(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_IMAGE_BASE64)) ?: "",
+                            createdAt = cursor.getLong(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_CREATED_AT)),
+                            likeCount = cursor.getLong(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_LIKE_COUNT)),
+                            commentCount = cursor.getLong(cursor.getColumnIndexOrThrow(DB.Post.COLUMN_COMMENT_COUNT))
+                        )
                     )
-                )
-            } catch (e: Exception) {
-                Log.e("view_profile", "Error parsing post from DB: ${e.message}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "loadUserPostsFromDb: Error parsing post", e)
+                }
             }
+            cursor.close()
+
+            postsAdapter.notifyDataSetChanged()
+            postsCountTextView.text = postList.size.toString()
+
+            Log.d(TAG, "loadUserPostsFromDb: Loaded ${postList.size} posts")
+        } catch (e: Exception) {
+            Log.e(TAG, "loadUserPostsFromDb: Exception", e)
         }
-        cursor.close()
-        postsAdapter.notifyDataSetChanged()
-        postsCountTextView.text = postList.size.toString()
     }
 
     private fun fetchUserPostsFromApi() {
         if (!isNetworkAvailable(this)) {
-            Log.d("view_profile", "Offline, skipping posts fetch")
+            Log.d(TAG, "fetchUserPostsFromApi: Offline, skipping")
             return
         }
 
-        val url = AppGlobals.BASE_URL + "profile_posts_get.php?targetUid=$targetUid"
-        Log.d("view_profile", "Fetching posts from: $url")
+        val url = "${AppGlobals.BASE_URL}profile_posts_get.php?targetUid=$targetUid"
+        Log.d(TAG, "fetchUserPostsFromApi: Fetching from: $url")
 
         val stringRequest = StringRequest(Request.Method.GET, url,
             { response ->
-                Log.d("view_profile", "Posts API Response length: ${response.length}")
+                Log.d(TAG, "fetchUserPostsFromApi: Response received")
                 try {
                     val cleanedResponse = cleanJsonResponse(response)
-
                     val json = JSONObject(cleanedResponse)
+
                     if (json.getBoolean("success")) {
                         val dataArray = json.getJSONArray("data")
-                        Log.d("view_profile", "Found ${dataArray.length()} posts")
+                        Log.d(TAG, "fetchUserPostsFromApi: Processing ${dataArray.length()} posts")
 
                         val db = dbHelper.writableDatabase
                         db.beginTransaction()
@@ -441,234 +494,388 @@ class view_profile : AppCompatActivity() {
 
                             for (i in 0 until dataArray.length()) {
                                 val postObj = dataArray.getJSONObject(i)
-                                val cv = ContentValues()
-                                cv.put(DB.Post.COLUMN_POST_ID, postObj.getString("postId"))
-                                cv.put(DB.Post.COLUMN_UID, postObj.getString("uid"))
-                                cv.put(DB.Post.COLUMN_USERNAME, postObj.optString("username", ""))
-                                cv.put(DB.Post.COLUMN_CAPTION, postObj.optString("caption", ""))
-                                cv.put(DB.Post.COLUMN_IMAGE_URL, postObj.optString("imageUrl", ""))
-                                cv.put(DB.Post.COLUMN_IMAGE_BASE64, postObj.optString("imageBase64", ""))
-                                cv.put(DB.Post.COLUMN_CREATED_AT, postObj.getLong("createdAt"))
-                                cv.put(DB.Post.COLUMN_LIKE_COUNT, postObj.optLong("likeCount", 0))
-                                cv.put(DB.Post.COLUMN_COMMENT_COUNT, postObj.optLong("commentCount", 0))
+                                val cv = ContentValues().apply {
+                                    put(DB.Post.COLUMN_POST_ID, postObj.getString("postId"))
+                                    put(DB.Post.COLUMN_UID, postObj.getString("uid"))
+                                    put(DB.Post.COLUMN_USERNAME, postObj.optString("username", ""))
+                                    put(DB.Post.COLUMN_CAPTION, postObj.optString("caption", ""))
+                                    put(DB.Post.COLUMN_IMAGE_URL, postObj.optString("imageUrl", ""))
+                                    put(DB.Post.COLUMN_IMAGE_BASE64, postObj.optString("imageBase64", ""))
+                                    put(DB.Post.COLUMN_CREATED_AT, postObj.getLong("createdAt"))
+                                    put(DB.Post.COLUMN_LIKE_COUNT, postObj.optLong("likeCount", 0))
+                                    put(DB.Post.COLUMN_COMMENT_COUNT, postObj.optLong("commentCount", 0))
+                                }
                                 db.insert(DB.Post.TABLE_NAME, null, cv)
                             }
                             db.setTransactionSuccessful()
                         } finally {
                             db.endTransaction()
                         }
+
                         loadUserPostsFromDb()
+                        Log.d(TAG, "fetchUserPostsFromApi: Posts saved and reloaded")
+                    } else {
+                        Log.w(TAG, "fetchUserPostsFromApi: API returned success=false")
                     }
                 } catch (e: Exception) {
-                    Log.e("view_profile", "Error parsing posts: ${e.message}")
-                    e.printStackTrace()
+                    Log.e(TAG, "fetchUserPostsFromApi: Error", e)
                 }
             },
             { error ->
-                Log.w("view_profile", "Volley error fetching posts: ${error.message}")
+                Log.e(TAG, "fetchUserPostsFromApi: Network error", error)
             }
         )
         queue.add(stringRequest)
     }
 
-    private fun openPostDetail(post: Post) {
-        val intent = Intent(this, GotoPostActivity::class.java).apply {
-            putExtra("POST_ID", post.postId)
-            putExtra("USER_ID", post.uid)
+    private fun setupPostsGrid() {
+        Log.d(TAG, "setupPostsGrid: Setting up")
+        try {
+            val spanCount = 3
+            postsRecyclerView.layoutManager = GridLayoutManager(this, spanCount)
+            postsRecyclerView.setHasFixedSize(true)
+            postsRecyclerView.addItemDecoration(
+                my_profile.GridSpacingDecoration(spanCount, dp(1), includeEdge = false)
+            )
+
+            postsAdapter = ProfilePostGridAdapter(postList) { clickedPost ->
+                openPostDetail(clickedPost)
+            }
+            postsRecyclerView.adapter = postsAdapter
+            Log.d(TAG, "setupPostsGrid: Complete")
+        } catch (e: Exception) {
+            Log.e(TAG, "setupPostsGrid: Error", e)
         }
-        startActivity(intent)
     }
 
-    private fun setupPostsGrid() {
-        postsRecyclerView.layoutManager = GridLayoutManager(this, 3)
-        postsAdapter = ProfilePostGridAdapter(postList) { clickedPost ->
-            openPostDetail(clickedPost)
+    private fun openPostDetail(post: Post) {
+        Log.d(TAG, "openPostDetail: Opening postId=${post.postId}")
+        try {
+            val intent = Intent(this, GotoPostActivity::class.java).apply {
+                putExtra("POST_ID", post.postId)
+                putExtra("USER_ID", post.uid)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "openPostDetail: Error", e)
+            Toast.makeText(this, "Error opening post", Toast.LENGTH_SHORT).show()
         }
-        postsRecyclerView.adapter = postsAdapter
     }
 
     private fun setupMessageButton() {
-        messageButton.visibility = View.VISIBLE
-        messageButton.isEnabled = false
-        messageButton.alpha = 0.5f
-
-        messageButton.setOnClickListener {
-            if (targetUsername.isNullOrEmpty()) {
-                Toast.makeText(this, "Loading user data...", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
+        Log.d(TAG, "setupMessageButton: Setting up")
+        try {
+            messageButton.setOnClickListener {
+                Log.d(TAG, "Message button clicked")
+                createChatAndOpen()
             }
-
-            // Create chat first, then open ChatActivity
-            createChatAndOpen()
+        } catch (e: Exception) {
+            Log.e(TAG, "setupMessageButton: Error", e)
         }
     }
 
-    /**
-     * Creates a chat session on the server before opening ChatActivity.
-     * Uses chat_create.php to ensure the chat exists.
-     */
     private fun createChatAndOpen() {
         if (!isNetworkAvailable(this)) {
-            // If offline, just open chat directly (it will work offline)
+            Log.d(TAG, "createChatAndOpen: Offline, opening chat directly")
             openChatActivity()
             return
         }
 
-        Log.d("view_profile", "Creating chat with user: $targetUid")
-        val url = AppGlobals.BASE_URL + "chat_create.php"
+        Log.d(TAG, "createChatAndOpen: Creating chat with targetUid=$targetUid")
+        val url = "${AppGlobals.BASE_URL}chat_create.php"
 
         val stringRequest = object : StringRequest(Request.Method.POST, url,
             { response ->
+                Log.d(TAG, "createChatAndOpen: Response received")
                 try {
                     val cleanedResponse = cleanJsonResponse(response)
                     val json = JSONObject(cleanedResponse)
                     if (json.getBoolean("success")) {
                         val dataObj = json.getJSONObject("data")
                         val chatId = dataObj.getString("chatId")
-                        val createdNow = dataObj.optBoolean("createdNow", false)
-
-                        Log.d("view_profile", "✅ Chat ready. ID: $chatId, createdNow: $createdNow")
+                        Log.d(TAG, "createChatAndOpen: Chat ready, ID=$chatId")
                         openChatActivity()
                     } else {
                         val errorMsg = json.optString("message", "Failed to create chat")
-                        Log.e("view_profile", "Chat creation failed: $errorMsg")
+                        Log.e(TAG, "createChatAndOpen: Error: $errorMsg")
                         Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
-                    Log.e("view_profile", "Error creating chat: ${e.message}")
-                    // Still open chat activity - it might work anyway
+                    Log.e(TAG, "createChatAndOpen: Parse error", e)
                     openChatActivity()
                 }
             },
             { error ->
-                Log.e("view_profile", "Network error creating chat: ${error.message}")
-                // Still open chat activity - offline mode will handle it
+                Log.e(TAG, "createChatAndOpen: Network error", error)
                 openChatActivity()
             }
         ) {
             override fun getParams(): MutableMap<String, String> {
-                val params = HashMap<String, String>()
-                params["uid1"] = meUid
-                params["uid2"] = targetUid
-                return params
+                return hashMapOf(
+                    "uid1" to meUid,
+                    "uid2" to targetUid
+                )
             }
         }
         queue.add(stringRequest)
     }
 
     private fun openChatActivity() {
-        Log.d("view_profile", "Opening chat with uid: $targetUid, username: $targetUsername")
-        val intent = Intent(this, ChatActivity::class.java).apply {
-            putExtra("userId", targetUid)
-            putExtra("username", targetUsername)
+        Log.d(TAG, "openChatActivity: Opening with targetUid=$targetUid, username=$targetUsername")
+        try {
+            val intent = Intent(this, ChatActivity::class.java).apply {
+                putExtra("userId", targetUid)
+                putExtra("username", targetUsername)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "openChatActivity: Error", e)
+            Toast.makeText(this, "Error opening chat", Toast.LENGTH_SHORT).show()
         }
-        startActivity(intent)
     }
 
     private fun setupFollowButton(following: Boolean, requested: Boolean) {
-        followButton.visibility = View.VISIBLE
-        followButton.isEnabled = true
-        followButton.alpha = 1.0f
-        setFollowState(following, requested)
+        Log.d(TAG, "setupFollowButton: following=$following, requested=$requested")
+        try {
+            followButton.visibility = View.VISIBLE
+            followButton.isEnabled = true
+            followButton.alpha = 1.0f
+            setFollowState(following, requested)
 
-        followButton.setOnClickListener {
-            if (isFollowing) {
-                unfollowUser()
-            } else if (isRequested) {
-                unfollowUser()
-            } else {
-                followUser()
+            followButton.setOnClickListener {
+                Log.d(TAG, "Follow button clicked: isFollowing=$isFollowing, isRequested=$isRequested")
+                try {
+                    if (isFollowing) {
+                        Log.d(TAG, "Unfollowing user")
+                        unfollowUser()
+                    } else if (isRequested) {
+                        Log.d(TAG, "Canceling follow request")
+                        unfollowUser()
+                    } else {
+                        Log.d(TAG, "Following user")
+                        followUser()
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Follow button click error", e)
+                    Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
+            Log.d(TAG, "setupFollowButton: Complete")
+        } catch (e: Exception) {
+            Log.e(TAG, "setupFollowButton: Error", e)
         }
     }
 
     private fun setFollowState(following: Boolean, requested: Boolean) {
-        isFollowing = following
-        isRequested = requested
-        followButton.gravity = Gravity.CENTER
-        followButton.setPadding(24, 12, 24, 12)
+        Log.d(TAG, "setFollowState: following=$following, requested=$requested")
+        try {
+            isFollowing = following
+            isRequested = requested
+            followButton.gravity = Gravity.CENTER
+            followButton.setPadding(24, 12, 24, 12)
 
-        when {
-            following -> {
-                followButton.text = "Following"
-                followButton.setBackgroundResource(R.drawable.follow_button)
-                ViewCompat.setBackgroundTintList(followButton, null)
-                followButton.setTextColor(getColor(R.color.black))
+            when {
+                following -> {
+                    followButton.text = "Following"
+                    followButton.setBackgroundResource(R.drawable.follow_button)
+                    ViewCompat.setBackgroundTintList(followButton, null)
+                    followButton.setTextColor(getColor(R.color.black))
+                    Log.d(TAG, "setFollowState: Set to Following")
+                }
+                requested -> {
+                    followButton.text = "Requested"
+                    followButton.setBackgroundResource(R.drawable.requested_button)
+                    ViewCompat.setBackgroundTintList(followButton, null)
+                    followButton.setTextColor(getColor(R.color.gray))
+                    Log.d(TAG, "setFollowState: Set to Requested")
+                }
+                else -> {
+                    followButton.text = "Follow"
+                    followButton.setBackgroundResource(R.drawable.message_bttn)
+                    ViewCompat.setBackgroundTintList(followButton, ColorStateList.valueOf(getColor(R.color.smd_theme)))
+                    followButton.setTextColor(getColor(android.R.color.white))
+                    Log.d(TAG, "setFollowState: Set to Follow")
+                }
             }
-            requested -> {
-                followButton.text = "Requested"
-                followButton.setBackgroundResource(R.drawable.requested_button)
-                ViewCompat.setBackgroundTintList(followButton, null)
-                followButton.setTextColor(getColor(R.color.gray))
-            }
-            else -> {
-                followButton.text = "Follow"
-                followButton.setBackgroundResource(R.drawable.message_bttn)
-                ViewCompat.setBackgroundTintList(followButton, ColorStateList.valueOf(getColor(R.color.smd_theme)))
-                followButton.setTextColor(getColor(android.R.color.white))
-            }
+        } catch (e: Exception) {
+            Log.e(TAG, "setFollowState: Error", e)
         }
     }
 
     private fun followUser() {
-        val url = AppGlobals.BASE_URL + "follow_user.php"
-        Log.d("view_profile", "Following user: $targetUid")
+        Log.d(TAG, "followUser: Starting - meUid=$meUid, targetUid=$targetUid")
+
+        if (meUid.isEmpty() || targetUid.isEmpty()) {
+            Log.e(TAG, "followUser: Missing UIDs")
+            Toast.makeText(this, "Error: User ID missing", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (!isNetworkAvailable(this)) {
+            Log.w(TAG, "followUser: No network available")
+            Toast.makeText(this, "No internet connection", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val url = "${AppGlobals.BASE_URL}follow_user.php"
+        Log.d(TAG, "followUser: Sending request to: $url")
+
+        // Disable button to prevent double-clicks
+        followButton.isEnabled = false
+        followButton.alpha = 0.5f
 
         val stringRequest = object : StringRequest(Request.Method.POST, url,
             { response ->
+                Log.d(TAG, "followUser: Response received, length=${response.length}")
+                Log.d(TAG, "followUser: Response: ${response.take(500)}")
+
                 try {
                     val cleanedResponse = cleanJsonResponse(response)
                     val json = JSONObject(cleanedResponse)
-                    if (json.getBoolean("success")) {
+                    val success = json.getBoolean("success")
+
+                    Log.d(TAG, "followUser: success=$success")
+
+                    if (success) {
                         val dataObj = json.getJSONObject("data")
                         val status = dataObj.getString("status")
 
-                        when (status) {
-                            "following" -> setFollowState(true, false)
-                            "requested" -> setFollowState(false, true)
+                        Log.d(TAG, "followUser: status=$status")
+
+                        runOnUiThread {
+                            when (status) {
+                                "following" -> {
+                                    setFollowState(true, false)
+                                    Toast.makeText(this, "Now following", Toast.LENGTH_SHORT).show()
+                                }
+                                "requested", "request_sent" -> {
+                                    setFollowState(false, true)
+                                    Toast.makeText(this, "Follow request sent", Toast.LENGTH_SHORT).show()
+                                }
+                                else -> {
+                                    Log.w(TAG, "followUser: Unknown status: $status")
+                                }
+                            }
+
+                            // Re-enable button
+                            followButton.isEnabled = true
+                            followButton.alpha = 1.0f
                         }
 
                         fetchUserProfileFromApi()
                     } else {
-                        Toast.makeText(this, json.getString("message"), Toast.LENGTH_SHORT).show()
+                        val message = json.optString("message", "Failed to follow")
+                        Log.e(TAG, "followUser: API error: $message")
+                        runOnUiThread {
+                            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                            followButton.isEnabled = true
+                            followButton.alpha = 1.0f
+                        }
                     }
-                } catch (e: Exception) { Log.e("view_profile", "Error parsing follow: ${e.message}") }
+                } catch (e: Exception) {
+                    Log.e(TAG, "followUser: Parse error", e)
+                    e.printStackTrace()
+                    runOnUiThread {
+                        Toast.makeText(this, "Error processing response", Toast.LENGTH_SHORT).show()
+                        followButton.isEnabled = true
+                        followButton.alpha = 1.0f
+                    }
+                }
             },
-            { error -> Toast.makeText(this, "Network error: ${error.message}", Toast.LENGTH_SHORT).show() }
+            { error ->
+                Log.e(TAG, "followUser: Network error", error)
+                error.printStackTrace()
+                runOnUiThread {
+                    Toast.makeText(this, "Network error: ${error.message}", Toast.LENGTH_SHORT).show()
+                    followButton.isEnabled = true
+                    followButton.alpha = 1.0f
+                }
+            }
         ) {
             override fun getParams(): MutableMap<String, String> {
-                val params = HashMap<String, String>()
-                params["uid"] = meUid
-                params["targetUid"] = targetUid
+                val params = hashMapOf(
+                    "uid" to meUid,
+                    "targetUid" to targetUid
+                )
+                Log.d(TAG, "followUser: Params: $params")
                 return params
             }
         }
         queue.add(stringRequest)
+        Log.d(TAG, "followUser: Request added to queue")
     }
 
     private fun unfollowUser() {
-        val url = AppGlobals.BASE_URL + "unfollow_user.php"
-        Log.d("view_profile", "Unfollowing user: $targetUid")
+        Log.d(TAG, "unfollowUser: Starting - meUid=$meUid, targetUid=$targetUid")
+
+        if (meUid.isEmpty() || targetUid.isEmpty()) {
+            Log.e(TAG, "unfollowUser: Missing UIDs")
+            Toast.makeText(this, "Error: User ID missing", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (!isNetworkAvailable(this)) {
+            Log.w(TAG, "unfollowUser: No network available")
+            Toast.makeText(this, "No internet connection", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val url = "${AppGlobals.BASE_URL}unfollow_user.php"
+        Log.d(TAG, "unfollowUser: Sending request to: $url")
+
+        // Disable button
+        followButton.isEnabled = false
+        followButton.alpha = 0.5f
 
         val stringRequest = object : StringRequest(Request.Method.POST, url,
             { response ->
+                Log.d(TAG, "unfollowUser: Response received")
                 try {
                     val cleanedResponse = cleanJsonResponse(response)
                     val json = JSONObject(cleanedResponse)
+
                     if (json.getBoolean("success")) {
-                        setFollowState(false, false)
+                        Log.d(TAG, "unfollowUser: Success")
+                        runOnUiThread {
+                            setFollowState(false, false)
+                            Toast.makeText(this, "Unfollowed", Toast.LENGTH_SHORT).show()
+                            followButton.isEnabled = true
+                            followButton.alpha = 1.0f
+                        }
                         fetchUserProfileFromApi()
                     } else {
-                        Toast.makeText(this, json.getString("message"), Toast.LENGTH_SHORT).show()
+                        val message = json.optString("message", "Failed to unfollow")
+                        Log.e(TAG, "unfollowUser: Error: $message")
+                        runOnUiThread {
+                            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                            followButton.isEnabled = true
+                            followButton.alpha = 1.0f
+                        }
                     }
-                } catch (e: Exception) { Log.e("view_profile", "Error parsing unfollow: ${e.message}") }
+                } catch (e: Exception) {
+                    Log.e(TAG, "unfollowUser: Parse error", e)
+                    runOnUiThread {
+                        Toast.makeText(this, "Error processing response", Toast.LENGTH_SHORT).show()
+                        followButton.isEnabled = true
+                        followButton.alpha = 1.0f
+                    }
+                }
             },
-            { error -> Toast.makeText(this, "Network error: ${error.message}", Toast.LENGTH_SHORT).show() }
+            { error ->
+                Log.e(TAG, "unfollowUser: Network error", error)
+                runOnUiThread {
+                    Toast.makeText(this, "Network error: ${error.message}", Toast.LENGTH_SHORT).show()
+                    followButton.isEnabled = true
+                    followButton.alpha = 1.0f
+                }
+            }
         ) {
             override fun getParams(): MutableMap<String, String> {
-                val params = HashMap<String, String>()
-                params["uid"] = meUid
-                params["targetUid"] = targetUid
+                val params = hashMapOf(
+                    "uid" to meUid,
+                    "targetUid" to targetUid
+                )
+                Log.d(TAG, "unfollowUser: Params: $params")
                 return params
             }
         }
@@ -676,17 +883,18 @@ class view_profile : AppCompatActivity() {
     }
 
     private fun setupBottomNavigationBar() {
+        Log.d(TAG, "setupBottomNavigationBar: Setting up")
         // Setup nav if needed
     }
 
     private fun isNetworkAvailable(context: Context): Boolean {
         val connectivityManager =
             context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val network = connectivityManager.activeNetwork ?: return false
             val activeNetwork =
                 connectivityManager.getNetworkCapabilities(network) ?: return false
-            return when {
+            when {
                 activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> true
                 activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> true
                 activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> true
@@ -696,7 +904,9 @@ class view_profile : AppCompatActivity() {
             @Suppress("DEPRECATION")
             val networkInfo = connectivityManager.activeNetworkInfo ?: return false
             @Suppress("DEPRECATION")
-            return networkInfo.isConnected
+            networkInfo.isConnected
         }
     }
+
+    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 }

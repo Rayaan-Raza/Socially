@@ -1,4 +1,3 @@
-
 // ==================== AppDbHelper.kt ====================
 package com.group.i230535_i230048
 
@@ -17,7 +16,7 @@ class AppDbHelper(context: Context) : SQLiteOpenHelper(
     override fun onCreate(db: SQLiteDatabase) {
         Log.d("AppDbHelper", "Creating database tables...")
 
-        // Create Users table
+        // Create Users table WITH photo column
         db.execSQL(
             """
             CREATE TABLE ${DB.User.TABLE_NAME} (
@@ -25,6 +24,7 @@ class AppDbHelper(context: Context) : SQLiteOpenHelper(
                 ${DB.User.COLUMN_USERNAME} TEXT,
                 ${DB.User.COLUMN_FULL_NAME} TEXT,
                 ${DB.User.COLUMN_PROFILE_PIC_URL} TEXT,
+                ${DB.User.COLUMN_PHOTO} TEXT,
                 ${DB.User.COLUMN_EMAIL} TEXT,
                 ${DB.User.COLUMN_BIO} TEXT,
                 ${DB.User.COLUMN_IS_ONLINE} INTEGER DEFAULT 0,
@@ -100,7 +100,7 @@ class AppDbHelper(context: Context) : SQLiteOpenHelper(
         """
         )
 
-        // Create Story Bubbles table (NEW!)
+        // Create Story Bubbles table
         db.execSQL(
             """
             CREATE TABLE ${DB.StoryBubble.TABLE_NAME} (
@@ -158,8 +158,8 @@ class AppDbHelper(context: Context) : SQLiteOpenHelper(
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         Log.d("AppDbHelper", "Upgrading database from version $oldVersion to $newVersion")
 
-        when (oldVersion) {
-            1 -> {
+        when {
+            oldVersion < 2 -> {
                 // Upgrade from version 1 to 2: Add story_bubbles table
                 db.execSQL(
                     """
@@ -199,7 +199,22 @@ class AppDbHelper(context: Context) : SQLiteOpenHelper(
 
                 Log.d("AppDbHelper", "Upgraded to version 2: Added story_bubbles table")
             }
-            // Add more version upgrades here as needed
+        }
+
+        // NEW: Upgrade to version 3 - Add photo column
+        if (oldVersion < 3) {
+            Log.d("AppDbHelper", "Upgrading to version 3: Adding photo column")
+            try {
+                db.execSQL(
+                    """
+                    ALTER TABLE ${DB.User.TABLE_NAME} 
+                    ADD COLUMN ${DB.User.COLUMN_PHOTO} TEXT
+                """
+                )
+                Log.d("AppDbHelper", "Successfully added photo column to users table")
+            } catch (e: Exception) {
+                Log.w("AppDbHelper", "Column photo might already exist: ${e.message}")
+            }
         }
     }
 

@@ -4,7 +4,7 @@ package com.group.i230535_i230048
 public final class DB private constructor() {
     companion object {
         const val DATABASE_NAME = "socially_offline.db"
-        const val DATABASE_VERSION = 2  // CHANGED: Incremented for new table
+        const val DATABASE_VERSION = 3  // CHANGED: Incremented for photo column
     }
 
     // User table
@@ -15,6 +15,7 @@ public final class DB private constructor() {
             const val COLUMN_USERNAME = "username"
             const val COLUMN_FULL_NAME = "fullName"
             const val COLUMN_PROFILE_PIC_URL = "profilePictureUrl"
+            const val COLUMN_PHOTO = "photo"  // NEW: Base64 encoded photo
             const val COLUMN_EMAIL = "email"
             const val COLUMN_BIO = "bio"
             const val COLUMN_IS_ONLINE = "isOnline"
@@ -82,7 +83,7 @@ public final class DB private constructor() {
         }
     }
 
-    // NEW: Story Bubbles table (for home screen story circles)
+    // Story Bubbles table (for home screen story circles)
     public final class StoryBubble private constructor() {
         companion object {
             const val TABLE_NAME = "story_bubbles"
