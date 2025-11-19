@@ -1,60 +1,95 @@
 package com.group.i230535_i230048
 
+import android.content.ContentValues
 import android.content.Context
 import android.util.Base64
+import android.util.Log
 import android.widget.ImageView
+import com.android.volley.Request
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
 import com.bumptech.glide.Glide
-import com.group.i230535_i230048.AppDbHelper // Make sure this import is used
-import com.group.i230535_i230048.DB // Make sure this import is used
+import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
 object AvatarUtils {
-
-    // Cache still helps reduce DB reads
     private val cache = ConcurrentHashMap<String, String?>()
 
-    // NEW: Reads from SQLite, not Firebase
     fun getProfileUrlFromDb(context: Context, uid: String): String? {
-        // 1. Check cache first
-        cache[uid]?.let { return it }
+        if (cache.containsKey(uid)) return cache[uid]
 
-        // 2. If not in cache, query local DB
         val dbHelper = AppDbHelper(context)
-        val db = dbHelper.readableDatabase
-        val cursor = db.query(
-            DB.User.TABLE_NAME,
-            arrayOf(DB.User.COLUMN_PROFILE_PIC_URL),
-            "${DB.User.COLUMN_UID} = ?",
-            arrayOf(uid),
-            null, null, null
-        )
-
         var url: String? = null
-        if (cursor.moveToFirst()) {
-            url = cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_PROFILE_PIC_URL))
-        }
-        cursor.close()
+        try {
+            val db = dbHelper.readableDatabase
+            val cursor = db.query(
+                DB.User.TABLE_NAME,
+                arrayOf(DB.User.COLUMN_PROFILE_PIC_URL, DB.User.COLUMN_PHOTO),
+                "${DB.User.COLUMN_UID} = ?",
+                arrayOf(uid),
+                null, null, null
+            )
 
-        // 3. Save to cache and return
+            if (cursor.moveToFirst()) {
+                url = cursor.getString(0) // Try URL
+                if (url.isNullOrBlank()) {
+                    url = cursor.getString(1) // Try Photo (Base64)
+                }
+            }
+            cursor.close()
+        } catch (e: Exception) {
+            Log.e("AvatarUtils", "DB Read Error", e)
+        }
         cache[uid] = url
         return url
     }
+
+    fun saveUrlToDb(context: Context, uid: String, url: String) {
+        cache[uid] = url
+        Thread {
+            try {
+                val dbHelper = AppDbHelper(context)
+                val db = dbHelper.writableDatabase
+                val cv = ContentValues()
+
+                if (url.startsWith("http")) {
+                    cv.put(DB.User.COLUMN_PROFILE_PIC_URL, url)
+                } else {
+                    cv.put(DB.User.COLUMN_PHOTO, url)
+                }
+
+                val rows = db.update(DB.User.TABLE_NAME, cv, "${DB.User.COLUMN_UID} = ?", arrayOf(uid))
+                if (rows == 0) {
+                    cv.put(DB.User.COLUMN_UID, uid)
+                    cv.put(DB.User.COLUMN_USERNAME, "User")
+                    db.insert(DB.User.TABLE_NAME, null, cv)
+                }
+            } catch (e: Exception) {
+                Log.e("AvatarUtils", "DB Write Error", e)
+            }
+        }.start()
+    }
 }
 
-// --- MOVED THIS FUNCTION ---
-// This function is now at the top level (OUTSIDE the AvatarUtils object)
+// --- FIXED LOADING LOGIC BASED ON OLD CODE ---
 fun ImageView.loadAvatarFromString(maybeBase64OrUrl: String?, placeholderRes: Int) {
     if (maybeBase64OrUrl.isNullOrBlank()) {
         setImageResource(placeholderRes)
         return
     }
-    val s = maybeBase64OrUrl.trim()
-    val isProbablyBase64 = s.startsWith("data:image") || s.length > 300 || !s.startsWith("http")
 
-    if (isProbablyBase64) {
-        val clean = s.substringAfter(",", s)
-        val bytes = try { Base64.decode(clean, Base64.DEFAULT) } catch (_: Exception) { null }
-        if (bytes != null) {
+    val s = maybeBase64OrUrl.trim()
+
+    // Logic from your old code: Check if it's NOT a http URL
+    if (!s.startsWith("http", ignoreCase = true)) {
+        try {
+            // 1. CLEAN IT (The "Comma" fix from your old home_page.kt)
+            val clean = s.substringAfter("base64,", s)
+
+            // 2. DECODE TO BYTES (The Byte Array fix)
+            val bytes = Base64.decode(clean, Base64.DEFAULT)
+
+            // 3. LOAD BYTES WITH GLIDE
             Glide.with(this.context)
                 .asBitmap()
                 .load(bytes)
@@ -62,10 +97,12 @@ fun ImageView.loadAvatarFromString(maybeBase64OrUrl: String?, placeholderRes: In
                 .placeholder(placeholderRes)
                 .error(placeholderRes)
                 .into(this)
-        } else {
+        } catch (e: Exception) {
+            Log.e("AvatarUtils", "Base64 decode failed", e)
             setImageResource(placeholderRes)
         }
     } else {
+        // It is a standard URL
         Glide.with(this.context)
             .load(s)
             .circleCrop()
@@ -75,16 +112,35 @@ fun ImageView.loadAvatarFromString(maybeBase64OrUrl: String?, placeholderRes: In
     }
 }
 
-// This function can now see "loadAvatarFromString" because they are both at the top level
 fun ImageView.loadUserAvatar(uid: String, fallbackUid: String, placeholderRes: Int) {
-    // Try to load primary user's URL from our local DB
-    val primaryUrl = AvatarUtils.getProfileUrlFromDb(this.context, uid)
+    val context = this.context
 
-    if (!primaryUrl.isNullOrBlank()) {
-        this.loadAvatarFromString(primaryUrl, placeholderRes)
-    } else {
-        // If primary fails, try to load fallback user's URL from our local DB
-        val fallbackUrl = AvatarUtils.getProfileUrlFromDb(this.context, fallbackUid)
-        this.loadAvatarFromString(fallbackUrl, placeholderRes)
-    }
+    // 1. Load DB immediately (Fast)
+    val localUrl = AvatarUtils.getProfileUrlFromDb(context, uid)
+        ?: AvatarUtils.getProfileUrlFromDb(context, fallbackUid)
+
+    loadAvatarFromString(localUrl, placeholderRes)
+
+    // 2. Fetch Fresh from API
+    val url = "${AppGlobals.BASE_URL}user_basic_get.php?uid=$uid"
+    val stringRequest = StringRequest(Request.Method.GET, url,
+        { response ->
+            try {
+                val json = JSONObject(response)
+                if (json.getBoolean("success")) {
+                    val data = json.getJSONObject("data")
+                    val serverAvatar = data.optString("profileUrl", "")
+                        .takeIf { it.isNotEmpty() }
+                        ?: data.optString("avatar", "")
+
+                    if (serverAvatar.isNotEmpty() && serverAvatar != localUrl) {
+                        loadAvatarFromString(serverAvatar, placeholderRes)
+                        AvatarUtils.saveUrlToDb(context, uid, serverAvatar)
+                    }
+                }
+            } catch (_: Exception) { }
+        },
+        { }
+    )
+    Volley.newRequestQueue(context.applicationContext).add(stringRequest)
 }

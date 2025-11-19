@@ -20,6 +20,7 @@ import com.android.volley.Request
 import com.android.volley.RequestQueue
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
+import com.bumptech.glide.Glide
 import org.json.JSONObject
 
 // Data classes matching PHP response structure
@@ -130,14 +131,31 @@ class you_page : AppCompatActivity() {
         private const val TAG = "you_page"
     }
 
-    fun loadBottomBarAvatar(navProfile: ImageView) {
-        try {
-            Log.d(TAG, "Loading bottom bar avatar for user: $meUid")
-            navProfile.loadUserAvatar(meUid, meUid, R.drawable.oval)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error loading bottom bar avatar: ${e.message}", e)
-            navProfile.setImageResource(R.drawable.oval)
-        }
+    private fun loadProfilePicture(uid: String) {
+        val url = "${AppGlobals.BASE_URL}getUserProfile.php?uid=$uid"
+        val stringRequest = StringRequest(Request.Method.GET, url,
+            { response ->
+                try {
+                    val jsonObject = JSONObject(response)
+                    if (jsonObject.getBoolean("success")) {
+                        val data = jsonObject.getJSONObject("data")
+                        val profile = data.getJSONObject("profile")
+                        val avatarUrl = profile.getString("avatar")
+                        val navProfile = findViewById<ImageView>(R.id.nav_profile)
+                        Glide.with(this)
+                            .load(avatarUrl)
+                            .circleCrop()
+                            .placeholder(R.drawable.oval)
+                            .into(navProfile)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error parsing profile response: ${e.message}")
+                }
+            },
+            { error ->
+                Log.e(TAG, "Error fetching profile: ${error.message}")
+            })
+        queue.add(stringRequest)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -166,11 +184,8 @@ class you_page : AppCompatActivity() {
 
             // Load bottom bar avatar safely
             try {
-                val navProfile = findViewById<ImageView>(R.id.nav_profile)
-                if (navProfile != null) {
-                    loadBottomBarAvatar(navProfile)
-                } else {
-                    Log.w(TAG, "nav_profile not found in layout")
+                if (meUid.isNotEmpty()) {
+                    loadProfilePicture(meUid)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading nav profile: ${e.message}", e)

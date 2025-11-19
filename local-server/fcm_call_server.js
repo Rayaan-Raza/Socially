@@ -371,11 +371,7 @@ app.get('/', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-    console.log('\n🚀 ════════════════════════════════════════════════════');
-    console.log(`   FCM Call Server running on port ${PORT}`);
-    console.log('   ════════════════════════════════════════════════════');
-    console.log(`   Health check: http://localhost:${PORT}/health`);
-    console.log(`   API docs:     http://localhost:${PORT}/`);
-    console.log('   ════════════════════════════════════════════════════\n');
+// ✅ NEW: Listen on 0.0.0.0 so the Emulator can see it
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n🚀 Server running on port ${PORT} (Accessible to Emulator)`);
 });

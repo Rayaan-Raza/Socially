@@ -23,8 +23,7 @@ import com.android.volley.Request
 import com.android.volley.RequestQueue
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.bumptech.glide.Glide // Ensure Glide is imported
 import org.json.JSONObject
 
 class my_profile : AppCompatActivity() {
@@ -51,14 +50,13 @@ class my_profile : AppCompatActivity() {
     private lateinit var postsAdapter: ProfilePostGridAdapter
     private val postList = mutableListOf<Post>()
 
+    // --- UPDATED: API-First Avatar Loading Logic ---
     fun loadBottomBarAvatar(navProfile: ImageView) {
-        Log.d(TAG, "loadBottomBarAvatar: Loading for uid=$currentUserId")
-        try {
-            navProfile.loadUserAvatar(currentUserId, currentUserId, R.drawable.oval)
-        } catch (e: Exception) {
-            Log.e(TAG, "loadBottomBarAvatar: Error", e)
-            navProfile.setImageResource(R.drawable.oval)
-        }
+        Log.d("home_page", "loadBottomBarAvatar: Loading for uid=$currentUserId")
+
+        // 1. Use the robust loader we defined in AvatarUtils
+        // This handles DB fallback AND the Base64 decoding correctly
+        navProfile.loadUserAvatar(currentUserId, currentUserId, R.drawable.oval)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -84,6 +82,7 @@ class my_profile : AppCompatActivity() {
             }
 
             val navProfile = findViewById<ImageView>(R.id.nav_profile)
+            // This now calls the updated API-first logic
             loadBottomBarAvatar(navProfile)
 
             ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
@@ -250,24 +249,13 @@ class my_profile : AppCompatActivity() {
                     val fullName = cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_FULL_NAME))
                     val bio = cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_BIO))
 
-                    // Get both profilePictureUrl and photo (Base64)
                     val profilePicUrl = try {
                         cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_PROFILE_PIC_URL))
-                    } catch (e: Exception) {
-                        Log.w(TAG, "loadProfileFromDb: No profilePictureUrl column", e)
-                        null
-                    }
+                    } catch (e: Exception) { null }
 
                     val photoBase64 = try {
                         cursor.getString(cursor.getColumnIndexOrThrow(DB.User.COLUMN_PHOTO))
-                    } catch (e: Exception) {
-                        Log.w(TAG, "loadProfileFromDb: No photo column", e)
-                        null
-                    }
-
-                    Log.d(TAG, "loadProfileFromDb: username=$username, fullName=$fullName")
-                    Log.d(TAG, "loadProfileFromDb: profilePicUrl=${profilePicUrl?.take(50)}")
-                    Log.d(TAG, "loadProfileFromDb: photoBase64=${photoBase64?.take(50)}")
+                    } catch (e: Exception) { null }
 
                     usernameText.text = username ?: "user"
                     displayNameText.text = fullName ?: username ?: "User"
@@ -276,7 +264,6 @@ class my_profile : AppCompatActivity() {
                     bioLine1.text = bioLines.getOrNull(0) ?: ""
                     bioLine2.text = bioLines.getOrNull(1) ?: ""
 
-                    // Load profile image - try both URL and Base64
                     loadProfileImage(profilePicUrl, photoBase64)
 
                     Log.d(TAG, "loadProfileFromDb: Profile loaded successfully")
@@ -285,7 +272,7 @@ class my_profile : AppCompatActivity() {
                 }
             } else {
                 Log.w(TAG, "loadProfileFromDb: No user found in DB for uid=$currentUserId")
-                // Set defaults
+                // Defaults
                 usernameText.text = "user"
                 displayNameText.text = "User"
                 bioLine1.text = ""
@@ -299,23 +286,11 @@ class my_profile : AppCompatActivity() {
     }
 
     private fun loadProfileImage(profilePicUrl: String?, photoBase64: String?) {
-        Log.d(TAG, "loadProfileImage: profilePicUrl=${profilePicUrl != null}, photoBase64=${photoBase64 != null}")
-
         try {
-            // Combine both into one string for loadAvatarFromString to handle
             val imageData = when {
-                !profilePicUrl.isNullOrBlank() -> {
-                    Log.d(TAG, "loadProfileImage: Using profilePicUrl")
-                    profilePicUrl
-                }
-                !photoBase64.isNullOrBlank() -> {
-                    Log.d(TAG, "loadProfileImage: Using photoBase64")
-                    photoBase64
-                }
-                else -> {
-                    Log.w(TAG, "loadProfileImage: No image data available")
-                    null
-                }
+                !profilePicUrl.isNullOrBlank() -> profilePicUrl
+                !photoBase64.isNullOrBlank() -> photoBase64
+                else -> null
             }
 
             if (imageData != null) {
@@ -363,31 +338,23 @@ class my_profile : AppCompatActivity() {
 
             postsAdapter.notifyDataSetChanged()
             postsCountText.text = postList.size.toString()
-
-            Log.d(TAG, "loadPostsFromDb: Loaded ${postList.size} posts")
         } catch (e: Exception) {
             Log.e(TAG, "loadPostsFromDb: Exception", e)
         }
     }
 
     private fun fetchProfileFromApi() {
-        if (!isNetworkAvailable(this)) {
-            Log.d(TAG, "fetchProfileFromApi: Offline, skipping profile fetch")
-            return
-        }
+        if (!isNetworkAvailable(this)) return
 
         Log.d(TAG, "fetchProfileFromApi: Fetching profile from API for uid=$currentUserId")
         val url = "${AppGlobals.BASE_URL}getUserProfile.php?uid=$currentUserId"
-        Log.d(TAG, "fetchProfileFromApi: URL=$url")
 
         val stringRequest = StringRequest(Request.Method.GET, url,
             { response ->
-                Log.d(TAG, "fetchProfileFromApi: Response received")
                 try {
                     val json = JSONObject(response)
                     if (json.getBoolean("success")) {
                         val userObj = json.getJSONObject("data")
-                        Log.d(TAG, "fetchProfileFromApi: Parsing user data")
 
                         followersCountText.text = userObj.getInt("followersCount").toString()
                         followingCountText.text = userObj.getInt("followingCount").toString()
@@ -400,12 +367,8 @@ class my_profile : AppCompatActivity() {
                         cv.put(DB.User.COLUMN_EMAIL, userObj.getString("email"))
                         cv.put(DB.User.COLUMN_BIO, userObj.optString("bio", ""))
 
-                        // Save both profilePictureUrl and photo
                         val profilePicUrl = userObj.optString("profilePictureUrl", "")
                         val photoBase64 = userObj.optString("photo", "")
-
-                        Log.d(TAG, "fetchProfileFromApi: profilePictureUrl=${profilePicUrl.take(50)}")
-                        Log.d(TAG, "fetchProfileFromApi: photo=${photoBase64.take(50)}")
 
                         cv.put(DB.User.COLUMN_PROFILE_PIC_URL, profilePicUrl)
                         cv.put(DB.User.COLUMN_PHOTO, photoBase64)
@@ -413,42 +376,28 @@ class my_profile : AppCompatActivity() {
                         dbHelper.writableDatabase.insertWithOnConflict(
                             DB.User.TABLE_NAME, null, cv, SQLiteDatabase.CONFLICT_REPLACE
                         )
-
                         loadProfileFromDb()
-                        Log.d(TAG, "fetchProfileFromApi: Profile saved and reloaded")
-                    } else {
-                        Log.w(TAG, "fetchProfileFromApi: API returned success=false")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "fetchProfileFromApi: Error parsing profile", e)
                 }
             },
-            { error ->
-                Log.w(TAG, "fetchProfileFromApi: Volley error", error)
-            }
+            { error -> Log.w(TAG, "fetchProfileFromApi: Volley error", error) }
         )
         queue.add(stringRequest)
     }
 
     private fun fetchPostsFromApi() {
-        if (!isNetworkAvailable(this)) {
-            Log.d(TAG, "fetchPostsFromApi: Offline, skipping posts fetch")
-            return
-        }
+        if (!isNetworkAvailable(this)) return
 
-        Log.d(TAG, "fetchPostsFromApi: Fetching posts from API for uid=$currentUserId")
         val url = "${AppGlobals.BASE_URL}profile_posts_get.php?targetUid=$currentUserId"
-        Log.d(TAG, "fetchPostsFromApi: URL=$url")
 
         val stringRequest = StringRequest(Request.Method.GET, url,
             { response ->
-                Log.d(TAG, "fetchPostsFromApi: Response received")
                 try {
                     val json = JSONObject(response)
                     if (json.getBoolean("success")) {
                         val dataArray = json.getJSONArray("data")
-                        Log.d(TAG, "fetchPostsFromApi: Processing ${dataArray.length()} posts")
-
                         val db = dbHelper.writableDatabase
                         db.beginTransaction()
                         try {
@@ -473,36 +422,20 @@ class my_profile : AppCompatActivity() {
                             db.endTransaction()
                         }
                         loadPostsFromDb()
-                        Log.d(TAG, "fetchPostsFromApi: Posts saved and reloaded")
-                    } else {
-                        Log.w(TAG, "fetchPostsFromApi: API returned success=false")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "fetchPostsFromApi: Error parsing posts", e)
                 }
             },
-            { error ->
-                Log.w(TAG, "fetchPostsFromApi: Volley error", error)
-            }
+            { error -> Log.w(TAG, "fetchPostsFromApi: Volley error", error) }
         )
         queue.add(stringRequest)
     }
 
     override fun onResume() {
         super.onResume()
-        Log.d(TAG, "onResume: Reloading data")
         loadProfileFromDb()
         loadPostsFromDb()
-    }
-
-    override fun onStop() {
-        super.onStop()
-        Log.d(TAG, "onStop")
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        Log.d(TAG, "onDestroy")
     }
 
     private fun isNetworkAvailable(context: Context): Boolean {

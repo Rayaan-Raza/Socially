@@ -1,22 +1,16 @@
 package com.group.i230535_i230048
 
+import android.util.Base64
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
 
 /**
  * Adapter for displaying posts in a grid layout on profile screens.
- * Efficiently handles both URL and Base64 images with proper recycling.
- *
- * Note: This adapter doesn't make API calls - it displays Post objects
- * that should be loaded from the database or API by the parent Activity/Fragment.
+ * Uses Glide to efficiently load URLs or Base64 bytes directly.
  */
 class ProfilePostGridAdapter(
     private val posts: List<Post>,
@@ -38,11 +32,16 @@ class ProfilePostGridAdapter(
         val ctx = holder.itemView.context
         val iv = holder.postImage
 
+        // 1. Check for URL
         val url = post.imageUrl.takeIf { it.isNotEmpty() && it.startsWith("http", true) }
-        val b64 = post.imageBase64
 
-        if (!url.isNullOrEmpty()) {
-            // URL image - straightforward Glide loading
+        // 2. Check for Base64 (optimistic or persistent)
+        val b64 = if (post.imageBase64.isNotEmpty()) post.imageBase64
+        else if (post.imageUrl.isNotEmpty() && !post.imageUrl.startsWith("http")) post.imageUrl
+        else null
+
+        if (url != null) {
+            // URL Load
             Glide.with(ctx)
                 .load(url)
                 .thumbnail(0.25f)
@@ -50,33 +49,24 @@ class ProfilePostGridAdapter(
                 .error(R.drawable.placeholder_image)
                 .centerCrop()
                 .into(iv)
-        } else if (b64.isNotEmpty()) {
-            // Base64 image - decode off main thread, then let Glide handle rendering
-            (ctx as? androidx.appcompat.app.AppCompatActivity)?.lifecycleScope?.launch {
-                val bytes = withContext(Dispatchers.IO) {
-                    try {
-                        // Handle optional data URI prefix (e.g., "data:image/jpeg;base64,...")
-                        val clean = b64.substringAfter("base64,", b64)
-                        android.util.Base64.decode(clean, android.util.Base64.DEFAULT)
-                    } catch (_: Exception) { null }
-                }
-                if (bytes != null) {
-                    Glide.with(ctx)
-                        .load(bytes)
-                        .thumbnail(0.25f)
-                        .placeholder(R.drawable.placeholder_image)
-                        .error(R.drawable.placeholder_image)
-                        .centerCrop()
-                        .into(iv)
-                } else {
-                    iv.setImageResource(R.drawable.placeholder_image)
-                }
-            } ?: run {
-                // Fallback if context is not an AppCompatActivity
+        } else if (b64 != null) {
+            // Base64 Load (Using Glide to handle bytes is much smoother than manual decoding)
+            try {
+                val clean = b64.substringAfter("base64,", b64)
+                val bytes = Base64.decode(clean, Base64.DEFAULT)
+
+                Glide.with(ctx)
+                    .load(bytes)
+                    .thumbnail(0.25f)
+                    .placeholder(R.drawable.placeholder_image)
+                    .error(R.drawable.placeholder_image)
+                    .centerCrop()
+                    .into(iv)
+            } catch (e: Exception) {
                 iv.setImageResource(R.drawable.placeholder_image)
             }
         } else {
-            // No image available
+            // No image
             iv.setImageResource(R.drawable.placeholder_image)
         }
 
@@ -85,9 +75,8 @@ class ProfilePostGridAdapter(
 
     override fun onViewRecycled(holder: PostViewHolder) {
         super.onViewRecycled(holder)
-        // Prevent wrong images flashing when views are reused
+        // Clear Glide target to prevent memory leaks and wrong images
         Glide.with(holder.itemView.context).clear(holder.postImage)
-        holder.postImage.setImageDrawable(null)
     }
 
     override fun getItemCount() = posts.size

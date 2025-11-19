@@ -1,8 +1,6 @@
 package com.group.i230535_i230048
 
 import android.annotation.SuppressLint
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.util.Base64
 import android.view.LayoutInflater
 import android.view.View
@@ -11,15 +9,9 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
 
-// NOTE: These data classes are required for the adapter to work.
-// Place them in this file or in a separate "Models" file.
-
-
+// Models (Data classes for Comment and Post)
+// Ensure you have a Post data class defined elsewhere or in this file if not already present.
 data class Comment(
     val commentId: String = "",
     val postId: String = "",
@@ -29,10 +21,6 @@ data class Comment(
     val createdAt: Long = 0L
 )
 
-/**
- * This adapter is designed for the main feed, showing full post details.
- * It connects to a layout like `item_post.xml`.
- */
 class PostFeedAdapter(
     private val onLikeToggle: (post: Post, liked: Boolean) -> Unit,
     private val onCommentClick: (post: Post) -> Unit
@@ -40,10 +28,10 @@ class PostFeedAdapter(
 
     private val items = mutableListOf<Post>()
     private val usernameCache = mutableMapOf<String, String>()
-    private val likeState = mutableMapOf<String, Boolean>()      // postId -> I liked
-    private val likeCounts = mutableMapOf<String, Int>()         // postId -> total likes
-    private val commentPreviews = mutableMapOf<String, List<Comment>>() // postId -> 2 latest comments
-    private val commentTotals = mutableMapOf<String, Int>()      // postId -> total comments
+    private val likeState = mutableMapOf<String, Boolean>()
+    private val likeCounts = mutableMapOf<String, Int>()
+    private val commentPreviews = mutableMapOf<String, List<Comment>>()
+    private val commentTotals = mutableMapOf<String, Int>()
 
     fun submitList(list: List<Post>) {
         items.clear()
@@ -99,21 +87,45 @@ class PostFeedAdapter(
         h.tvCaption.text = "$shownName  ${item.caption}"
 
         // --- Avatar ---
-        // Using the loadUserAvatar extension function
+        // Uses the robust extension function defined in AvatarUtils.kt
         h.avatar.loadUserAvatar(item.uid, item.uid, R.drawable.oval)
 
-        // --- Post Image (URL preferred, Base64 as fallback) ---
-        if (item.imageUrl.isNotEmpty()) {
+        // --- Post Image Logic ---
+        // 1. Check for valid URL first (must start with http/https)
+        if (item.imageUrl.isNotEmpty() && item.imageUrl.startsWith("http", true)) {
             Glide.with(h.postImage.context)
                 .load(item.imageUrl)
                 .placeholder(R.drawable.person1)
                 .error(R.drawable.person1)
                 .into(h.postImage)
-        } else if (item.imageBase64.isNotEmpty()) {
-            val bmp = decodeBase64(item.imageBase64)
-            if (bmp != null) h.postImage.setImageBitmap(bmp) else h.postImage.setImageResource(R.drawable.person1)
-        } else {
-            h.postImage.setImageResource(R.drawable.person1)
+        }
+        // 2. If not a URL, check for Base64 (in either field)
+        else {
+            // Handle Optimistic UI: Base64 might be in imageBase64 OR mistakenly in imageUrl
+            val rawString = if (item.imageBase64.isNotEmpty()) item.imageBase64
+            else if (item.imageUrl.isNotEmpty()) item.imageUrl
+            else null
+
+            if (rawString != null) {
+                try {
+                    // Clean prefix if present
+                    val cleanBase64 = rawString.substringAfter("base64,", rawString)
+                    // Decode to bytes
+                    val imageBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
+
+                    // Load bytes directly into Glide
+                    Glide.with(h.postImage.context)
+                        .asBitmap()
+                        .load(imageBytes)
+                        .placeholder(R.drawable.person1)
+                        .error(R.drawable.person1)
+                        .into(h.postImage)
+                } catch (e: Exception) {
+                    h.postImage.setImageResource(R.drawable.person1)
+                }
+            } else {
+                h.postImage.setImageResource(R.drawable.person1)
+            }
         }
 
         // --- Likes ---
@@ -135,21 +147,10 @@ class PostFeedAdapter(
         h.tvViewAll.visibility = if (total > 2) View.VISIBLE else View.GONE
 
         // --- Click Listeners ---
-        h.likeBtn.setOnClickListener {
-            onLikeToggle(item, !liked)
-        }
+        h.likeBtn.setOnClickListener { onLikeToggle(item, !liked) }
         h.commentBtn.setOnClickListener { onCommentClick(item) }
         h.tvViewAll.setOnClickListener { onCommentClick(item) }
     }
 
     override fun getItemCount() = items.size
-
-    private fun decodeBase64(base64String: String): Bitmap? {
-        return try {
-            val decodedBytes = Base64.decode(base64String, Base64.DEFAULT)
-            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
-        } catch (e: IllegalArgumentException) {
-            null
-        }
-    }
 }
