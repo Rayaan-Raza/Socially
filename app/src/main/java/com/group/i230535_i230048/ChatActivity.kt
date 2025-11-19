@@ -632,6 +632,14 @@ class ChatActivity : AppCompatActivity() {
             Log.d("ChatActivity", "📴 No network, saving to sync queue")
             saveToSyncQueue("messages_send.php", payload)
         }
+        NotificationHelper.sendNewMessageNotification(
+            context = this,
+            receiverUid = otherUserId,
+            senderName = myUsername, // Make sure this is set from Prefs
+            content = if (messageType == "text") content else "Sent an attachment",
+            chatId = chatId,
+            messageType = messageType
+        )
     }
 
     private fun saveMessageToDb(msg: Message) {
@@ -841,6 +849,14 @@ class ChatActivity : AppCompatActivity() {
         } else {
             saveToSyncQueue(endpoint, payload)
         }
+        NotificationHelper.sendScreenshotNotification(
+            context = this,
+            receiverUid = otherUserId,
+            takerName = myUsername,
+            chatId = chatId
+        )
+
+        Toast.makeText(this, "Screenshot detected!", Toast.LENGTH_SHORT).show()
     }
 
     private fun showUserInfo() {

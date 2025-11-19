@@ -84,66 +84,57 @@ object CallManager {
         otherUserName: String,
         isVideoCall: Boolean
     ) {
-        Log.d(TAG, "📞 Step 1: Getting $otherUserName's FCM token from PHP...")
-
-        val queue = Volley.newRequestQueue(context)
+        // 1. Construct the URL
         val fcmUrl = AppGlobals.BASE_URL + "user_fcm_get.php?uid=$otherUserId"
 
+        // 🔍 DEBUG LOG: Verify this is your ACTUAL live URL
+        Log.e(TAG, "🔍 DEBUG: Attempting to connect to: $fcmUrl")
+
+        val queue = Volley.newRequestQueue(context)
         val fcmRequest = StringRequest(Request.Method.GET, fcmUrl,
             { response ->
-                Log.d(TAG, "PHP Response: $response")
-                try {
-                    // Clean response just in case of PHP warnings
-                    var cleanedResponse = response.trim()
-                    if (!cleanedResponse.startsWith("{")) {
-                        cleanedResponse = cleanedResponse.substring(cleanedResponse.indexOf("{"))
-                    }
+                Log.d(TAG, "✅ PHP Connection Successful!")
+                // ... (Your existing parsing logic here) ...
 
-                    val json = JSONObject(cleanedResponse)
+                try {
+                    val cleanedResponse = response.trim().substringAfter("{").substringBeforeLast("}")
+                    val json = JSONObject("{$cleanedResponse}")
 
                     if (json.getBoolean("success")) {
                         val dataObj = json.getJSONObject("data")
                         val receiverFcmToken = dataObj.getString("fcmToken")
 
-                        Log.d(TAG, "✅ Got Token. Step 2: Opening Call Page & Contacting Node.js")
-
-                        // Generate Channel Name locally so we can open UI immediately
+                        // Generate Channel Name
                         val channelName = if (currentUserId < otherUserId) "${currentUserId}_${otherUserId}" else "${otherUserId}_${currentUserId}"
-
-                        // Temporary Call ID (will be updated if Node returns a different one, but usually irrelevant for outgoing)
                         val tempCallId = "call_${System.currentTimeMillis()}"
 
-                        // 🚀 OPTIMISTIC UI: Open the page IMMEDIATELY so the user sees "Calling..."
+                        // ✅ OPEN UI NOW
                         openCallPage(context, tempCallId, channelName, otherUserName, otherUserId, isVideoCall, true)
 
-                        // Step 3: Send Notification in Background
-                        sendCallNotificationViaNodeJS(
-                            context,
-                            currentUserId,
-                            currentUserName,
-                            otherUserId,
-                            otherUserName,
-                            receiverFcmToken,
-                            isVideoCall,
-                            channelName
-                        )
+                        // Send to Node
+                        sendCallNotificationViaNodeJS(context, currentUserId, currentUserName, otherUserId, otherUserName, receiverFcmToken, isVideoCall, channelName)
                     } else {
-                        val errorMsg = json.optString("message", "User not available")
-                        Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "User not available (No Token)", Toast.LENGTH_LONG).show()
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "JSON Parse Error: ${e.message}")
-                    Toast.makeText(context, "Error parsing user data", Toast.LENGTH_SHORT).show()
+                    Log.e(TAG, "❌ JSON Parse Error: ${e.message}")
                 }
             },
             { error ->
-                Log.e(TAG, "PHP Network Error: ${error.message}")
-                Toast.makeText(context, "Could not reach PHP server", Toast.LENGTH_SHORT).show()
+                // 🔍 DIAGNOSTIC LOGGING
+                Log.e(TAG, "❌ PHP FAILURE REASON: ${error.message}")
+                if (error.networkResponse != null) {
+                    Log.e(TAG, "❌ Status Code: ${error.networkResponse.statusCode}")
+                } else {
+                    Log.e(TAG, "❌ No Network Response. Likely DNS, SSL, or Offline.")
+                    error.printStackTrace() // This prints the full technical error to Logcat
+                }
+
+                Toast.makeText(context, "Connection Failed. Check Logcat.", Toast.LENGTH_LONG).show()
             }
         )
         queue.add(fcmRequest)
     }
-
     private fun sendCallNotificationViaNodeJS(
         context: Context,
         callerUid: String,
